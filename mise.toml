@@ -1,0 +1,57 @@
+[tasks."index-fixtures"]
+description = "Build test fixture index from tests/fixtures/docs"
+run = "node packages/cli/dist/index.js build --docs-dir tests/fixtures/docs --out tests/fixtures/index --embedding-provider hash"
+depends = ["build"]
+
+[tasks."serve:http"]
+description = "Start MCP docs server over Streamable HTTP (set PORT to override)"
+run = "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback"
+sources = ["packages/server/src/**"]
+depends = ["index-fixtures"]
+
+[tasks."inspect:http"]
+description = "Run MCP Inspector against local MCP HTTP server (set MCP_SERVER_URL or PORT to override)"
+run = "MCP_SERVER_URL=${MCP_SERVER_URL:-http://localhost:${PORT:-20310}/mcp} npx @modelcontextprotocol/inspector"
+
+[tasks.build]
+description = "Build all packages"
+run = "pnpm build"
+
+[tasks.test]
+description = "Run all tests"
+run = "pnpm test"
+depends = ["index-fixtures"]
+
+[tasks."test:server"]
+description = "Run server package tests (including HTTP transport)"
+run = "pnpm --filter @speakeasy-api/docs-mcp-server test"
+depends = ["index-fixtures"]
+
+[tasks.playground]
+description = "Start playground (MCP server + API server + Vite dev server)"
+run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback" "node packages/playground/src/server.ts" "cd packages/playground && npx vite"'
+depends = ["index-fixtures"]
+
+[tasks."playground:server"]
+description = "Start only the playground API server"
+run = "node packages/playground/src/server.ts"
+depends = ["build"]
+
+[tasks."playground:client"]
+description = "Start only the playground Vite dev server"
+run = "cd packages/playground && npx vite"
+
+[tasks.nuke]
+description = "Kill all processes attached to dev ports (20310, 3001, 3000)"
+run = '''
+set +e
+for port in 20310 3001 3000; do
+  pids=$(lsof -ti :$port)
+  if [ -n "$pids" ]; then
+    echo "Killing processes on port $port: $pids"
+    echo "$pids" | xargs kill -9
+  else
+    echo "No processes on port $port"
+  fi
+done
+'''

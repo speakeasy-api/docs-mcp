@@ -1,0 +1,48 @@
+{
+  "name": "@speakeasy-api/docs-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server runtime exposing hybrid search over documentation via HTTP and stdio transports",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "author": "Speakeasy <info@speakeasy.com> (https://speakeasy.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/speakeasy-api/docs-mcp.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/speakeasy-api/docs-mcp",
+  "bugs": {
+    "url": "https://github.com/speakeasy-api/docs-mcp/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "docs-mcp-server": "dist/bin.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/check-workspace-protocol.mjs",
+    "prepublishOnly": "pnpm run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@speakeasy-api/docs-mcp-core": "workspace:*",
+    "commander": "^13.1.0",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "strategy": {
+    "chunk_by": "h2",
+    "max_chunk_size": 8000,
+    "min_chunk_size": 200
+  },
+  "metadata": {
+    "scope": "sdk-specific",
+    "language": "typescript"
+  }
+}

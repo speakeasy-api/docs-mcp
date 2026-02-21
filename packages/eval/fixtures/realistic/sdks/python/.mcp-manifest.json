@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "strategy": {
+    "chunk_by": "h2"
+  },
+  "metadata": {
+    "scope": "sdk-specific",
+    "language": "python"
+  }
+}

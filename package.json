@@ -1,0 +1,37 @@
+{
+  "name": "docs-mcp",
+  "private": true,
+  "description": "Lightweight, domain-agnostic embedded search engine exposed via MCP, optimized for serving SDK documentation to AI coding agents",
+  "type": "module",
+  "packageManager": "pnpm@10.5.2",
+  "license": "AGPL-3.0-only",
+  "author": "Speakeasy <info@speakeasy.com> (https://speakeasy.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/speakeasy-api/docs-mcp.git"
+  },
+  "homepage": "https://github.com/speakeasy-api/docs-mcp",
+  "bugs": {
+    "url": "https://github.com/speakeasy-api/docs-mcp/issues"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "release": "pnpm build && pnpm -r publish --access public --no-git-checks"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.13.10",
+    "@types/picomatch": "^4.0.2",
+    "@types/semver": "^7.7.1",
+    "eslint": "^9.22.0",
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

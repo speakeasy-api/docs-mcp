@@ -1,0 +1,107 @@
+[
+  {
+    "name": "Exact Class Match - TypeScript (FTS Dominance)",
+    "query": "AcmeAuthClientV2 initialization",
+    "filters": { "language": "typescript" },
+    "expected_chunk_id": "sdks/typescript/auth.md#acmeauthclientv2",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Exact Class Match - Python (FTS Dominance)",
+    "query": "AcmeAuthClientV2 initialization",
+    "filters": { "language": "python" },
+    "expected_chunk_id": "sdks/python/auth.md#acmeauthclientv2",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Exact Class Match - Go (FTS Dominance)",
+    "query": "AcmeAuthClientV2 initialization",
+    "filters": { "language": "go" },
+    "expected_chunk_id": "sdks/go/auth.md#acmeauthclientv2",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Conceptual Search - Rate Limiting",
+    "query": "how do I handle rate limits and 429s",
+    "filters": {},
+    "expected_chunk_id": "guides/rate-limiting.md#handling-429-errors",
+    "max_rounds_allowed": 2
+  },
+  {
+    "name": "Conceptual Search - Retries",
+    "query": "exponential backoff retry configuration",
+    "filters": {},
+    "expected_chunk_id": "guides/retries.md#backoff-strategy",
+    "max_rounds_allowed": 2
+  },
+  {
+    "name": "Method Lookup - getToken TypeScript",
+    "query": "getToken method",
+    "filters": { "language": "typescript" },
+    "expected_chunk_id": "sdks/typescript/auth.md#gettoken",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Method Lookup - get_token Python",
+    "query": "get_token method",
+    "filters": { "language": "python" },
+    "expected_chunk_id": "sdks/python/auth.md#get_token",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Pagination Cursor Guide",
+    "query": "pagination cursor",
+    "filters": {},
+    "expected_chunk_id": "guides/pagination.md#cursor-pagination",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Webhook Verification TypeScript",
+    "query": "verify webhook signature",
+    "filters": { "language": "typescript" },
+    "expected_chunk_id": "sdks/typescript/webhooks.md#verifywebhooksignature",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "OAuth Token Exchange",
+    "query": "OAuth authorization code token exchange",
+    "filters": {},
+    "expected_chunk_id": "guides/authentication.md#oauth-20",
+    "max_rounds_allowed": 2
+  },
+  {
+    "name": "Language-Scoped Auto-Include (Global Guide Included)",
+    "query": "retry configuration",
+    "filters": { "language": "typescript" },
+    "expected_chunk_id": "guides/retries.md#backoff-strategy",
+    "max_rounds_allowed": 2
+  },
+  {
+    "name": "Model Lookup - User",
+    "query": "User model properties",
+    "filters": {},
+    "expected_chunk_id": "models/user.md",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Error Handling TypeScript",
+    "query": "RateLimitError error handling",
+    "filters": { "language": "typescript" },
+    "expected_chunk_id": "sdks/typescript/auth.md#error-handling",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Explicit Scope Filter - SDK Only",
+    "query": "authentication",
+    "filters": { "language": "typescript", "scope": "sdk-specific" },
+    "expected_chunk_id": "sdks/typescript/auth.md#acmeauthclientv2",
+    "max_rounds_allowed": 1
+  },
+  {
+    "name": "Explicit Scope Filter - Global Only",
+    "query": "authentication",
+    "filters": { "scope": "global-guide" },
+    "expected_chunk_id": "guides/authentication.md#overview",
+    "max_rounds_allowed": 1
+  }
+]

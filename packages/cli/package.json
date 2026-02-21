@@ -1,0 +1,47 @@
+{
+  "name": "@speakeasy-api/docs-mcp-cli",
+  "version": "0.1.0",
+  "description": "CLI toolchain for validating, indexing, and bootstrapping docs-mcp documentation corpora",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "author": "Speakeasy <info@speakeasy.com> (https://speakeasy.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/speakeasy-api/docs-mcp.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/speakeasy-api/docs-mcp",
+  "bugs": {
+    "url": "https://github.com/speakeasy-api/docs-mcp/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "docs-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "prepack": "node ../../scripts/check-workspace-protocol.mjs",
+    "prepublishOnly": "pnpm run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@speakeasy-api/docs-mcp-core": "workspace:*",
+    "commander": "^13.1.0",
+    "fast-glob": "^3.3.3"
+  }
+}

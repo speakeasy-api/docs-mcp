@@ -1,0 +1,50 @@
+{
+  "name": "@speakeasy-api/docs-mcp-core",
+  "version": "0.1.0",
+  "description": "Core retrieval and indexing primitives for docs-mcp: markdown chunking, hybrid search, and LanceDB integration",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "author": "Speakeasy <info@speakeasy.com> (https://speakeasy.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/speakeasy-api/docs-mcp.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/speakeasy-api/docs-mcp",
+  "bugs": {
+    "url": "https://github.com/speakeasy-api/docs-mcp/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "prepublishOnly": "pnpm run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "@lancedb/lancedb": "^0.26.2",
+    "apache-arrow": "^18.1.0",
+    "gray-matter": "^4.0.3",
+    "mdast-util-to-string": "^4.0.0",
+    "picomatch": "^4.0.2",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "semver": "^7.7.1",
+    "unified": "^11.0.5"
+  }
+}

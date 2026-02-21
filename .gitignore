@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+.pnpm-store/
+.DS_Store
+.lancedb/
+mise.local.toml
+mprocs.log
+tests/fixtures/index/
+.agents/
+.claude/
+package-lock.json

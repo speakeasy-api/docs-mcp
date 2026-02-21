@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+LOCAL_CONFIG="mise.local.toml"
+
+# Parse args
+auto_yes=false
+for arg in "$@"; do
+    case $arg in
+        -y|--yes)
+            auto_yes=true
+            shift
+            ;;
+    esac
+done
+
+# Ensure mise is installed
+if ! command -v mise &> /dev/null; then
+    echo "mise is not installed. Install it from https://mise.jdx.dev/"
+    exit 1
+fi
+
+# Create mise.local.toml if it doesn't exist
+if [ ! -f "$LOCAL_CONFIG" ]; then
+    cat > "$LOCAL_CONFIG" << 'EOF'
+# Local mise configuration (gitignored)
+
+[env]
+# GRAM_API_KEY = "your-key-here"
+EOF
+    echo "Created $LOCAL_CONFIG"
+fi
+
+# Check for GRAM_API_KEY
+if grep -q '^GRAM_API_KEY\s*=' "$LOCAL_CONFIG" && ! grep -q '# GRAM_API_KEY' "$LOCAL_CONFIG"; then
+    echo "GRAM_API_KEY already configured in $LOCAL_CONFIG"
+elif [ -n "${GRAM_API_KEY:-}" ]; then
+    echo "Using GRAM_API_KEY from environment"
+    sed -i '' '/GRAM_API_KEY/d' "$LOCAL_CONFIG"
+    echo "GRAM_API_KEY = \"$GRAM_API_KEY\"" >> "$LOCAL_CONFIG"
+    echo "Wrote GRAM_API_KEY to $LOCAL_CONFIG"
+else
+    echo ""
+    echo "The playground requires a Gram API key."
+    echo "Set the GRAM_API_KEY environment variable or enter it now."
+    echo ""
+    read -rp "GRAM_API_KEY: " api_key
+    if [ -z "$api_key" ]; then
+        echo "No key provided. Set GRAM_API_KEY in $LOCAL_CONFIG manually."
+        exit 1
+    fi
+    sed -i '' '/GRAM_API_KEY/d' "$LOCAL_CONFIG"
+    echo "GRAM_API_KEY = \"$api_key\"" >> "$LOCAL_CONFIG"
+    echo "Wrote GRAM_API_KEY to $LOCAL_CONFIG"
+fi
+
+echo ""
+echo "Installing dependencies..."
+mise install
+pnpm install
+
+echo ""
+echo "Building..."
+pnpm build
+
+echo ""
+echo "Ready. Run 'mise run playground' to start."
+
+if $auto_yes; then
+    exec mise run playground
+fi

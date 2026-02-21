@@ -1,0 +1,16 @@
+{
+  "name": "@speakeasy-api/eslint-config",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.js",
+  "peerDependencies": {
+    "eslint": "^9.22.0"
+  },
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "globals": "^17.3.0"
+  }
+}

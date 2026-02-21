@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "strategy": {
+    "chunk_by": "h2"
+  },
+  "metadata": {
+    "scope": "global-guide"
+  }
+}
