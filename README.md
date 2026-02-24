@@ -56,10 +56,10 @@ npx @speakeasy-api/docs-mcp-cli build --docs-dir ./docs --out ./dist/.lancedb
 
 ### In Other Projects
 
-If you have a corpus of unchunked markdown files, you can use the CLI to
-automatically generate a manifest with intelligent chunking hints based on the
-document structure. This will create a `.mcp-manifest.json` in each folder,
-which the indexer will use to chunk the documents at build time.
+If you have an existing a corpus of unchunked markdown files, you can use the
+CLI to automatically generate a manifest with intelligent chunking hints based
+on the document structure. This will create a `.mcp-manifest.json` in each
+folder, which the indexer will use to chunk the documents at build time.
 
 ```bash
 npx @speakeasy-api/docs-mcp-cli fix --docs-dir ./docs
