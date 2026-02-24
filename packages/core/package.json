@@ -33,7 +33,11 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "eslint src test"
+    "lint": "eslint src test",
+    "generate:schema": "tsx scripts/generate-schema.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.26.2",
@@ -45,6 +49,7 @@
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
     "semver": "^7.7.1",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "zod": "^4.3.6"
   }
 }

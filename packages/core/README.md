@@ -10,7 +10,7 @@ Core retrieval and indexing primitives for [Speakeasy Docs MCP](https://github.c
 - Hybrid search combining full-text search with semantic vector search via Reciprocal Rank Fusion
 - LanceDB integration with memory-mapped IO for fast retrieval
 - Embedding generation and caching (OpenAI or deterministic hash)
-- Manifest resolution and metadata extraction from `.mcp-manifest.json` files
+- Manifest resolution and metadata extraction from `.docs-mcp.json` files
 
 ## Installation
 

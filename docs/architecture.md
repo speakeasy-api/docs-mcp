@@ -41,7 +41,7 @@ Speakeasy generates massive monolithic `README.md` files. Naive chunking destroy
 ### The Validation and Fix Pipeline
 To keep the CI build fast and deterministic, authoring logic is separated from indexing.
 1.  **`docs-mcp validate` (Fast CI Gatekeeper):** Parses the AST to verify structural integrity. It catches dangling chunking hints, orphaned HTML metadata comments, and enforces JSON schema taxonomy on frontmatter. To prevent brittleness from external SDK syncs, it emits non-fatal warnings for files missing explicit strategies, falling back to a global catch-all rule (e.g., `**/*.md -> h2`).
-2.  **`docs-mcp fix` (LLM-Assisted Authoring):** A local tool for authors. It can bootstrap a new directory by scanning content to generate a `.mcp-manifest.json`, or repair drift if a document outgrows its current chunking strategy. It proposes fixes and persists them locally.
+2.  **`docs-mcp fix` (LLM-Assisted Authoring):** A local tool for authors. It can bootstrap a new directory by scanning content to generate a `.docs-mcp.json`, or repair drift if a document outgrows its current chunking strategy. It proposes fixes and persists them locally.
 3.  **`docs-mcp build` (Deterministic Indexer):** Strictly fails if structural validation fails. Builds the `.lancedb` directory. Embedding generation is controlled by a pluggable embedding backend (see §3a below).
 
 ### 3a. Embedding Backend (`EmbeddingProvider` Interface)
@@ -60,7 +60,7 @@ The embedding model is fully configurable via a provider interface. The `docs-mc
 
 ### Intelligent Chunking & AST Parsing
 The indexer (`@speakeasy-api/docs-mcp-core`, driven by the CLI) uses a strict AST parser (`remark`):
-*   **Chunking Hints:** Distributed via `.mcp-manifest.json`, YAML frontmatter, or inline HTML comments.
+*   **Chunking Hints:** Distributed via `.docs-mcp.json`, YAML frontmatter, or inline HTML comments.
 *   **Atomic Grouping:** When splitting at an `h2`, it collects all sibling nodes (paragraphs, code blocks, tables) to guarantee methods stay intact.
 *   **Hierarchical Context Injection:** Ancestor headings are prepended to the text sent to the embedding model to preserve semantic meaning (e.g., "Document: Setup > Retries. Content: ..."). This prefix is applied only to the embedding input — the FTS-indexed text and the stored display text remain unprefixed. BM25 field weighting (heading boost) ensures correct ranking without polluting the FTS column.
 

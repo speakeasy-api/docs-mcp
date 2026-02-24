@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.2/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@speakeasy-api/docs-mcp-core",
+      "@speakeasy-api/docs-mcp-server",
+      "@speakeasy-api/docs-mcp-cli",
+      "@speakeasy-api/docs-mcp-eval",
+      "@speakeasy-api/docs-mcp-playground"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "@speakeasy-api/tsconfig"
+  ]
+}
