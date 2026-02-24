@@ -75,5 +75,5 @@ export const ManifestSchema = z
       ),
   })
   .describe(
-    "MCP manifest configuration file (.mcp-manifest.json) that controls how documentation is chunked, tagged, and indexed for search."
+    "Docs MCP configuration file (.docs-mcp.json) that controls how documentation is chunked, tagged, and indexed for search."
   );

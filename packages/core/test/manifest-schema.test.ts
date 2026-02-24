@@ -6,7 +6,7 @@ import { z } from "zod";
 import { ManifestSchema } from "../src/manifest-schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const schemaPath = resolve(__dirname, "../../../schemas/mcp-manifest.schema.json");
+const schemaPath = resolve(__dirname, "../../../schemas/docs-mcp.schema.json");
 
 describe("manifest JSON schema", () => {
   it("committed schema matches generated schema from Zod", () => {

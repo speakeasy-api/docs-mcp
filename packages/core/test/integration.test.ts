@@ -24,12 +24,12 @@ async function resolveFixtureFile(relPath: string) {
   const fullPath = path.join(FIXTURES_DIR, relPath);
   const markdown = await readFile(fullPath, "utf8");
 
-  // Walk up from the file to FIXTURES_DIR looking for .mcp-manifest.json
+  // Walk up from the file to FIXTURES_DIR looking for .docs-mcp.json
   let manifestDir = path.dirname(fullPath);
   let manifest: Manifest | undefined;
   let manifestBaseDir = "";
   while (true) {
-    const candidate = path.join(manifestDir, ".mcp-manifest.json");
+    const candidate = path.join(manifestDir, ".docs-mcp.json");
     try {
       const raw = JSON.parse(await readFile(candidate, "utf8"));
       manifest = parseManifest(raw);

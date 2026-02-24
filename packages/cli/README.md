@@ -22,7 +22,7 @@ docs-mcp build --docs-dir ./docs --out ./dist/.lancedb --embedding-provider hash
 
 ### `docs-mcp fix`
 
-Bootstrap a baseline `.mcp-manifest.json` for legacy docs without chunking strategies.
+Bootstrap a baseline `.docs-mcp.json` for legacy docs without chunking strategies.
 
 ```bash
 docs-mcp fix --docs-dir ./docs

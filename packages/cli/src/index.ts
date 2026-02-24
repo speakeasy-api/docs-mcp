@@ -276,11 +276,11 @@ program
 
 program
   .command("fix")
-  .description("Generate a baseline .mcp-manifest.json using deterministic heading heuristics")
+  .description("Generate a baseline .docs-mcp.json using deterministic heading heuristics")
   .requiredOption("--docs-dir <path>", "Path to markdown corpus")
   .action(async (options: { docsDir: string }) => {
     const docsDir = path.resolve(options.docsDir);
-    const manifestPath = path.join(docsDir, ".mcp-manifest.json");
+    const manifestPath = path.join(docsDir, ".docs-mcp.json");
 
     if (await exists(manifestPath)) {
       console.log(`manifest already exists: ${manifestPath}`);
@@ -318,7 +318,7 @@ async function loadNearestManifest(
   const stopDir = path.resolve(docsDir);
 
   while (true) {
-    const candidate = path.join(currentDir, ".mcp-manifest.json");
+    const candidate = path.join(currentDir, ".docs-mcp.json");
     if (await exists(candidate)) {
       const cached = cache.get(candidate);
       const manifest = cached ?? parseManifestJson(await readFile(candidate, "utf8"));

@@ -1,7 +1,7 @@
-# Contract: `.mcp-manifest.json`
+# Contract: `.docs-mcp.json`
 
 ## Purpose
-This document defines the schema, composition rules, and precedence hierarchy for the `.mcp-manifest.json` file. These manifests are distributed throughout the markdown corpus to dictate how files should be chunked and what metadata should be attached to them.
+This document defines the schema, composition rules, and precedence hierarchy for the `.docs-mcp.json` file. These manifests are distributed throughout the markdown corpus to dictate how files should be chunked and what metadata should be attached to them.
 
 ## Schema Definition
 
@@ -60,10 +60,10 @@ When the indexer evaluates a specific markdown file, it resolves the chunking st
 
 ### 2. Directory Composition (Nearest Ancestor Wins)
 Manifests **do not merge across directories**. 
-If `/docs/.mcp-manifest.json` and `/docs/sdks/typescript/.mcp-manifest.json` both exist, a file located at `/docs/sdks/typescript/auth.md` is governed **exclusively** by the TypeScript folder's manifest. The parent `/docs` manifest is completely ignored for that subtree. This prevents complex, hard-to-debug inheritance chains.
+If `/docs/.docs-mcp.json` and `/docs/sdks/typescript/.docs-mcp.json` both exist, a file located at `/docs/sdks/typescript/auth.md` is governed **exclusively** by the TypeScript folder's manifest. The parent `/docs` manifest is completely ignored for that subtree. This prevents complex, hard-to-debug inheritance chains.
 
 ### 3. Glob Matching within Overrides (Last-Match Wins)
-Within a single `.mcp-manifest.json`, the `overrides` array is evaluated from top to bottom. If a file path matches multiple glob patterns, the **last matching entry wins**. This allows authors to define broad catch-all rules at the top and specific exceptions at the bottom.
+Within a single `.docs-mcp.json`, the `overrides` array is evaluated from top to bottom. If a file path matches multiple glob patterns, the **last matching entry wins**. This allows authors to define broad catch-all rules at the top and specific exceptions at the bottom.
 Override `pattern` matching is evaluated against the file path **relative to the directory containing that manifest**.
 
 ## System Boundaries

@@ -25,7 +25,7 @@ Docs MCP provides a local, in-memory Hybrid Search engine (powered by LanceDB) t
 
 When used with Speakeasy SDKs, the engine leverages distributed manifests to enable powerful features:
 
-- **Intelligent Chunking Hints:** Instead of naive character limits, the indexer uses a "hinting" system (`h1`, `h2`, `h3`, `file`) to find perfect boundaries. These hints are distributed: they can be defined in a `.mcp-manifest.json` within an imported SDK folder, or overridden by YAML frontmatter for specific guides.
+- **Intelligent Chunking Hints:** Instead of naive character limits, the indexer uses a "hinting" system (`h1`, `h2`, `h3`, `file`) to find perfect boundaries. These hints are distributed: they can be defined in a `.docs-mcp.json` within an imported SDK folder, or overridden by YAML frontmatter for specific guides.
 - **Hierarchical Context Injection:** Ancestor headings (`Service: Auth > Method: Login`) are injected into the text sent to the embedding model, ensuring the vector perfectly captures the intent of the isolated code block.
 - **Strict Resolution (Enforced Taxonomy):** Speakeasy generates docs for Python, TS, Go, etc., creating massive semantic duplication. Instead of trying to dynamically "collapse" results, the server relies on the dynamically injected JSON Schema `enum`s to force the LLM to define the language upfront based on the user's workspace.
 
@@ -97,7 +97,7 @@ CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port"
 Docs MCP separates the heavy LLM/authoring workflows from the deterministic CI build and the lean runtime server.
 
 **1. Authoring (Local Dev)**
-If you have legacy docs without chunking strategies, use the CLI locally to bootstrap a baseline `.mcp-manifest.json`.
+If you have legacy docs without chunking strategies, use the CLI locally to bootstrap a baseline `.docs-mcp.json`.
 ```bash
 npx @speakeasy-api/docs-mcp-cli fix --docs-dir ./docs
 ```
