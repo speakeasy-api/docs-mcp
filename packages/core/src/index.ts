@@ -3,6 +3,7 @@ export * from "./chunking.js";
 export * from "./parser.js";
 export * from "./cursor.js";
 export * from "./manifest.js";
+export * from "./manifest-schema.js";
 export * from "./metadata.js";
 export * from "./search.js";
 export * from "./embedding.js";
