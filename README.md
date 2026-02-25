@@ -61,13 +61,51 @@ operations, pull in the most relevant documentation on demand, and answer
 questions with concrete, API‑aware detail—all without you hand‑writing tools or
 duplicating any of your docs.
 
-## Usage
+## Quickstart
 
-### CLI
+Requires Node.js >= 22. For best results set `OPENAI_API_KEY`, or use
+`--embedding-provider hash` for a free local alternative.
 
 ```bash
-npm install -g @speakeasy-api/docs-mcp-cli
+# 1. Build an index from your markdown docs
+OPENAI_API_KEY=sk-... npx @speakeasy-api/docs-mcp-cli build \
+  --docs-dir ./docs --out ./dist --embedding-provider openai
+
+# 2. Start the MCP server
+npx @speakeasy-api/docs-mcp-server --index-dir ./dist --transport http --port 20310
+
+# 3. Open the playground at http://localhost:3001
+npx @speakeasy-api/docs-mcp-playground
 ```
 
-Refer to the [CLI documentation](./packages/cli/README.md) for usage instructions.
+For stdio transport (e.g. Claude Desktop), omit `--transport` and `--port`.
+
+## Creating an Image
+
+```dockerfile
+FROM node:22-slim
+RUN npm install -g @speakeasy-api/docs-mcp-cli @speakeasy-api/docs-mcp-server
+ARG DOCS_DIR=docs
+COPY ${DOCS_DIR} /corpus
+RUN --mount=type=secret,id=OPENAI_API_KEY \
+    OPENAI_API_KEY=$(cat /run/secrets/OPENAI_API_KEY) \
+    docs-mcp build --docs-dir /corpus --out /index --embedding-provider openai
+EXPOSE 20310
+CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
+```
+
+```bash
+# Build the image
+docker build --secret id=OPENAI_API_KEY,env=OPENAI_API_KEY \
+  --build-arg DOCS_DIR=./docs -t docs-mcp .
+
+# Run the server
+docker run -p 20310:20310 docs-mcp
+```
+
+## Reference
+
+- [CLI docs](./packages/cli/README.md)
+- [Server docs](./packages/server/README.md)
+- [Playground docs](./packages/playground/README.md)
 
