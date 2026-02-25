@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import fg from "fast-glob";
@@ -11,9 +11,11 @@ const { version: CLI_VERSION } = require("../package.json") as { version: string
 import {
   buildLanceDbIndex,
   buildChunks,
+  computeChunkFingerprint,
   createEmbeddingProvider,
   embedChunksIncremental,
   loadCache,
+  loadChunksFromPreviousIndex,
   parseManifestJson,
   resolveFileConfig,
   saveCache,
@@ -21,7 +23,8 @@ import {
   type EmbedProgressEvent,
   type EmbeddingMetadata,
   type IndexBuildStep,
-  type Manifest
+  type Manifest,
+  type PreviousIndexReader
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
 import { resolveSourceCommit } from "./git.js";
@@ -116,8 +119,63 @@ program
     const outDir = path.resolve(options.out);
     const files = await listMarkdownFiles(docsDir);
     const manifestCache = new Map<string, Manifest>();
+    const lanceDbPath = path.join(outDir, ".lancedb");
+    const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
+    const lanceDbOldPath = path.join(outDir, ".lancedb.old");
+
+    // Clean up stale tmp/old dirs from interrupted builds
+    await rm(lanceDbTmpPath, { recursive: true, force: true });
+    await rm(lanceDbOldPath, { recursive: true, force: true });
+
+    // Load previous index for chunk caching (old .lancedb/ stays readable during build)
+    let previousIndex: PreviousIndexReader | null = options.rebuildCache
+      ? null
+      : await loadChunksFromPreviousIndex(lanceDbPath);
+
+    // Canary validation: re-chunk the first 10 fingerprint-matching files to
+    // detect chunking logic changes without maintaining a version number.
+    if (previousIndex) {
+      let validated = 0;
+      for (const file of files) {
+        if (validated >= 10) break;
+        const markdown = await readFile(file, "utf8");
+        const relative = toPosix(path.relative(docsDir, file));
+        const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
+        const resolved = resolveFileConfig({
+          relativeFilePath: relative,
+          markdown,
+          ...(manifestContext
+            ? {
+                manifest: manifestContext.manifest,
+                manifestBaseDir: manifestContext.manifestBaseDir
+              }
+            : {})
+        });
+
+        const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);
+        if (previousIndex.fingerprints.get(relative) !== fingerprint) continue;
+
+        const freshChunks = buildChunks({
+          filepath: relative,
+          markdown,
+          strategy: resolved.strategy,
+          metadata: resolved.metadata
+        });
+        const cachedChunks = await previousIndex.getChunks(relative);
+
+        if (JSON.stringify(freshChunks) !== JSON.stringify(cachedChunks)) {
+          console.warn(`warn: chunk cache canary mismatch for ${relative}; discarding cache`);
+          previousIndex.close();
+          previousIndex = null;
+          break;
+        }
+        validated++;
+      }
+    }
 
     const chunks: Chunk[] = [];
+    const newFileFingerprints: Record<string, string> = {};
+    let chunkCacheHits = 0;
     for (let fi = 0; fi < files.length; fi++) {
       writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
       const file = files[fi]!;
@@ -135,6 +193,16 @@ program
           : {})
       });
 
+      const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);
+      newFileFingerprints[relative] = fingerprint;
+
+      if (previousIndex?.fingerprints.get(relative) === fingerprint) {
+        const cachedChunks = await previousIndex.getChunks(relative);
+        chunks.push(...cachedChunks);
+        chunkCacheHits++;
+        continue;
+      }
+
       const fileChunks = buildChunks({
         filepath: relative,
         markdown,
@@ -144,7 +212,8 @@ program
       chunks.push(...fileChunks);
     }
     clearProgress();
-    console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks`);
+    const cacheSuffix = chunkCacheHits > 0 ? ` (${chunkCacheHits} cached)` : "";
+    console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks${cacheSuffix}`);
 
     const providerInput: {
       provider: "none" | "hash" | "openai";
@@ -252,7 +321,9 @@ program
       sourceCommit
     );
     const metadataKeys = Object.keys(metadata.taxonomy);
-    const lanceDbPath = path.join(outDir, ".lancedb");
+
+    // Close previous index before writing the new one
+    previousIndex?.close();
 
     const indexStepLabels: Record<IndexBuildStep, string> = {
       "writing-table": "Building search index: writing table...",
@@ -265,11 +336,13 @@ program
       chunks: Chunk[];
       metadataKeys: string[];
       vectorsByChunkId?: Map<string, number[]>;
+      fileFingerprints?: Record<string, string>;
       onProgress?: (step: IndexBuildStep) => void;
     } = {
-      dbPath: lanceDbPath,
+      dbPath: lanceDbTmpPath,
       chunks,
       metadataKeys,
+      fileFingerprints: newFileFingerprints,
       onProgress: (step) => writeProgress(indexStepLabels[step]),
     };
     if (vectorsByChunkId) {
@@ -294,6 +367,12 @@ program
         2
       )
     );
+
+    // Atomic swap: .lancedb.tmp → .lancedb
+    await rm(lanceDbOldPath, { recursive: true, force: true });
+    try { await rename(lanceDbPath, lanceDbOldPath); } catch {}
+    await rename(lanceDbTmpPath, lanceDbPath);
+    await rm(lanceDbOldPath, { recursive: true, force: true }).catch(() => {});
 
     console.log(`wrote ${chunks.length} chunks and .lancedb index to ${outDir}`);
   });

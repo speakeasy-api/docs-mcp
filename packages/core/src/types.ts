@@ -132,6 +132,8 @@ export interface EmbeddingProvider {
   readonly dimensions: number;
   readonly configFingerprint: string;
   readonly batchSize?: number;
+  /** USD cost per 1 million input tokens, or 0 for free providers. */
+  readonly costPerMillionTokens: number;
   embed(texts: string[]): Promise<number[][]>;
 }
 

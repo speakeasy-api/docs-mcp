@@ -9,3 +9,4 @@ export * from "./search.js";
 export * from "./embedding.js";
 export * from "./embedding-cache.js";
 export * from "./lancedb.js";
+export * from "./chunk-cache.js";

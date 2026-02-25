@@ -37,6 +37,7 @@ export class NoopEmbeddingProvider implements EmbeddingProvider {
   readonly name = "none";
   readonly model = "none";
   readonly dimensions = 0;
+  readonly costPerMillionTokens = 0;
   readonly configFingerprint: string;
 
   constructor() {
@@ -56,6 +57,7 @@ export class HashEmbeddingProvider implements EmbeddingProvider {
   readonly name = "hash";
   readonly model: string;
   readonly dimensions: number;
+  readonly costPerMillionTokens = 0;
   readonly configFingerprint: string;
 
   constructor(options: { dimensions?: number; model?: string } = {}) {
@@ -80,10 +82,18 @@ export class HashEmbeddingProvider implements EmbeddingProvider {
  */
 const DEFAULT_MAX_INPUT_CHARS = 24_000;
 
+/** Known pricing in USD per 1M input tokens for OpenAI embedding models. */
+const OPENAI_COST_PER_M_TOKENS: Record<string, number> = {
+  "text-embedding-3-large": 0.13,
+  "text-embedding-3-small": 0.02,
+  "text-embedding-ada-002": 0.10,
+};
+
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly name = "openai";
   readonly model: string;
   readonly dimensions: number;
+  readonly costPerMillionTokens: number;
   readonly configFingerprint: string;
 
   private readonly apiKey: string;
@@ -101,6 +111,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     this.apiKey = options.apiKey;
     this.model = options.model ?? "text-embedding-3-large";
+    this.costPerMillionTokens = OPENAI_COST_PER_M_TOKENS[this.model] ?? 0;
     this.dimensions = options.dimensions ?? 3072;
     this.batchSize = options.batchSize ?? 128;
     this.baseUrl = (options.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");

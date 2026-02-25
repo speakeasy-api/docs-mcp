@@ -3,7 +3,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Command } from "commander";
-import { generateBenchmarkMarkdown, runBenchmark, type ProviderName } from "./benchmark.js";
+import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
 import { runEvaluationAgainstServer, type EvalHarnessOutput, type EvalQueryCase } from "./runner.js";
 
@@ -93,17 +93,15 @@ program
     }
   });
 
-const ALL_PROVIDERS: ProviderName[] = ["none", "hash", "openai"];
-
 program
   .command("benchmark")
-  .description("Run eval cases across multiple embedding providers and produce a comparison report")
+  .description("Run eval cases across multiple embedding models and produce a comparison report")
   .requiredOption("--cases <path>", "Path to eval cases JSON")
   .requiredOption("--docs-dir <path>", "Path to markdown corpus")
   .requiredOption("--work-dir <path>", "Working directory for per-provider outputs")
   .requiredOption("--build-command <path>", "Path to CLI build script")
   .requiredOption("--server-command <path>", "Path to server script")
-  .option("--providers <list>", "Comma-separated: none,hash,openai", "none,hash,openai")
+  .option("--embeddings <list>", "Comma-separated embedding specs: none,hash,openai/text-embedding-3-large", "none,openai/text-embedding-3-large")
   .option("--warmup-queries <n>", "Warmup queries per provider", parseIntOption, 3)
   .option("--out <path>", "Output JSON path (else stdout)")
   .action(async (options: {
@@ -112,17 +110,11 @@ program
     workDir: string;
     buildCommand: string;
     serverCommand: string;
-    providers: string;
+    embeddings: string;
     warmupQueries: number;
     out?: string;
   }) => {
-    const providers = options.providers.split(",").map((s) => s.trim()).filter(Boolean) as ProviderName[];
-    for (const p of providers) {
-      if (!ALL_PROVIDERS.includes(p)) {
-        console.error(`Unknown provider: ${p}. Must be one of: ${ALL_PROVIDERS.join(", ")}`);
-        process.exit(1);
-      }
-    }
+    const embeddings = options.embeddings.split(",").map((s) => parseEmbeddingSpec(s)).filter((s) => s.provider);
 
     const casesPath = path.resolve(options.cases);
     const casesRaw = await readFile(casesPath, "utf8");
@@ -134,7 +126,7 @@ program
       workDir: path.resolve(options.workDir),
       buildCommand: path.resolve(options.buildCommand),
       serverCommand: path.resolve(options.serverCommand),
-      providers,
+      embeddings,
       warmupQueries: options.warmupQueries
     }, cases);
 

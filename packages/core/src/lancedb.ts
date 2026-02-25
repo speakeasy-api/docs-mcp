@@ -34,6 +34,7 @@ export interface BuildLanceDbIndexOptions {
   tableName?: string;
   metadataKeys?: string[];
   vectorsByChunkId?: Map<string, number[]>;
+  fileFingerprints?: Record<string, string>;
   onProgress?: (step: IndexBuildStep) => void;
 }
 
@@ -66,7 +67,7 @@ export async function buildLanceDbIndex(
   const metadataKeys = options.metadataKeys ?? collectMetadataKeys(options.chunks);
 
   const rows = options.chunks.map((chunk) =>
-    serializeChunkRow(chunk, metadataKeys, options.vectorsByChunkId)
+    serializeChunkRow(chunk, metadataKeys, options.vectorsByChunkId, options.fileFingerprints)
   );
 
   if (rows.length === 0) {
@@ -556,7 +557,8 @@ function extractMetadata(
 function serializeChunkRow(
   chunk: Chunk,
   metadataKeys: string[],
-  vectorsByChunkId?: Map<string, number[]>
+  vectorsByChunkId?: Map<string, number[]>,
+  fileFingerprints?: Record<string, string>
 ): ChunkRow {
   const record: ChunkRow = {
     chunk_id: chunk.chunk_id,
@@ -572,6 +574,10 @@ function serializeChunkRow(
 
   for (const key of metadataKeys) {
     record[key] = chunk.metadata[key] ?? "";
+  }
+
+  if (fileFingerprints) {
+    record.file_fingerprint = fileFingerprints[chunk.filepath] ?? "";
   }
 
   const vector = vectorsByChunkId?.get(chunk.chunk_id);
@@ -655,7 +661,7 @@ function normalizePhraseSlop(value: number | undefined): number {
   return Math.max(0, Math.min(5, rounded));
 }
 
-interface ChunkRow extends Record<string, unknown> {
+export interface ChunkRow extends Record<string, unknown> {
   chunk_id: string;
   filepath: string;
   heading: string;
@@ -665,5 +671,6 @@ interface ChunkRow extends Record<string, unknown> {
   breadcrumb: string;
   chunk_index: number;
   metadata_json: string;
+  file_fingerprint?: string;
   vector?: number[];
 }

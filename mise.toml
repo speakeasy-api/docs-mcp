@@ -43,7 +43,7 @@ run = "cd packages/playground && npx vite"
 
 [tasks."bench:realistic"]
 description = "Benchmark embedding providers against realistic test fixture (none, hash)"
-run = "node packages/eval/dist/bin.js benchmark --cases packages/eval/fixtures/realistic/cases.json --docs-dir packages/eval/fixtures/realistic --work-dir /tmp/bench-realistic --build-command packages/cli/dist/index.js --server-command packages/server/dist/bin.js --providers none,hash"
+run = "node packages/eval/dist/bin.js benchmark --cases packages/eval/fixtures/realistic/cases.json --docs-dir packages/eval/fixtures/realistic --work-dir /tmp/bench-realistic --build-command packages/cli/dist/index.js --server-command packages/server/dist/bin.js --embeddings none,hash"
 depends = ["build"]
 
 [tasks.nuke]
