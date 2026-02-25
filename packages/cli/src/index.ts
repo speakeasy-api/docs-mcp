@@ -14,12 +14,14 @@ import {
   computeChunkFingerprint,
   createEmbeddingProvider,
   embedChunksIncremental,
+  formatDuration,
   loadCache,
   loadChunksFromPreviousIndex,
   mergeTaxonomyConfigs,
   parseManifestJson,
   resolveFileConfig,
   saveCache,
+  type BatchProgressEvent,
   type Chunk,
   type EmbedProgressEvent,
   type EmbeddingMetadata,
@@ -29,13 +31,120 @@ import {
   type PreviousIndexReader
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
-import { resolveSourceCommit } from "./git.js";
+import { resolveCorpusLabel, resolveSourceCommit } from "./git.js";
 
 const program = new Command();
 
 const isTTY = process.stderr.isTTY ?? false;
-function writeProgress(msg: string) { if (isTTY) process.stderr.write(`\r\x1b[K${msg}`); }
-function clearProgress() { if (isTTY) process.stderr.write("\r\x1b[K"); }
+let progressLineCount = 0;
+
+function writeProgress(msg: string) { writeProgressBlock([msg]); }
+
+function writeProgressBlock(lines: string[]) {
+  if (!isTTY) return;
+  // Move cursor up to start of previous block
+  if (progressLineCount > 1) {
+    process.stderr.write(`\x1b[${progressLineCount - 1}A`);
+  }
+  // Write new lines, clearing each
+  for (let i = 0; i < lines.length; i++) {
+    process.stderr.write(`\r\x1b[K${lines[i]}`);
+    if (i < lines.length - 1) process.stderr.write("\n");
+  }
+  // Clear any leftover lines from a previously taller block
+  for (let i = lines.length; i < progressLineCount; i++) {
+    process.stderr.write("\n\x1b[K");
+  }
+  const extra = progressLineCount - lines.length;
+  if (extra > 0) {
+    process.stderr.write(`\x1b[${extra}A`);
+  }
+  progressLineCount = lines.length;
+}
+
+function clearProgress() {
+  if (!isTTY || progressLineCount === 0) return;
+  if (progressLineCount > 1) {
+    process.stderr.write(`\x1b[${progressLineCount - 1}A`);
+  }
+  process.stderr.write("\r\x1b[K");
+  for (let i = 1; i < progressLineCount; i++) {
+    process.stderr.write("\n\x1b[K");
+  }
+  if (progressLineCount > 1) {
+    process.stderr.write(`\x1b[${progressLineCount - 1}A\r`);
+  }
+  progressLineCount = 0;
+}
+
+let lastNonTtyWrite = 0;
+
+/**
+ * Pack segments into lines that fit within `cols`, separating with `sep`.
+ * Any single segment wider than `cols` is hard-truncated.
+ */
+function packLines(segments: string[], cols: number, sep = "  "): string[] {
+  const lines: string[] = [];
+  let cur = "";
+  for (const seg of segments) {
+    const truncated = seg.length > cols ? seg.slice(0, cols) : seg;
+    if (cur.length === 0) {
+      cur = truncated;
+    } else if (cur.length + sep.length + truncated.length <= cols) {
+      cur += sep + truncated;
+    } else {
+      lines.push(cur);
+      cur = truncated;
+    }
+  }
+  if (cur.length > 0) lines.push(cur);
+  return lines;
+}
+
+function writeBatchProgress(event: BatchProgressEvent) {
+  // Non-polling phases: always emit
+  if (event.phase !== "batch-polling") {
+    if (isTTY) {
+      writeProgress(event.message);
+    } else {
+      console.warn(event.message);
+    }
+    return;
+  }
+
+  // Non-TTY: throttle to one line per ~10s
+  if (!isTTY) {
+    const now = Date.now();
+    if (now - lastNonTtyWrite >= 10_000) {
+      lastNonTtyWrite = now;
+      console.warn(event.message);
+    }
+    return;
+  }
+
+  // TTY: read current width every call (terminal can be resized)
+  const cols = process.stderr.columns || 80;
+
+  // If the flat message fits, use it as-is
+  if (event.message.length <= cols) {
+    writeProgress(event.message);
+    return;
+  }
+
+  // Build discrete segments and pack into as many lines as needed
+  if (event.counts) {
+    const { completed, total, failed } = event.counts;
+    const pct = ((completed / total) * 100).toFixed(1);
+    const segments = [`Batch: ${completed}/${total} (${pct}%)`];
+    if (failed > 0) segments.push(`${failed} failed`);
+    if (event.etaSec != null) segments.push(`ETA ~${formatDuration(event.etaSec)}`);
+    if (event.elapsedSec != null) segments.push(`Elapsed: ${formatDuration(event.elapsedSec)}`);
+    if (event.pollRemainingSec != null) segments.push(`Next poll: ${event.pollRemainingSec}s`);
+    writeProgressBlock(packLines(segments, cols));
+  } else {
+    writeProgress(event.message);
+  }
+}
 
 program
   .name("docs-mcp")
@@ -219,6 +328,9 @@ program
 
     const taxonomyConfig = mergeTaxonomyConfigs(manifestCache.values());
 
+    const onBatchProgress = (event: BatchProgressEvent) => {
+      writeBatchProgress(event);
+    };
     const providerInput: {
       provider: "none" | "hash" | "openai";
       model?: string;
@@ -226,10 +338,16 @@ program
       apiKey?: string;
       baseUrl?: string;
       batchSize?: number;
+      batchApiThreshold?: number;
+      batchName?: string;
       concurrency?: number;
       maxRetries?: number;
+      onBatchProgress?: (event: BatchProgressEvent) => void;
     } = {
-      provider: normalizeProvider(options.embeddingProvider)
+      provider: normalizeProvider(options.embeddingProvider),
+      batchApiThreshold: 2500,
+      batchName: `docs-mcp:${await resolveCorpusLabel(docsDir)}`,
+      onBatchProgress,
     };
     if (options.embeddingModel !== undefined) {
       providerInput.model = options.embeddingModel;
@@ -280,7 +398,11 @@ program
         chunks,
         { ...config, embed: (texts) => embeddingProvider.embed(texts) },
         cache,
-        { ...(embeddingProvider.batchSize !== undefined ? { batchSize: embeddingProvider.batchSize } : {}), onProgress },
+        {
+          ...(embeddingProvider.batchSize !== undefined ? { batchSize: embeddingProvider.batchSize } : {}),
+          ...(embeddingProvider.batchApiThreshold !== undefined ? { batchApiThreshold: embeddingProvider.batchApiThreshold } : {}),
+          onProgress,
+        },
       );
       clearProgress();
       const embedMs = ((Date.now() - embedStart) / 1000).toFixed(1);

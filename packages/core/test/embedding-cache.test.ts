@@ -495,6 +495,47 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
   });
 });
 
+describe("embedChunksIncremental with batchApiThreshold", () => {
+  it("sends all texts in one embed() call when missCount >= batchApiThreshold", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const embedSpy = vi.spyOn(provider, "embed");
+    const chunks = Array.from({ length: 5 }, (_, i) =>
+      makeChunk({ chunk_id: `f${i}.md#s`, content_text: `text-${i}`, breadcrumb: `f${i}` })
+    );
+
+    const result = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+      { batchSize: 2, batchApiThreshold: 5 },
+    );
+
+    expect(result.stats.misses).toBe(5);
+    // With batchApiThreshold=5, all 5 misses should be sent in a single call
+    expect(embedSpy).toHaveBeenCalledTimes(1);
+    expect(embedSpy.mock.calls[0]![0]).toHaveLength(5);
+  });
+
+  it("uses standard batching when missCount < batchApiThreshold", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const embedSpy = vi.spyOn(provider, "embed");
+    const chunks = Array.from({ length: 3 }, (_, i) =>
+      makeChunk({ chunk_id: `f${i}.md#s`, content_text: `text-${i}`, breadcrumb: `f${i}` })
+    );
+
+    const result = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+      { batchSize: 2, batchApiThreshold: 5 },
+    );
+
+    expect(result.stats.misses).toBe(3);
+    // 3 misses < threshold of 5, so standard batching with batchSize=2 → 2 calls
+    expect(embedSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("end-to-end: save → load → incremental", () => {
   let tmpDir: string;
 

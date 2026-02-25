@@ -58,56 +58,38 @@ Ancestor headings (breadcrumbs like `Auth SDK > AcmeAuthClientV2 > Initializatio
 
 ## Benchmarks
 
-On a realistic 28.8MB multi-language SDK corpus (38 eval cases across 9 categories), benchmarked with [`docs-mcp-eval benchmark`](docs/eval.md):
+On a realistic ~300-operation API with hand-written guides (~28.8MB corpus, 5 eval categories), benchmarked with [`docs-mcp-eval benchmark`](docs/eval.md):
 
 ### Summary
 
-| Metric | none | openai/text-embedding-3-large |
-| --- | ---: | ---: |
-| MRR@5 | 0.1803 | 0.2320 |
-| NDCG@5 | 0.2136 | 0.2657 |
-| Facet Precision | 0.3158 | 0.3684 |
-| Search p50 (ms) | 5.2 | 242.6 |
-| Search p95 (ms) | 6.6 | 5914.1 |
-| Build Time (ms) | 6989 | 20448 |
-| Peak RSS (MB) | 247.6 | 313.6 |
-| Index Size (corpus 28.8MB) | 104.9MB | 356.9MB |
-| Embed Cost (est.) | $0 | $0.9825 |
-| Query Cost (est.) | $0 | $0.000003 |
-
-### Per-Category Facet Precision
-
-| Category | none | openai/text-embedding-3-large |
-| --- | ---: | ---: |
-| api-discovery | 0.0000 | 0.0000 |
-| cross-service | 0.3333 | 0.3333 |
-| distractor | 0.4000 | 0.4000 |
-| error-handling | 0.0000 | 0.0000 |
-| intent | 0.4000 | 0.4000 |
-| lexical | 0.8000 | 0.8000 |
-| multi-hop | 0.3333 | 0.3333 |
-| paraphrased | 0.1250 | 0.2500 |
-| sdk-reference | 0.3333 | 0.6667 |
+| Metric | none | openai | Takeaway |
+| --- | ---: | ---: | --- |
+| MRR@5 | 0.2141 | 0.2833 | Embeddings lift relevant-result ranking by 32% |
+| NDCG@5 | 0.2536 | 0.3218 | Graded relevance improves 27% with embeddings |
+| Facet Precision | 0.3750 | 0.4375 | Embeddings improve filter accuracy by 17% |
+| Search p50 (ms) | 5.2 | 258.4 | FTS-only is ~50x faster at median |
+| Search p95 (ms) | 6.5 | 11101.1 | Tail latency dominated by embedding API |
+| Build Time (ms) | 6022 | 1569703 | Embedding uses batch API for large corpora |
+| Peak RSS (MB) | 221.1 | 283.8 | Modest memory overhead |
+| Index Size (corpus 28.8MB) | 104.9MB | 356.9MB | Vectors ~3.4x the FTS-only index |
+| Embed Cost (est.) | $0 | $0.9825 | ~$1 one-time cost per corpus |
+| Query Cost (est.) | $0 | $0.000003 | Negligible per-query cost |
 
 ### Per-Category MRR@5
 
-| Category | none | openai/text-embedding-3-large |
-| --- | ---: | ---: |
-| api-discovery | 0.0000 | 0.0000 |
-| cross-service | 0.1667 | 0.3333 |
-| distractor | 0.3000 | 0.3000 |
-| error-handling | 0.0000 | 0.0000 |
-| intent | 0.0900 | 0.2667 |
-| lexical | 0.4800 | 0.5067 |
-| multi-hop | 0.3333 | 0.3333 |
-| paraphrased | 0.0625 | 0.0938 |
-| sdk-reference | 0.1667 | 0.2333 |
+> MRR@5 (Mean Reciprocal Rank at 5) measures how high the first relevant result appears in the top 5. 1.0 = always ranked first; 0.0 = never appears in top 5.
 
-**Key takeaways:**
-- Embeddings double facet precision on `paraphrased` and `sdk-reference` categories
-- Embeddings triple MRR on `intent` queries (0.09 → 0.27)
-- `lexical`, `distractor`, `cross-service`, `multi-hop` — FTS alone matches embedding performance
-- FTS-only search: 5ms p50 latency, zero embedding cost
+| Category | none | openai | Takeaway |
+| --- | ---: | ---: | --- |
+| clarification | 0.3000 | 0.3000 | FTS matches embeddings |
+| cross-service | 0.1667 | 0.3333 | Embeddings double rank |
+| exact-name | 0.3625 | 0.3792 | FTS nearly matches embeddings |
+| natural-language | 0.0731 | 0.1692 | Embeddings lift 130% |
+| workflow | 0.3333 | 0.4444 | Embeddings lift 33% |
+
+### Recommendation
+
+We recommend starting with FTS-only search. While embeddings improve relevance for conceptual and paraphrased queries, they also introduce ~50x query latency and substantial build overhead. For agents that iterate through multiple searches, the faster cycle time of pure FTS has anecdotally proven more valuable than the per-query relevance lift — particularly with modern models capable of query refinement.
 
 ## Graceful Fallback
 

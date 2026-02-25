@@ -253,7 +253,11 @@ export async function embedChunksIncremental(
   const missVectors: number[][] = [];
 
   const batchSize = options?.batchSize;
-  if (missTexts.length > 0 && batchSize && batchSize > 0) {
+  const batchApiThreshold = options?.batchApiThreshold;
+  if (missTexts.length > 0 && batchApiThreshold && missTexts.length >= batchApiThreshold) {
+    // Send all at once so provider can use Batch API
+    missVectors.push(...await provider.embed(missTexts));
+  } else if (missTexts.length > 0 && batchSize && batchSize > 0) {
     let embeddedSoFar = 0;
     for (let offset = 0; offset < missTexts.length; offset += batchSize) {
       const batch = missTexts.slice(offset, offset + batchSize);
