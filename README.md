@@ -13,6 +13,7 @@
     <a href="https://www.speakeasy.com/product/sdk-generation" target="_blank">
       <b>Generate SDKs</b>
     </a>
+    &nbsp;&nbsp;//&nbsp;&nbsp;
     <a href="https://go.speakeasy.com/slack" target="_blank">
       <b>Join us on Slack</b>
     </a>
