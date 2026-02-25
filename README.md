@@ -80,35 +80,27 @@ npx @speakeasy-api/docs-mcp-playground
 
 For stdio transport (e.g. Claude Desktop), omit `--transport` and `--port`.
 
-## Deploying
+## Creating an Image
 
 ```dockerfile
 FROM node:22-slim
 RUN npm install -g @speakeasy-api/docs-mcp-cli @speakeasy-api/docs-mcp-server
-COPY docs /corpus
-RUN docs-mcp build --docs-dir /corpus --out /index --embedding-provider hash
+ARG DOCS_DIR=docs
+COPY ${DOCS_DIR} /corpus
+RUN --mount=type=secret,id=OPENAI_API_KEY \
+    OPENAI_API_KEY=$(cat /run/secrets/OPENAI_API_KEY) \
+    docs-mcp build --docs-dir /corpus --out /index --embedding-provider openai
 EXPOSE 20310
 CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
 ```
 
-```yaml
-# .github/workflows/deploy-docs-mcp.yml
-name: Deploy Docs MCP
-on:
-  push:
-    branches: [main]
-    paths: [docs/**]
+```bash
+# Build the image
+docker build --secret id=OPENAI_API_KEY,env=OPENAI_API_KEY \
+  --build-arg DOCS_DIR=./docs -t docs-mcp .
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: your-registry/docs-mcp:latest
+# Run the server
+docker run -p 20310:20310 docs-mcp
 ```
 
 ## Reference
