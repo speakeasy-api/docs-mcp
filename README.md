@@ -1,6 +1,28 @@
+<div align="center">
+  <a href="https://www.speakeasy.com/" target="_blank">
+    <img
+      width="1500"
+      height="500"
+      alt="Speakeasy"
+      src="https://github.com/user-attachments/assets/0e56055b-02a3-4476-9130-4be299e5a39c"
+    />
+  </a>
+</div>
+
 # Speakeasy Docs MCP
 
 A lightweight, domain-agnostic hybrid search engine for markdown corpora, exposed via the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP). While it can index and serve **any** markdown corpus, it is deeply optimized for serving SDK documentation to AI coding agents. **Beta.**
+
+## Features
+
+- **Hybrid search** — full-text, phrase proximity, and vector similarity blended via Reciprocal Rank Fusion
+- **Distributed manifests** — per-directory `.docs-mcp.json` files configure chunking strategy, metadata, and taxonomy independently per subtree
+- **Faceted taxonomy** — metadata keys become enum-injected JSON Schema filters on the search tool
+- **Vector collapse** — deduplicates near-identical cross-language results at search time
+- **Incremental builds** — embedding cache fingerprints each chunk; only changed content is re-embedded
+- **Graceful degradation**
+  - *Chunking* — chunk sizes adapt to the configured embedding provider's context window; falls back to conservative defaults when no provider is set
+  - *Query* — if the embedding API errors at runtime (downtime, expired credits, network issues), the server falls back to FTS-only search with a one-time warning
 
 ## How It Works
 
@@ -209,13 +231,30 @@ The tools exposed to the agent are dynamically generated based on your `corpus_d
 ## Quick Start
 
 ```dockerfile
+# --- build stage ---
+FROM node:22-slim AS build
+RUN npm install -g @speakeasy-api/docs-mcp-cli
+ARG DOCS_DIR=docs
+COPY ${DOCS_DIR} /corpus
+RUN --mount=type=secret,id=OPENAI_API_KEY \
+    OPENAI_API_KEY=$(cat /run/secrets/OPENAI_API_KEY) \
+    docs-mcp build --docs-dir /corpus --out /index --embedding-provider openai
+
+# --- runtime stage ---
 FROM node:22-slim
-RUN npm install -g @speakeasy-api/docs-mcp-cli @speakeasy-api/docs-mcp-server
-COPY docs /corpus
-RUN docs-mcp build --docs-dir /corpus --out /index --embedding-provider hash
+RUN npm install -g @speakeasy-api/docs-mcp-server
+COPY --from=build /index /index
 EXPOSE 20310
 CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
 ```
+
+```bash
+docker build --secret id=OPENAI_API_KEY,env=OPENAI_API_KEY \
+  --build-arg DOCS_DIR=./docs -t docs-mcp .
+docker run -p 20310:20310 -e OPENAI_API_KEY docs-mcp
+```
+
+The build secret embeds the corpus; the runtime `-e OPENAI_API_KEY` lets the server embed search queries.
 
 ## Usage & Deployment
 
@@ -244,6 +283,13 @@ The `.lancedb` directory is packaged with the MCP server. FTS search is fully lo
 ```bash
 npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb
 ```
+
+**4. Playground (Optional)**
+Explore the index interactively in a browser:
+```bash
+npx @speakeasy-api/docs-mcp-playground
+```
+Open `http://localhost:3001`. Requires a running HTTP server (step 3 with `--transport http`).
 
 ## Evaluation
 
