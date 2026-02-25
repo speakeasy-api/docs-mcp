@@ -1,5 +1,7 @@
 [
   {
+    "name": "AcmeAuthClientV2 initialization",
+    "category": "lexical",
     "query": "AcmeAuthClientV2 initialization",
     "expectedChunkId": "sdks/typescript/auth.md#typescript-auth-sdk/acmeauthclientv2-initialization",
     "filters": {
@@ -9,6 +11,8 @@
     "maxRounds": 2
   },
   {
+    "name": "handle 429 rate limits",
+    "category": "paraphrased",
     "query": "how do I handle 429 rate limits",
     "expectedChunkId": "guides/retries.md#retries-guide/handling-429-errors",
     "filters": {},
@@ -16,6 +20,8 @@
     "maxRounds": 2
   },
   {
+    "name": "cursor pagination next_cursor",
+    "category": "lexical",
     "query": "cursor pagination next_cursor",
     "expectedChunkId": "guides/pagination.md#pagination-guide/cursor-pagination",
     "filters": {},
@@ -23,6 +29,8 @@
     "maxRounds": 2
   },
   {
+    "name": "python retry configuration",
+    "category": "intent",
     "query": "retry configuration",
     "expectedChunkId": "sdks/python/auth.md#python-auth-sdk/retry-configuration",
     "filters": {
@@ -32,6 +40,8 @@
     "maxRounds": 2
   },
   {
+    "name": "go retry configuration",
+    "category": "intent",
     "query": "retry configuration",
     "expectedChunkId": "sdks/go/auth.md#go-auth-sdk/retry-configuration",
     "filters": {

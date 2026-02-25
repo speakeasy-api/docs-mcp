@@ -108,7 +108,7 @@ export function generateDeltaMarkdown(
  */
 export function toDeltaCases(cases: RankedCase[]): DeltaCaseData[] {
   return cases.map((c, i) => ({
-    name: `case-${i}`,
+    name: c.name ?? `case-${i}`,
     passed: c.rankedChunkIds.slice(0, 5).includes(c.expectedChunkId),
     expectedChunkId: c.expectedChunkId,
     rankedChunkIds: c.rankedChunkIds

@@ -2,6 +2,8 @@ export interface RankedCase {
   expectedChunkId: string;
   rankedChunkIds: string[];
   roundsToRightDoc: number;
+  name?: string;
+  category?: string;
 }
 
 export interface EvalSummary {
@@ -84,6 +86,43 @@ export function summarizeCases(
     buildTimeMs: round(timings.buildTimeMs ?? 0),
     peakRssMb: round(timings.peakRssMb ?? 0)
   };
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  caseCount: number;
+  facetPrecision: number;
+  mrrAt5: number;
+  ndcgAt5: number;
+}
+
+export function computeCategoryBreakdown(cases: RankedCase[]): CategoryBreakdown[] {
+  const groups = new Map<string, RankedCase[]>();
+  for (const c of cases) {
+    const cat = c.category ?? "uncategorized";
+    let group = groups.get(cat);
+    if (!group) {
+      group = [];
+      groups.set(cat, group);
+    }
+    group.push(c);
+  }
+
+  const result: CategoryBreakdown[] = [];
+  for (const [category, group] of groups) {
+    result.push({
+      category,
+      caseCount: group.length,
+      facetPrecision: round(
+        group.filter((c) => c.rankedChunkIds.slice(0, 5).includes(c.expectedChunkId)).length /
+          (group.length || 1)
+      ),
+      mrrAt5: round(computeMrrAtK(group, 5)),
+      ndcgAt5: round(computeNdcgAtK(group, 5))
+    });
+  }
+
+  return result.sort((a, b) => a.category.localeCompare(b.category));
 }
 
 function log2(value: number): number {

@@ -52,6 +52,8 @@ export interface EvalQueryCase {
   filters?: Record<string, string>;
   limit?: number;
   maxRounds?: number;
+  name?: string;
+  category?: string;
 }
 
 export interface EvalHarnessInput {
@@ -263,7 +265,9 @@ async function executeCase(
     rankedCase: {
       expectedChunkId: testCase.expectedChunkId,
       rankedChunkIds,
-      roundsToRightDoc
+      roundsToRightDoc,
+      ...(testCase.name !== undefined ? { name: testCase.name } : {}),
+      ...(testCase.category !== undefined ? { category: testCase.category } : {})
     },
     searchLatenciesMs,
     getDocLatenciesMs

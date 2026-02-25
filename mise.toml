@@ -41,6 +41,11 @@ depends = ["build"]
 description = "Start only the playground Vite dev server"
 run = "cd packages/playground && npx vite"
 
+[tasks."bench:realistic"]
+description = "Benchmark embedding providers against realistic test fixture (none, hash)"
+run = "node packages/eval/dist/bin.js benchmark --cases packages/eval/fixtures/realistic/cases.json --docs-dir packages/eval/fixtures/realistic --work-dir /tmp/bench-realistic --build-command packages/cli/dist/index.js --server-command packages/server/dist/bin.js --providers none,hash"
+depends = ["build"]
+
 [tasks.nuke]
 description = "Kill all processes attached to dev ports (20310, 3000)"
 run = '''

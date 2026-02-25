@@ -3,6 +3,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Command } from "commander";
+import { generateBenchmarkMarkdown, runBenchmark, type ProviderName } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
 import { runEvaluationAgainstServer, type EvalHarnessOutput, type EvalQueryCase } from "./runner.js";
 
@@ -10,7 +11,11 @@ const program = new Command();
 
 program
   .name("docs-mcp-eval")
-  .description("Run MCP docs eval suite against an MCP server over stdio")
+  .description("Run MCP docs eval suite against an MCP server over stdio");
+
+program
+  .command("run", { isDefault: true })
+  .description("Run eval cases against a single server")
   .requiredOption("--cases <path>", "Path to JSON array of eval cases")
   .requiredOption("--server-command <value>", "Command to launch the MCP server")
   .option("--server-arg <value>", "Server arg (repeatable)", collectValues, [] as string[])
@@ -86,6 +91,63 @@ program
     if (deltaMarkdown) {
       process.stderr.write(`${deltaMarkdown}\n`);
     }
+  });
+
+const ALL_PROVIDERS: ProviderName[] = ["none", "hash", "openai"];
+
+program
+  .command("benchmark")
+  .description("Run eval cases across multiple embedding providers and produce a comparison report")
+  .requiredOption("--cases <path>", "Path to eval cases JSON")
+  .requiredOption("--docs-dir <path>", "Path to markdown corpus")
+  .requiredOption("--work-dir <path>", "Working directory for per-provider outputs")
+  .requiredOption("--build-command <path>", "Path to CLI build script")
+  .requiredOption("--server-command <path>", "Path to server script")
+  .option("--providers <list>", "Comma-separated: none,hash,openai", "none,hash,openai")
+  .option("--warmup-queries <n>", "Warmup queries per provider", parseIntOption, 3)
+  .option("--out <path>", "Output JSON path (else stdout)")
+  .action(async (options: {
+    cases: string;
+    docsDir: string;
+    workDir: string;
+    buildCommand: string;
+    serverCommand: string;
+    providers: string;
+    warmupQueries: number;
+    out?: string;
+  }) => {
+    const providers = options.providers.split(",").map((s) => s.trim()).filter(Boolean) as ProviderName[];
+    for (const p of providers) {
+      if (!ALL_PROVIDERS.includes(p)) {
+        console.error(`Unknown provider: ${p}. Must be one of: ${ALL_PROVIDERS.join(", ")}`);
+        process.exit(1);
+      }
+    }
+
+    const casesPath = path.resolve(options.cases);
+    const casesRaw = await readFile(casesPath, "utf8");
+    const cases = JSON.parse(casesRaw) as EvalQueryCase[];
+
+    const result = await runBenchmark({
+      docsDir: path.resolve(options.docsDir),
+      casesPath,
+      workDir: path.resolve(options.workDir),
+      buildCommand: path.resolve(options.buildCommand),
+      serverCommand: path.resolve(options.serverCommand),
+      providers,
+      warmupQueries: options.warmupQueries
+    }, cases);
+
+    const markdown = generateBenchmarkMarkdown(result);
+
+    if (options.out) {
+      const serialized = `${JSON.stringify(result, null, 2)}\n`;
+      const outPath = path.resolve(options.out);
+      await writeFile(outPath, serialized);
+      console.error(`wrote benchmark result to ${outPath}`);
+    }
+
+    process.stdout.write(`\n${markdown}\n`);
   });
 
 void program.parseAsync(process.argv);
