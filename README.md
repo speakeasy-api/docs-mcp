@@ -68,7 +68,7 @@ Requires Node.js >= 22. For best results set `OPENAI_API_KEY`, or use
 
 ```bash
 # 1. Build an index from your markdown docs
-npx @speakeasy-api/docs-mcp-cli build \
+OPENAI_API_KEY=sk-... npx @speakeasy-api/docs-mcp-cli build \
   --docs-dir ./docs --out ./dist --embedding-provider openai
 
 # 2. Start the MCP server
