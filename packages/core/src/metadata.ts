@@ -1,6 +1,16 @@
 import semver from "semver";
 import type { CorpusMetadata, EmbeddingMetadata, TaxonomyField } from "./types.js";
 
+/**
+ * Returns taxonomy keys that have `vector_collapse: true`, i.e. dimensions
+ * whose values should be collapsed at search time.
+ */
+export function getCollapseKeys(taxonomy: Record<string, TaxonomyField>): string[] {
+  return Object.entries(taxonomy)
+    .filter(([, field]) => field.vector_collapse === true)
+    .map(([key]) => key);
+}
+
 const LIMITS = {
   maxKeys: 64,
   maxKeyLength: 64,
@@ -81,9 +91,13 @@ function normalizeTaxonomy(value: unknown): Record<string, TaxonomyField> {
     const values = normalizeValues(field.values, key);
     const description = field.description === undefined ? undefined : asTrimmedString(field.description);
 
-    normalized[key] = description
-      ? { description, values }
-      : { values };
+    const vectorCollapse = field.vector_collapse === true ? true : undefined;
+
+    normalized[key] = {
+      ...(description ? { description } : {}),
+      values,
+      ...(vectorCollapse ? { vector_collapse: true } : {})
+    };
   }
 
   return normalized;

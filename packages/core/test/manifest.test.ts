@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseManifest, resolveFileConfig } from "../src/manifest.js";
+import { mergeTaxonomyConfigs, parseManifest, resolveFileConfig } from "../src/manifest.js";
+import type { Manifest } from "../src/types.js";
 
 describe("manifest resolution", () => {
   it("uses last-match wins for overrides", () => {
@@ -112,5 +113,124 @@ describe("manifest resolution", () => {
       language: "typescript",
       scope: "sdk-specific"
     });
+  });
+
+  it("parses taxonomy config with vector_collapse", () => {
+    const manifest = parseManifest({
+      version: "1",
+      metadata: { language: "typescript" },
+      taxonomy: {
+        language: { vector_collapse: true }
+      }
+    });
+
+    expect(manifest.taxonomy).toEqual({
+      language: { vector_collapse: true }
+    });
+  });
+
+  it("parses taxonomy config without vector_collapse", () => {
+    const manifest = parseManifest({
+      version: "1",
+      taxonomy: {
+        language: {}
+      }
+    });
+
+    expect(manifest.taxonomy).toEqual({ language: { vector_collapse: false } });
+  });
+});
+
+describe("mergeTaxonomyConfigs", () => {
+  it("returns empty when no manifests have taxonomy", () => {
+    const manifests: Manifest[] = [
+      { version: "1" },
+      { version: "1", metadata: { scope: "global-guide" } }
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({});
+  });
+
+  it("picks up vector_collapse from a single child manifest", () => {
+    const manifests: Manifest[] = [
+      { version: "1", metadata: { scope: "global-guide" } },
+      {
+        version: "1",
+        metadata: { language: "python", scope: "sdk-specific" },
+        taxonomy: { language: { vector_collapse: true } }
+      }
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      language: { vector_collapse: true }
+    });
+  });
+
+  it("unions vector_collapse across multiple child manifests", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        metadata: { language: "python" },
+        taxonomy: { language: { vector_collapse: true } }
+      },
+      {
+        version: "1",
+        metadata: { language: "typescript" },
+        taxonomy: { language: { vector_collapse: true } }
+      }
+    ];
+
+    const merged = mergeTaxonomyConfigs(manifests);
+    expect(merged).toEqual({ language: { vector_collapse: true } });
+  });
+
+  it("propagates when only one of N manifests declares vector_collapse", () => {
+    const manifests: Manifest[] = [
+      { version: "1", metadata: { scope: "global-guide" } },
+      {
+        version: "1",
+        metadata: { language: "python" },
+        taxonomy: { language: { vector_collapse: true } }
+      },
+      { version: "1", metadata: { language: "go" } },
+      { version: "1", metadata: { language: "typescript" } }
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      language: { vector_collapse: true }
+    });
+  });
+
+  it("merges different keys from different manifests", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        taxonomy: { language: { vector_collapse: true } }
+      },
+      {
+        version: "1",
+        taxonomy: { platform: { vector_collapse: true } }
+      }
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      language: { vector_collapse: true },
+      platform: { vector_collapse: true }
+    });
+  });
+
+  it("ignores manifests with taxonomy but no vector_collapse", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        taxonomy: { language: {} }
+      },
+      {
+        version: "1",
+        taxonomy: { language: { vector_collapse: false } }
+      }
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({});
   });
 });

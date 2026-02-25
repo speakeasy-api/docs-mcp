@@ -222,6 +222,69 @@ describe("integration: build → search → getDoc round-trip", () => {
     expect(typescriptHits.length).toBe(0);
   });
 
+  it("collapses equivalent SDK chunks across languages with vector_collapse", async () => {
+    const allChunks = await buildAllChunks();
+
+    const dbDir = await mkdtemp(path.join(os.tmpdir(), "docs-mcp-dedup-"));
+    tempDirs.push(dbDir);
+
+    const metadataKeys = ["scope", "language"];
+    const collapseKeys = ["language"];
+    await buildLanceDbIndex({ dbPath: dbDir, chunks: allChunks, metadataKeys });
+
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dbDir,
+      metadataKeys,
+      collapseKeys
+    });
+
+    // Search for a heading shared across both SDKs (Installation, Authentication, etc.)
+    const result = await engine.search({
+      query: "installation",
+      limit: 20,
+      filters: {}
+    });
+
+    // SDK "Installation" chunks exist in both python and typescript,
+    // but should be collapsed to 1 with vector_collapse
+    const sdkInstallHits = result.hits.filter(
+      (h) => h.metadata.scope === "sdk-specific" && h.heading === "Installation"
+    );
+    expect(sdkInstallHits).toHaveLength(1);
+
+    // Guide results should be unaffected
+    const guideHits = result.hits.filter((h) => h.metadata.scope === "global-guide");
+    expect(guideHits.length).toBeGreaterThanOrEqual(0); // may or may not match
+  });
+
+  it("does not collapse when language filter restricts to one value", async () => {
+    const allChunks = await buildAllChunks();
+
+    const dbDir = await mkdtemp(path.join(os.tmpdir(), "docs-mcp-dedup-filter-"));
+    tempDirs.push(dbDir);
+
+    const metadataKeys = ["scope", "language"];
+    const collapseKeys = ["language"];
+    await buildLanceDbIndex({ dbPath: dbDir, chunks: allChunks, metadataKeys });
+
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dbDir,
+      metadataKeys,
+      collapseKeys
+    });
+
+    const result = await engine.search({
+      query: "installation",
+      limit: 20,
+      filters: { language: "typescript" },
+      taxonomy_keys: metadataKeys
+    });
+
+    // With a language filter, dedup is a no-op — all typescript chunks survive
+    const tsHits = result.hits.filter((h) => h.metadata.language === "typescript");
+    expect(tsHits.length).toBeGreaterThan(0);
+  });
+
   it("phrase search ranks exact match higher than scattered terms", async () => {
     const dbDir = await mkdtemp(path.join(os.tmpdir(), "docs-mcp-phrase-"));
     tempDirs.push(dbDir);

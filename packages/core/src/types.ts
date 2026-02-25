@@ -22,10 +22,15 @@ export interface ManifestOverride {
   metadata?: Record<string, string>;
 }
 
+export interface ManifestTaxonomyFieldConfig {
+  vector_collapse: boolean;
+}
+
 export interface Manifest {
   version: string;
   strategy?: ChunkingStrategy;
   metadata?: Record<string, string>;
+  taxonomy?: Record<string, ManifestTaxonomyFieldConfig>;
   overrides?: ManifestOverride[];
 }
 
@@ -75,6 +80,15 @@ export interface SearchEngine {
 export interface TaxonomyField {
   description?: string;
   values: string[];
+  /**
+   * When true, this taxonomy dimension identifies content variants that are
+   * near-identical in vector space (e.g. the same API operation documented in
+   * multiple languages). Search results sharing the same content identity —
+   * determined by normalizing this field's value out of the filepath — are
+   * collapsed to the highest-scoring result. Has no effect when a filter for
+   * this field is active, since the filter already restricts to a single value.
+   */
+  vector_collapse?: boolean;
 }
 
 export interface MetadataStats {

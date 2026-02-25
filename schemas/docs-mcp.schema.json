@@ -67,6 +67,35 @@
         "type": "string"
       }
     },
+    "taxonomy": {
+      "examples": [
+        {
+          "language": {
+            "vector_collapse": true
+          }
+        }
+      ],
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "vector_collapse": {
+            "default": false,
+            "description": "When true, this taxonomy dimension identifies content variants that are near-identical in vector space (e.g. the same API operation documented in multiple SDK languages). At search time, results sharing the same content identity — determined by normalizing this field's value out of the filepath — are collapsed to the highest-scoring result. Has no effect when a filter for this field is active, since the filter already restricts to a single value.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "vector_collapse"
+        ],
+        "additionalProperties": false,
+        "description": "Configuration for a taxonomy field's search-time behavior."
+      },
+      "description": "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing."
+    },
     "overrides": {
       "description": "Per-file-pattern overrides for chunking strategy and metadata. Evaluated top-to-bottom; last match wins.",
       "type": "array",

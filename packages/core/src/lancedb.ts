@@ -9,6 +9,7 @@ import {
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor.js";
 import {
   clampLimit,
+  dedupKey,
   isChunkIdFormat,
   makeSnippet
 } from "./search-common.js";
@@ -48,6 +49,7 @@ export interface OpenLanceDbSearchEngineOptions {
   dbPath: string;
   tableName?: string;
   metadataKeys: string[];
+  collapseKeys?: string[];
   proximityWeight?: number;
   phraseSlop?: number;
   queryEmbeddingProvider?: EmbeddingProvider;
@@ -127,6 +129,7 @@ export async function buildLanceDbIndex(
 export class LanceDbSearchEngine implements SearchEngine {
   private readonly table: Table;
   private readonly metadataKeys: string[];
+  private readonly collapseKeys: string[];
   private readonly proximityWeight: number;
   private readonly phraseSlop: number;
   private readonly queryEmbeddingProvider: EmbeddingProvider | undefined;
@@ -138,6 +141,7 @@ export class LanceDbSearchEngine implements SearchEngine {
     table: Table,
     metadataKeys: string[],
     options: DocsIndexOptions & {
+      collapseKeys?: string[];
       queryEmbeddingProvider?: EmbeddingProvider;
       vectorWeight?: number;
       onWarning?: (message: string) => void;
@@ -145,6 +149,7 @@ export class LanceDbSearchEngine implements SearchEngine {
   ) {
     this.table = table;
     this.metadataKeys = [...metadataKeys];
+    this.collapseKeys = options.collapseKeys ?? [];
     this.proximityWeight = options.proximityWeight ?? 1.25;
     this.phraseSlop = normalizePhraseSlop(options.phraseSlop);
     this.queryEmbeddingProvider = options.queryEmbeddingProvider;
@@ -156,10 +161,14 @@ export class LanceDbSearchEngine implements SearchEngine {
     const db = await connect(options.dbPath);
     const table = await db.openTable(options.tableName ?? DEFAULT_TABLE_NAME);
     const engineOptions: DocsIndexOptions & {
+      collapseKeys?: string[];
       queryEmbeddingProvider?: EmbeddingProvider;
       vectorWeight?: number;
       onWarning?: (message: string) => void;
     } = {};
+    if (options.collapseKeys !== undefined) {
+      engineOptions.collapseKeys = options.collapseKeys;
+    }
     if (options.proximityWeight !== undefined) {
       engineOptions.proximityWeight = options.proximityWeight;
     }
@@ -211,14 +220,21 @@ export class LanceDbSearchEngine implements SearchEngine {
     const phraseWeight = request.rrf_weights?.phrase ?? this.proximityWeight;
     const vecWeight = request.rrf_weights?.vector ?? this.vectorWeight;
     const blended = blendRows(matchRows, phraseRows, vectorRows, phraseWeight, vecWeight, matchWeight);
-    const paged = blended.slice(offset, offset + limit);
+
+    // Collapse content-equivalent results across variant axes (e.g. same
+    // operation documented in multiple SDK languages). Skipped when active
+    // filters already restrict every collapse axis to a single value.
+    const activeCollapseKeys = this.collapseKeys.filter((k) => !filters[k]);
+    const deduped = deduplicateRows(blended, activeCollapseKeys);
+
+    const paged = deduped.slice(offset, offset + limit);
 
     const hits = paged.map((entry) =>
       toSearchHit(entry.row, entry.score, query, this.metadataKeys)
     );
 
     const nextOffset = offset + paged.length;
-    const nextCursor = nextOffset < blended.length
+    const nextCursor = nextOffset < deduped.length
       ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
       : null;
 
@@ -465,6 +481,28 @@ function blendRows(
       }
       return expectStringField(a.row, "chunk_id").localeCompare(expectStringField(b.row, "chunk_id"));
     });
+}
+
+function deduplicateRows(
+  rows: Array<{ row: ChunkRow; score: number }>,
+  collapseKeys: string[]
+): Array<{ row: ChunkRow; score: number }> {
+  if (collapseKeys.length === 0) return rows;
+
+  const seen = new Set<string>();
+  return rows.filter((entry) => {
+    const key = dedupKey(
+      expectStringField(entry.row, "filepath"),
+      expectStringField(entry.row, "heading"),
+      expectStringField(entry.row, "chunk_id"),
+      (k) => expectStringField(entry.row, k),
+      collapseKeys
+    );
+    if (key === null) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function buildWhereClause(filters: Record<string, string>, taxonomyKeys?: string[]): string | null {

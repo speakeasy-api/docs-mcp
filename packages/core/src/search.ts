@@ -1,6 +1,7 @@
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor.js";
 import {
   clampLimit,
+  dedupKey,
   isChunkIdFormat,
   makeSnippet,
   matchesMetadataFilters,
@@ -24,12 +25,14 @@ export class InMemorySearchEngine implements SearchEngine {
   private readonly byId: Map<string, Chunk>;
   private readonly byFile: Map<string, Chunk[]>;
   private readonly proximityWeight: number;
+  private readonly collapseKeys: string[];
 
-  constructor(chunks: Chunk[], options: DocsIndexOptions = {}) {
+  constructor(chunks: Chunk[], options: DocsIndexOptions & { collapseKeys?: string[] } = {}) {
     this.chunks = [...chunks];
     this.byId = new Map(chunks.map((chunk) => [chunk.chunk_id, chunk]));
     this.byFile = new Map<string, Chunk[]>();
     this.proximityWeight = options.proximityWeight ?? 1.25;
+    this.collapseKeys = options.collapseKeys ?? [];
 
     for (const chunk of chunks) {
       const list = this.byFile.get(chunk.filepath) ?? [];
@@ -63,11 +66,14 @@ export class InMemorySearchEngine implements SearchEngine {
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score || a.chunk.chunk_id.localeCompare(b.chunk.chunk_id));
 
-    const paged = scored.slice(offset, offset + limit);
+    const activeCollapseKeys = this.collapseKeys.filter((k) => !filters[k]);
+    const deduped = deduplicateChunks(scored, activeCollapseKeys);
+
+    const paged = deduped.slice(offset, offset + limit);
     const hits = paged.map(({ chunk, score }) => toSearchHit(chunk, score, query));
 
     const nextOffset = offset + paged.length;
-    const nextCursor = nextOffset < scored.length
+    const nextCursor = nextOffset < deduped.length
       ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
       : null;
 
@@ -209,6 +215,28 @@ function buildHint(
       : `0 results found for query '${query}'.`,
     suggested_filters: suggestions
   };
+}
+
+function deduplicateChunks(
+  entries: Array<{ chunk: Chunk; score: number }>,
+  collapseKeys: string[]
+): Array<{ chunk: Chunk; score: number }> {
+  if (collapseKeys.length === 0) return entries;
+
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    const key = dedupKey(
+      entry.chunk.filepath,
+      entry.chunk.heading,
+      entry.chunk.chunk_id,
+      (k) => entry.chunk.metadata[k] ?? "",
+      collapseKeys
+    );
+    if (key === null) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function countToken(value: string, token: string): number {

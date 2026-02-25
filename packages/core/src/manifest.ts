@@ -1,13 +1,36 @@
 import matter from "gray-matter";
 import picomatch from "picomatch";
+import { ManifestTaxonomyConfigSchema } from "./manifest-schema.js";
 import type {
   ChunkingStrategy,
   Manifest,
   ManifestOverride,
+  ManifestTaxonomyFieldConfig,
   ResolvedFileConfig
 } from "./types.js";
 
 const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
+
+/**
+ * Union-merges taxonomy field configs from multiple manifests. If any manifest
+ * sets `vector_collapse: true` for a key, the merged result includes it.
+ */
+export function mergeTaxonomyConfigs(
+  manifests: Iterable<Manifest>
+): Record<string, ManifestTaxonomyFieldConfig> {
+  const merged: Record<string, ManifestTaxonomyFieldConfig> = {};
+
+  for (const manifest of manifests) {
+    if (!manifest.taxonomy) continue;
+    for (const [key, config] of Object.entries(manifest.taxonomy)) {
+      if (config.vector_collapse) {
+        merged[key] = { ...merged[key], vector_collapse: true };
+      }
+    }
+  }
+
+  return merged;
+}
 
 const HTML_HINT_REGEX = /<!--\s*mcp_chunking_hint:\s*(\{[^}]+\})\s*-->/;
 
@@ -29,6 +52,13 @@ export function parseManifest(input: unknown): Manifest {
   }
   if (manifest.metadata) {
     parsed.metadata = parseMetadata(manifest.metadata, "metadata");
+  }
+  if (manifest.taxonomy) {
+    try {
+      parsed.taxonomy = ManifestTaxonomyConfigSchema.parse(manifest.taxonomy);
+    } catch (err) {
+      throw new Error(`Invalid taxonomy config: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   if (manifest.overrides) {
     parsed.overrides = parseOverrides(manifest.overrides);

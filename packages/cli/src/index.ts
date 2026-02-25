@@ -16,12 +16,14 @@ import {
   embedChunksIncremental,
   loadCache,
   loadChunksFromPreviousIndex,
+  mergeTaxonomyConfigs,
   parseManifestJson,
   resolveFileConfig,
   saveCache,
   type Chunk,
   type EmbedProgressEvent,
   type EmbeddingMetadata,
+  type ManifestTaxonomyFieldConfig,
   type IndexBuildStep,
   type Manifest,
   type PreviousIndexReader
@@ -215,6 +217,8 @@ program
     const cacheSuffix = chunkCacheHits > 0 ? ` (${chunkCacheHits} cached)` : "";
     console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks${cacheSuffix}`);
 
+    const taxonomyConfig = mergeTaxonomyConfigs(manifestCache.values());
+
     const providerInput: {
       provider: "none" | "hash" | "openai";
       model?: string;
@@ -318,9 +322,17 @@ program
       files,
       options.description,
       embeddingMetadata,
-      sourceCommit
+      sourceCommit,
+      taxonomyConfig
     );
     const metadataKeys = Object.keys(metadata.taxonomy);
+
+    // Warn about taxonomy config keys that don't match any chunk metadata
+    for (const key of Object.keys(taxonomyConfig)) {
+      if (!metadata.taxonomy[key]) {
+        console.warn(`warn: taxonomy config key '${key}' does not match any chunk metadata — this configuration has no effect`);
+      }
+    }
 
     // Close previous index before writing the new one
     previousIndex?.close();
@@ -466,11 +478,12 @@ function buildMetadata(
   files: string[],
   corpusDescription: string,
   embedding: EmbeddingMetadata | null,
-  sourceCommit: string | null
+  sourceCommit: string | null,
+  taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>
 ): {
   metadata_version: string;
   corpus_description: string;
-  taxonomy: Record<string, { description: string; values: string[] }>;
+  taxonomy: Record<string, { description: string; values: string[]; vector_collapse?: boolean }>;
   stats: {
     total_chunks: number;
     total_files: number;
@@ -488,11 +501,13 @@ function buildMetadata(
     }
   }
 
-  const taxonomy: Record<string, { description: string; values: string[] }> = {};
+  const taxonomy: Record<string, { description: string; values: string[]; vector_collapse?: boolean }> = {};
   for (const [key, values] of taxonomyValues.entries()) {
+    const config = taxonomyConfig[key];
     taxonomy[key] = {
       description: `Filter results by ${key}.`,
-      values: [...values].sort((a, b) => a.localeCompare(b))
+      values: [...values].sort((a, b) => a.localeCompare(b)),
+      ...(config?.vector_collapse ? { vector_collapse: true } : {})
     };
   }
 

@@ -48,6 +48,42 @@ export function makeSnippet(content: string, query: string): string {
   return `${prefix}${normalized.slice(start, end).trim()}${suffix}`;
 }
 
+/**
+ * Computes a dedup key for collapsing content-equivalent results across
+ * taxonomy variant axes (e.g. the same operation documented in multiple SDK
+ * languages). Returns null when no collapsing applies.
+ */
+export function dedupKey(
+  filepath: string,
+  heading: string,
+  chunkId: string,
+  getMetadataValue: (key: string) => string,
+  collapseKeys: string[]
+): string | null {
+  if (collapseKeys.length === 0) return null;
+
+  const parts = filepath.split("/");
+  let anyNormalized = false;
+
+  for (const key of collapseKeys) {
+    const value = getMetadataValue(key);
+    if (!value) return null;
+
+    const idx = parts.indexOf(value);
+    if (idx >= 0) {
+      parts[idx] = "*";
+      anyNormalized = true;
+    }
+  }
+
+  if (!anyNormalized) return null;
+
+  const partMatch = chunkId.match(/-part-(\d+)$/);
+  const partSuffix = partMatch ? `:${partMatch[1]}` : "";
+
+  return `${parts.join("/")}:${heading}${partSuffix}`;
+}
+
 export function matchesMetadataFilters(
   metadata: Record<string, string>,
   filters: Record<string, string>,

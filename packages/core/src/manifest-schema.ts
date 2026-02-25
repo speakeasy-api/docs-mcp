@@ -51,6 +51,23 @@ export const ManifestOverrideSchema = z
     "Overrides the default chunking strategy and/or metadata for files matching a glob pattern. Within the overrides array, later matches take precedence."
   );
 
+export const TaxonomyFieldConfigSchema = z
+  .object({
+    vector_collapse: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, this taxonomy dimension identifies content variants that are near-identical in vector space (e.g. the same API operation documented in multiple SDK languages). At search time, results sharing the same content identity — determined by normalizing this field's value out of the filepath — are collapsed to the highest-scoring result. Has no effect when a filter for this field is active, since the filter already restricts to a single value."
+      ),
+  })
+  .describe("Configuration for a taxonomy field's search-time behavior.");
+
+export const ManifestTaxonomyConfigSchema = z
+  .record(z.string(), TaxonomyFieldConfigSchema)
+  .describe(
+    "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing."
+  );
+
 export const ManifestSchema = z
   .object({
     version: z
@@ -67,6 +84,8 @@ export const ManifestSchema = z
         "Key-value pairs attached to every chunk produced from this directory tree. Each key becomes a filterable taxonomy dimension exposed as an enum parameter on the search tool."
       )
       .meta({ examples: [{ language: "typescript", scope: "sdk-specific" }] }),
+    taxonomy: ManifestTaxonomyConfigSchema.optional()
+      .meta({ examples: [{ language: { vector_collapse: true } }] }),
     overrides: z
       .array(ManifestOverrideSchema)
       .optional()

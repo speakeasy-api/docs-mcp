@@ -9,6 +9,7 @@ import {
   DocsIndex,
   LanceDbSearchEngine,
   createEmbeddingProvider,
+  getCollapseKeys,
   normalizeMetadata,
   type Chunk,
   type CorpusMetadata,
@@ -119,6 +120,7 @@ program
     }
     const metadata = normalizeMetadata(metadataDocument as unknown as CorpusMetadata) as CorpusMetadata;
     const metadataKeys = Object.keys(metadata.taxonomy);
+    const collapseKeys = getCollapseKeys(metadata.taxonomy);
     const indexConfig = parseIndexConfig(metadataDocument);
     const queryEmbeddingProvider = resolveQueryEmbeddingProvider(options, metadata.embedding);
 
@@ -127,6 +129,7 @@ program
       tableName: string;
       chunksPath: string;
       metadataKeys: string[];
+      collapseKeys: string[];
       queryEmbeddingProvider?: EmbeddingProvider;
       proximityWeight?: number;
       phraseSlop?: number;
@@ -137,6 +140,7 @@ program
       tableName: indexConfig.table,
       chunksPath,
       metadataKeys,
+      collapseKeys,
       allowChunksFallback: options.allowChunksFallback
     };
     if (queryEmbeddingProvider !== undefined) {
@@ -188,6 +192,7 @@ async function loadSearchEngine(input: {
   tableName: string;
   chunksPath: string;
   metadataKeys: string[];
+  collapseKeys: string[];
   queryEmbeddingProvider?: EmbeddingProvider;
   proximityWeight?: number;
   phraseSlop?: number;
@@ -199,6 +204,7 @@ async function loadSearchEngine(input: {
       dbPath: string;
       tableName: string;
       metadataKeys: string[];
+      collapseKeys?: string[];
       queryEmbeddingProvider?: EmbeddingProvider;
       proximityWeight?: number;
       phraseSlop?: number;
@@ -208,6 +214,7 @@ async function loadSearchEngine(input: {
       dbPath: input.lancedbPath,
       tableName: input.tableName,
       metadataKeys: input.metadataKeys,
+      ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {}),
       onWarning: (message: string) => console.warn(`warn: ${message}`)
     };
     if (input.queryEmbeddingProvider !== undefined) {
@@ -237,7 +244,9 @@ async function loadSearchEngine(input: {
   );
   const chunksRaw = await readFile(input.chunksPath, "utf8");
   const chunks = JSON.parse(chunksRaw) as Chunk[];
-  return new DocsIndex(chunks);
+  return new DocsIndex(chunks, {
+    ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {})
+  });
 }
 
 function parseIndexConfig(metadata: Record<string, unknown>): { path: string; table: string } {

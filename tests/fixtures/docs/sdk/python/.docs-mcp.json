@@ -8,5 +8,8 @@
   "metadata": {
     "scope": "sdk-specific",
     "language": "python"
+  },
+  "taxonomy": {
+    "language": { "vector_collapse": true }
   }
 }
