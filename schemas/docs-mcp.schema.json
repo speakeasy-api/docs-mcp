@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "version": {
@@ -28,12 +28,12 @@
           ]
         },
         "max_chunk_size": {
-          "description": "Maximum chunk size in characters. Chunks exceeding this limit are split at the next available boundary to prevent oversized results.",
+          "description": "Maximum chunk size in characters (default: 20000). Oversized chunks are first split recursively at finer heading levels (e.g. h2→h3→h4→…→h6), preserving semantic structure and breadcrumbs. Only when no further sub-headings exist does it fall back to AST node boundary splitting.",
           "examples": [
             8000
           ],
           "type": "integer",
-          "minimum": 1,
+          "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         },
         "min_chunk_size": {
@@ -42,7 +42,7 @@
             200
           ],
           "type": "integer",
-          "minimum": 1,
+          "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         }
       },
@@ -99,12 +99,12 @@
                 ]
               },
               "max_chunk_size": {
-                "description": "Maximum chunk size in characters. Chunks exceeding this limit are split at the next available boundary to prevent oversized results.",
+                "description": "Maximum chunk size in characters (default: 20000). Oversized chunks are first split recursively at finer heading levels (e.g. h2→h3→h4→…→h6), preserving semantic structure and breadcrumbs. Only when no further sub-headings exist does it fall back to AST node boundary splitting.",
                 "examples": [
                   8000
                 ],
                 "type": "integer",
-                "minimum": 1,
+                "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               },
               "min_chunk_size": {
@@ -113,7 +113,7 @@
                   200
                 ],
                 "type": "integer",
-                "minimum": 1,
+                "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               }
             },

@@ -35,6 +35,13 @@ const CHUNK_LEVEL_MAP: Record<Exclude<ChunkingStrategy["chunk_by"], "file">, num
   h3: 3
 };
 
+/**
+ * Default maximum chunk size in characters (~6,700 tokens at ~3 chars/token),
+ * well under OpenAI's 8,191-token embedding limit. Applied when no explicit
+ * `max_chunk_size` is configured.
+ */
+export const DEFAULT_MAX_CHUNK_SIZE = 20_000;
+
 // ─── Public API ──────────────────────────────────────────────────
 
 export function buildChunks(input: BuildChunksInput): Chunk[] {
@@ -240,28 +247,23 @@ function slugify(value: string): string {
 // ─── AST-safe size rules ─────────────────────────────────────────
 
 function applySizeRules(segments: Segment[], strategy: ChunkingStrategy): Segment[] {
-  const max = strategy.max_chunk_size;
+  const max = strategy.max_chunk_size ?? DEFAULT_MAX_CHUNK_SIZE;
   const min = strategy.min_chunk_size;
 
-  // Phase 1: split oversized segments using AST node boundaries
+  // Phase 1: split oversized segments — try recursive heading refinement first,
+  // then fall back to AST node boundary splitting.
   const expanded: Segment[] = [];
 
   for (const segment of segments) {
     const contentLength = rawMarkdown(segment.nodes, segment.fullMarkdown).length;
 
-    if (!max || contentLength <= max) {
+    if (contentLength <= max) {
       expanded.push(segment);
       continue;
     }
 
-    const nodeGroups = splitByNodeSize(segment.nodes, segment.fullMarkdown, max);
-    nodeGroups.forEach((groupNodes, partIndex) => {
-      expanded.push({
-        ...segment,
-        nodes: groupNodes,
-        part: partIndex + 1
-      });
-    });
+    const refined = refineOversizedSegment(segment, max);
+    expanded.push(...refined);
   }
 
   // Phase 2: merge undersized segments into previous (Opus-style breadcrumb check)
@@ -287,6 +289,107 @@ function applySizeRules(segments: Segment[], strategy: ChunkingStrategy): Segmen
   }
 
   return merged;
+}
+
+/**
+ * Recursively refine an oversized segment by splitting at progressively finer
+ * heading levels (headingLevel+1, +2, ... up to h6). Falls back to AST node
+ * boundary splitting when no sub-headings exist.
+ */
+function refineOversizedSegment(segment: Segment, max: number): Segment[] {
+  const nextLevel = segment.headingLevel + 1;
+  if (nextLevel > 6) {
+    return splitByNodeSizeSegments(segment, max);
+  }
+
+  // Find sub-heading boundaries at nextLevel within this segment's nodes
+  const subBoundaries: Array<{ nodeIndex: number; heading: string; slug: string }> = [];
+  const slugCounts = new Map<string, number>();
+
+  for (let i = 0; i < segment.nodes.length; i += 1) {
+    const node = segment.nodes[i]!;
+    if (node.type === "heading" && node.depth === nextLevel) {
+      const heading = toString(node).trim() || "section";
+      const baseSlug = slugify(heading) || "section";
+      const count = (slugCounts.get(baseSlug) ?? 0) + 1;
+      slugCounts.set(baseSlug, count);
+      const slug = count === 1 ? baseSlug : `${baseSlug}-${count}`;
+      subBoundaries.push({ nodeIndex: i, heading, slug });
+    }
+  }
+
+  if (subBoundaries.length === 0) {
+    // No sub-headings at this level — try the next level down
+    const deeper: Segment = { ...segment, headingLevel: nextLevel };
+    return refineOversizedSegment(deeper, max);
+  }
+
+  const subSegments: Segment[] = [];
+
+  // Preamble: nodes before the first sub-heading (inherits parent heading)
+  if (subBoundaries[0]!.nodeIndex > 0) {
+    const preambleNodes = segment.nodes.slice(0, subBoundaries[0]!.nodeIndex);
+    const preambleContent = rawMarkdown(preambleNodes, segment.fullMarkdown);
+    if (preambleContent.trim()) {
+      subSegments.push({
+        ...segment,
+        nodes: preambleNodes,
+        part: 1
+      });
+    }
+  }
+
+  // Create sub-segments for each sub-heading
+  for (let i = 0; i < subBoundaries.length; i += 1) {
+    const boundary = subBoundaries[i]!;
+    const next = subBoundaries[i + 1];
+    const startIdx = boundary.nodeIndex;
+    const endIdx = next ? next.nodeIndex : segment.nodes.length;
+    const sectionNodes = segment.nodes.slice(startIdx, endIdx);
+
+    const content = rawMarkdown(sectionNodes, segment.fullMarkdown);
+    if (!content.trim()) {
+      continue;
+    }
+
+    subSegments.push({
+      kind: "heading",
+      heading: boundary.heading,
+      headingLevel: nextLevel,
+      ancestorTexts: [...segment.ancestorTexts, ...(segment.heading ? [segment.heading] : [])],
+      ancestorSlugs: [...segment.ancestorSlugs, ...(segment.slug ? [segment.slug] : [])],
+      slug: boundary.slug,
+      nodes: sectionNodes,
+      fullMarkdown: segment.fullMarkdown,
+      part: 1
+    });
+  }
+
+  // Recursively refine any sub-segments that are still oversized
+  const result: Segment[] = [];
+  for (const sub of subSegments) {
+    const subLength = rawMarkdown(sub.nodes, sub.fullMarkdown).length;
+    if (subLength <= max) {
+      result.push(sub);
+    } else {
+      result.push(...refineOversizedSegment(sub, max));
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Fallback: split an oversized segment at AST node boundaries, producing
+ * multi-part segments with the same heading metadata.
+ */
+function splitByNodeSizeSegments(segment: Segment, max: number): Segment[] {
+  const nodeGroups = splitByNodeSize(segment.nodes, segment.fullMarkdown, max);
+  return nodeGroups.map((groupNodes, partIndex) => ({
+    ...segment,
+    nodes: groupNodes,
+    part: partIndex + 1
+  }));
 }
 
 /**

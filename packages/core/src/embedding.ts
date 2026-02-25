@@ -73,6 +73,13 @@ export class HashEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+/**
+ * Conservative character limit per text input to stay under the 8191-token
+ * context window of OpenAI embedding models.  We use ~3 chars/token as a
+ * safety margin so 8000 * 3 = 24 000 characters.
+ */
+const DEFAULT_MAX_INPUT_CHARS = 24_000;
+
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly name = "openai";
   readonly model: string;
@@ -139,6 +146,16 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
   private async embedBatchWithRetry(batch: string[]): Promise<number[][]> {
     let attempt = 0;
+    const truncated = batch.map((text) => {
+      if (text.length > DEFAULT_MAX_INPUT_CHARS) {
+        console.warn(
+          `[docs-mcp] Embedding input truncated from ${text.length} to ${DEFAULT_MAX_INPUT_CHARS} characters. ` +
+            `Consider lowering max_chunk_size in your chunking strategy to avoid content loss.`
+        );
+        return text.slice(0, DEFAULT_MAX_INPUT_CHARS);
+      }
+      return text;
+    });
 
     while (true) {
       const response = await fetch(`${this.baseUrl}/embeddings`, {
@@ -149,7 +166,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         },
         body: JSON.stringify({
           model: this.model,
-          input: batch,
+          input: truncated,
           dimensions: this.dimensions
         })
       });

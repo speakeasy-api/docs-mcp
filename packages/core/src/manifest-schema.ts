@@ -13,7 +13,7 @@ export const ChunkingStrategySchema = z
       .positive()
       .optional()
       .describe(
-        "Maximum chunk size in characters. Chunks exceeding this limit are split at the next available boundary to prevent oversized results."
+        "Maximum chunk size in characters (default: 20000). Oversized chunks are first split recursively at finer heading levels (e.g. h2→h3→h4→…→h6), preserving semantic structure and breadcrumbs. Only when no further sub-headings exist does it fall back to AST node boundary splitting."
       )
       .meta({ examples: [8000] }),
     min_chunk_size: z
