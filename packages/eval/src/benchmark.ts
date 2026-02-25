@@ -92,10 +92,8 @@ export async function runBenchmark(
         ...(embedding.model ? ["--embedding-model", embedding.model] : [])
       ];
 
-      const queryEmbeddingProvider = embedding.provider === "none" ? "none" : "auto";
       const serverArgs = [
-        "--index-dir", outDir,
-        "--query-embedding-provider", queryEmbeddingProvider
+        "--index-dir", outDir
       ];
 
       // StdioClientTransport only inherits a small allowlist of env vars

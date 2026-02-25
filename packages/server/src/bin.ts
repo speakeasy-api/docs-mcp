@@ -25,16 +25,11 @@ import { startHttpServer } from "./http.js";
 const require = createRequire(import.meta.url);
 const { version: SERVER_VERSION } = require("../package.json") as { version: string };
 
-type QueryEmbeddingProviderOption = "auto" | "none" | "hash" | "openai";
-
 interface ServerCliOptions {
   indexDir: string;
   name: string;
   toolPrefix?: string;
   version: string;
-  queryEmbeddingProvider: QueryEmbeddingProviderOption;
-  queryEmbeddingModel?: string;
-  queryEmbeddingDimensions?: number;
   queryEmbeddingApiKey?: string;
   queryEmbeddingBaseUrl?: string;
   queryEmbeddingBatchSize?: number;
@@ -81,14 +76,6 @@ program
   .option("--name <value>", "MCP server name", "@speakeasy-api/docs-mcp-server")
   .option("--tool-prefix <value>", "Tool name prefix (e.g. 'acme' produces acme_search_docs)")
   .option("--version <value>", "MCP server version", SERVER_VERSION)
-  .option(
-    "--query-embedding-provider <provider>",
-    "Query embedding provider: auto | none | hash | openai",
-    parseQueryEmbeddingProvider,
-    "none"
-  )
-  .option("--query-embedding-model <value>", "Query embedding model override")
-  .option("--query-embedding-dimensions <number>", "Query embedding dimensions", parseNumberOption)
   .option(
     "--query-embedding-api-key <value>",
     "Query embedding API key (or set OPENAI_API_KEY)"
@@ -269,11 +256,15 @@ function resolveQueryEmbeddingProvider(
   options: ServerCliOptions,
   metadataEmbedding: EmbeddingMetadata | null
 ): EmbeddingProvider | undefined {
-  const selectedProvider = selectEmbeddingProvider(
-    options.queryEmbeddingProvider,
-    metadataEmbedding
-  );
-  if (!selectedProvider || selectedProvider === "none") {
+  const provider = metadataEmbedding?.provider?.trim().toLowerCase();
+  if (!provider || provider === "none") {
+    return undefined;
+  }
+
+  if (provider !== "hash" && provider !== "openai") {
+    console.warn(
+      `warn: embedding provider '${metadataEmbedding?.provider}' is not supported at runtime; falling back to FTS-only search`
+    );
     return undefined;
   }
 
@@ -285,17 +276,15 @@ function resolveQueryEmbeddingProvider(
     baseUrl?: string;
     batchSize?: number;
   } = {
-    provider: selectedProvider
+    provider
   };
 
-  const model = options.queryEmbeddingModel ?? metadataEmbedding?.model;
-  if (model !== undefined) {
-    input.model = model;
+  if (metadataEmbedding?.model !== undefined) {
+    input.model = metadataEmbedding.model;
   }
 
-  const dimensions = options.queryEmbeddingDimensions ?? metadataEmbedding?.dimensions;
-  if (dimensions !== undefined) {
-    input.dimensions = dimensions;
+  if (metadataEmbedding?.dimensions !== undefined) {
+    input.dimensions = metadataEmbedding.dimensions;
   }
 
   const apiKey =
@@ -319,44 +308,6 @@ function resolveQueryEmbeddingProvider(
     console.warn(`warn: query embedding disabled: ${message}`);
     return undefined;
   }
-}
-
-function selectEmbeddingProvider(
-  option: QueryEmbeddingProviderOption,
-  metadataEmbedding: EmbeddingMetadata | null
-): "none" | "hash" | "openai" | undefined {
-  if (option !== "auto") {
-    return option;
-  }
-
-  const provider = metadataEmbedding?.provider?.trim().toLowerCase();
-  if (!provider || provider === "none") {
-    return undefined;
-  }
-
-  if (provider === "hash" || provider === "openai") {
-    return provider;
-  }
-
-  console.warn(
-    `warn: embedding provider '${metadataEmbedding?.provider}' is not supported at runtime; falling back to FTS-only search`
-  );
-  return undefined;
-}
-
-function parseQueryEmbeddingProvider(value: string): QueryEmbeddingProviderOption {
-  const normalized = value.trim().toLowerCase();
-  if (
-    normalized === "auto" ||
-    normalized === "none" ||
-    normalized === "hash" ||
-    normalized === "openai"
-  ) {
-    return normalized;
-  }
-  throw new Error(
-    `unsupported query embedding provider '${value}'. Expected one of: auto, none, hash, openai`
-  );
 }
 
 function parseNumberOption(value: string): number {

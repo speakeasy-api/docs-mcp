@@ -72,3 +72,122 @@ The eval runner produces a markdown delta table comparing the current run's metr
 ```
 
 No hard pass/fail gates — the delta table gives reviewers the data to make informed decisions.
+
+## Building an Eval Suite
+
+An eval suite is a JSON array of test cases. Each case describes a query, optional filters, and the chunk ID that should appear in the results.
+
+### Case Format
+
+```json
+[
+  {
+    "name": "Exact Class Match",
+    "category": "lexical",
+    "query": "AcmeAuthClientV2 initialization",
+    "expectedChunkId": "sdks/typescript/auth.md#typescript-auth-sdk/acmeauthclientv2-initialization",
+    "filters": { "language": "typescript" },
+    "limit": 5,
+    "maxRounds": 2
+  },
+  {
+    "name": "Conceptual Retry Query",
+    "category": "intent",
+    "query": "retry configuration",
+    "expectedChunkId": "sdks/python/auth.md#python-auth-sdk/retry-configuration",
+    "filters": { "language": "python" },
+    "limit": 5,
+    "maxRounds": 2
+  }
+]
+```
+
+### Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `query` | yes | The search query to send to `search_docs` |
+| `expectedChunkId` | yes | The chunk ID that should appear in the results. Format: `filepath#heading-slug` |
+| `filters` | no | Taxonomy filters to pass (e.g. `{"language": "python"}`). Defaults to `{}` |
+| `limit` | no | Number of results per page. Defaults to 5 |
+| `maxRounds` | no | Maximum pagination rounds before giving up. Defaults to 3 |
+| `name` | no | Human-readable name for reporting |
+| `category` | no | Category tag for per-category breakdown analysis |
+
+### Choosing Categories
+
+Categories enable per-category metric breakdowns, revealing where your search engine excels and where it struggles. Common categories:
+
+| Category | Tests | Example query |
+|---|---|---|
+| `lexical` | Exact keyword / class name matches | `"AcmeAuthClientV2 initialization"` |
+| `paraphrased` | Semantically equivalent but differently worded | `"how do I handle 429 rate limits"` |
+| `intent` | Conceptual queries requiring understanding | `"retry configuration"` |
+| `sdk-reference` | SDK-specific API lookups | `"list organizations method"` |
+| `cross-service` | Queries spanning multiple services | `"authentication across services"` |
+| `multi-hop` | Requires connecting multiple chunks | `"pagination with retry on failure"` |
+| `distractor` | Queries with plausible but wrong matches | `"authentication" (expecting auth guide, not SDK)` |
+| `error-handling` | Error code and exception lookups | `"ERR_RATE_LIMIT handling"` |
+| `api-discovery` | Finding available operations | `"what endpoints are available"` |
+
+## Running Benchmarks
+
+### Single Eval Run
+
+Run an eval suite against a single server configuration:
+
+```bash
+npx docs-mcp-eval run \
+  --cases ./eval-cases.json \
+  --server-command "node packages/server/dist/bin.js --index-dir ./my-index"
+```
+
+Options:
+- `--cases` — path to your eval suite JSON file (required)
+- `--server-command` — command to launch the MCP server (required)
+- `--build-command` — optional pre-eval index build step
+- `--warmup-queries` — number of warmup searches before measurement (default: 0)
+- `--baseline` — path to a previous eval result JSON for delta comparison
+- `--out` — output path for the eval result JSON
+
+### Multi-Embedding Benchmark
+
+Compare search quality across embedding providers:
+
+```bash
+npx docs-mcp-eval benchmark \
+  --cases ./eval-cases.json \
+  --docs-dir ./my-docs \
+  --work-dir ./benchmark-output \
+  --build-command "npx docs-mcp build" \
+  --server-command "npx docs-mcp-server" \
+  --embeddings "none,openai/text-embedding-3-large" \
+  --warmup-queries 3
+```
+
+This builds a separate index for each embedding provider, runs the full eval suite against each, and generates a comparison report. The `--embeddings` flag accepts a comma-separated list of specs in the format `provider` or `provider/model`.
+
+## Interpreting Results
+
+### MRR@5 (Mean Reciprocal Rank at 5)
+
+The average of `1/rank` for the first correct result in the top 5. Measures how early the right answer appears.
+
+- **1.0** — the correct chunk is always the #1 result
+- **0.5** — correct chunk is typically at rank 2
+- **0.0** — correct chunk never appears in the top 5
+
+### NDCG@5 (Normalized Discounted Cumulative Gain at 5)
+
+Like MRR but accounts for the full ranking quality, not just the first correct result. Uses logarithmic discounting — a wrong result at rank 1 is penalized more heavily than at rank 5.
+
+### Facet Precision
+
+The fraction of eval cases where the expected chunk appears anywhere in the top 5 results. A simple retrieval success rate.
+
+- **1.0** — every eval case found its expected chunk
+- **0.5** — half the cases found the expected chunk
+
+### Per-Category Breakdowns
+
+The most actionable output. Per-category tables reveal which query types benefit from embeddings and which are already well-served by FTS alone. For example, `lexical` queries often perform identically with or without embeddings, while `paraphrased` and `intent` queries show significant improvement with semantic search.

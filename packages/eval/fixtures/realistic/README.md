@@ -21,10 +21,6 @@ node packages/eval/dist/bin.js \
   --server-arg packages/server/dist/bin.js \
   --server-arg --index-dir \
   --server-arg /tmp/docs-mcp-index \
-  --server-arg --query-embedding-provider \
-  --server-arg hash \
-  --server-arg --query-embedding-dimensions \
-  --server-arg 256 \
   --warmup-queries 10
 ```
 
