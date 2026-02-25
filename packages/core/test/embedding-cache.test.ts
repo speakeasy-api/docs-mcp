@@ -377,6 +377,124 @@ describe("embedChunksIncremental", () => {
   });
 });
 
+describe("embedChunksIncremental with batchSize and onProgress", () => {
+  it("calls onProgress once per batch with correct counts", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const chunks = [
+      makeChunk({ chunk_id: "a.md#s1", content_text: "alpha", breadcrumb: "a" }),
+      makeChunk({ chunk_id: "b.md#s2", content_text: "bravo", breadcrumb: "b" }),
+      makeChunk({ chunk_id: "c.md#s3", content_text: "charlie", breadcrumb: "c" }),
+      makeChunk({ chunk_id: "d.md#s4", content_text: "delta", breadcrumb: "d" }),
+      makeChunk({ chunk_id: "e.md#s5", content_text: "echo", breadcrumb: "e" }),
+    ];
+
+    const events: Array<{ completed: number; total: number; cached: number }> = [];
+    const result = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+      {
+        batchSize: 2,
+        onProgress: (event) => { events.push({ completed: event.completed, total: event.total, cached: event.cached }); },
+      },
+    );
+
+    expect(result.stats.total).toBe(5);
+    expect(result.stats.misses).toBe(5);
+    // 5 misses with batchSize=2 → 3 batches (2, 2, 1)
+    expect(events).toHaveLength(3);
+    expect(events[0]).toEqual({ completed: 2, total: 5, cached: 0 });
+    expect(events[1]).toEqual({ completed: 4, total: 5, cached: 0 });
+    expect(events[2]).toEqual({ completed: 5, total: 5, cached: 0 });
+  });
+
+  it("splits embed calls into expected number of batches", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const embedSpy = vi.spyOn(provider, "embed");
+    const chunks = [
+      makeChunk({ chunk_id: "a.md#s1", content_text: "alpha", breadcrumb: "a" }),
+      makeChunk({ chunk_id: "b.md#s2", content_text: "bravo", breadcrumb: "b" }),
+      makeChunk({ chunk_id: "c.md#s3", content_text: "charlie", breadcrumb: "c" }),
+    ];
+
+    await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+      { batchSize: 2 },
+    );
+
+    // 3 misses with batchSize=2 → 2 embed calls
+    expect(embedSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not call onProgress when all chunks are cached", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const chunks = [
+      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
+    ];
+
+    // First pass: cold cache
+    const result1 = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+    );
+
+    // Second pass: warm cache
+    const events: unknown[] = [];
+    const result2 = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      result1.updatedCache,
+      {
+        batchSize: 1,
+        onProgress: (event) => { events.push(event); },
+      },
+    );
+
+    expect(result2.stats.hits).toBe(1);
+    expect(result2.stats.misses).toBe(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it("reports correct cached count when mixing hits and misses", async () => {
+    const provider = new HashEmbeddingProvider({ dimensions: 8 });
+    const chunks = [
+      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
+      makeChunk({ chunk_id: "b.md#s2", content_text: "world", breadcrumb: "b" }),
+    ];
+
+    // First pass: cold cache
+    const result1 = await embedChunksIncremental(
+      chunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      null,
+    );
+
+    // Second pass: modify one chunk
+    const modifiedChunks = [
+      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
+      makeChunk({ chunk_id: "b.md#s2", content_text: "world updated", breadcrumb: "b" }),
+    ];
+
+    const events: Array<{ completed: number; total: number; cached: number }> = [];
+    await embedChunksIncremental(
+      modifiedChunks,
+      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      result1.updatedCache,
+      {
+        batchSize: 10,
+        onProgress: (event) => { events.push({ completed: event.completed, total: event.total, cached: event.cached }); },
+      },
+    );
+
+    // 1 hit, 1 miss → 1 batch → 1 progress event
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ completed: 2, total: 2, cached: 1 });
+  });
+});
+
 describe("end-to-end: save → load → incremental", () => {
   let tmpDir: string;
 

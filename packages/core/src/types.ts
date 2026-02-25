@@ -131,7 +131,20 @@ export interface EmbeddingProvider {
   readonly model: string;
   readonly dimensions: number;
   readonly configFingerprint: string;
+  readonly batchSize?: number;
   embed(texts: string[]): Promise<number[][]>;
+}
+
+export interface EmbedProgressEvent {
+  phase: "embedding";
+  completed: number;
+  total: number;
+  cached: number;
+}
+
+export interface EmbedIncrementalOptions {
+  batchSize?: number;
+  onProgress?: (event: EmbedProgressEvent) => void;
 }
 
 export interface DocsIndexOptions {

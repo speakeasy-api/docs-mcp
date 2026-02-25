@@ -18,13 +18,19 @@ import {
   resolveFileConfig,
   saveCache,
   type Chunk,
+  type EmbedProgressEvent,
   type EmbeddingMetadata,
+  type IndexBuildStep,
   type Manifest
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
 import { resolveSourceCommit } from "./git.js";
 
 const program = new Command();
+
+const isTTY = process.stderr.isTTY ?? false;
+function writeProgress(msg: string) { if (isTTY) process.stderr.write(`\r\x1b[K${msg}`); }
+function clearProgress() { if (isTTY) process.stderr.write("\r\x1b[K"); }
 
 program
   .name("docs-mcp")
@@ -112,7 +118,9 @@ program
     const manifestCache = new Map<string, Manifest>();
 
     const chunks: Chunk[] = [];
-    for (const file of files) {
+    for (let fi = 0; fi < files.length; fi++) {
+      writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
+      const file = files[fi]!;
       const markdown = await readFile(file, "utf8");
       const relative = toPosix(path.relative(docsDir, file));
       const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
@@ -135,6 +143,8 @@ program
       });
       chunks.push(...fileChunks);
     }
+    clearProgress();
+    console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks`);
 
     const providerInput: {
       provider: "none" | "hash" | "openai";
@@ -190,11 +200,16 @@ program
       const cache = options.rebuildCache ? null : await loadCache(cacheBaseDir, config);
 
       const embedStart = Date.now();
+      const onProgress = (event: EmbedProgressEvent) => {
+        writeProgress(`Embedding [${event.completed}/${event.total}] (${event.cached} cached)...`);
+      };
       const result = await embedChunksIncremental(
         chunks,
         { ...config, embed: (texts) => embeddingProvider.embed(texts) },
         cache,
+        { ...(embeddingProvider.batchSize !== undefined ? { batchSize: embeddingProvider.batchSize } : {}), onProgress },
       );
+      clearProgress();
       const embedMs = ((Date.now() - embedStart) / 1000).toFixed(1);
 
       vectorsByChunkId = result.vectorsByChunkId;
@@ -239,20 +254,29 @@ program
     const metadataKeys = Object.keys(metadata.taxonomy);
     const lanceDbPath = path.join(outDir, ".lancedb");
 
+    const indexStepLabels: Record<IndexBuildStep, string> = {
+      "writing-table": "Building search index: writing table...",
+      "indexing-fts": "Building search index: full-text index...",
+      "indexing-scalar": "Building search index: scalar indices...",
+      "indexing-vector": "Building search index: vector index...",
+    };
     const buildInput: {
       dbPath: string;
       chunks: Chunk[];
       metadataKeys: string[];
       vectorsByChunkId?: Map<string, number[]>;
+      onProgress?: (step: IndexBuildStep) => void;
     } = {
       dbPath: lanceDbPath,
       chunks,
-      metadataKeys
+      metadataKeys,
+      onProgress: (step) => writeProgress(indexStepLabels[step]),
     };
     if (vectorsByChunkId) {
       buildInput.vectorsByChunkId = vectorsByChunkId;
     }
     await buildLanceDbIndex(buildInput);
+    clearProgress();
 
     await writeFile(path.join(outDir, "chunks.json"), JSON.stringify(chunks, null, 2));
     await writeFile(

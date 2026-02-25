@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { connect } from "@lancedb/lancedb";
 import { sha256hex, toEmbeddingInput } from "./embedding.js";
-import type { Chunk, EmbeddingConfig } from "./types.js";
+import type { Chunk, EmbedIncrementalOptions, EmbeddingConfig } from "./types.js";
 
 /**
  * Bumped only if toEmbeddingInput() changes in a way that isn't captured
@@ -221,6 +221,7 @@ export async function embedChunksIncremental(
   chunks: Chunk[],
   provider: EmbeddingConfig & { embed(texts: string[]): Promise<number[][]> },
   cache: EmbeddingCache | null,
+  options?: EmbedIncrementalOptions,
 ): Promise<{
   vectorsByChunkId: Map<string, number[]>;
   updatedCache: EmbeddingCache;
@@ -249,7 +250,27 @@ export async function embedChunksIncremental(
 
   // Embed only misses
   const missTexts = missIndices.map((i) => toEmbeddingInput(chunks[i]!));
-  const missVectors = missTexts.length > 0 ? await provider.embed(missTexts) : [];
+  const missVectors: number[][] = [];
+
+  const batchSize = options?.batchSize;
+  if (missTexts.length > 0 && batchSize && batchSize > 0) {
+    let embeddedSoFar = 0;
+    for (let offset = 0; offset < missTexts.length; offset += batchSize) {
+      const batch = missTexts.slice(offset, offset + batchSize);
+      const batchVectors = await provider.embed(batch);
+      missVectors.push(...batchVectors);
+      embeddedSoFar += batch.length;
+      options.onProgress?.({
+        phase: "embedding",
+        completed: hitIndices.length + embeddedSoFar,
+        total: chunks.length,
+        cached: hitIndices.length,
+      });
+    }
+  } else if (missTexts.length > 0) {
+    missVectors.push(...await provider.embed(missTexts));
+  }
+
   if (missVectors.length !== missTexts.length) {
     throw new Error(
       `Embedding provider returned ${missVectors.length} vectors for ${missTexts.length} chunks`

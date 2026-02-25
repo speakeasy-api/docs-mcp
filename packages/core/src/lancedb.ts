@@ -34,7 +34,14 @@ export interface BuildLanceDbIndexOptions {
   tableName?: string;
   metadataKeys?: string[];
   vectorsByChunkId?: Map<string, number[]>;
+  onProgress?: (step: IndexBuildStep) => void;
 }
+
+export type IndexBuildStep =
+  | "writing-table"
+  | "indexing-fts"
+  | "indexing-scalar"
+  | "indexing-vector";
 
 export interface OpenLanceDbSearchEngineOptions {
   dbPath: string;
@@ -66,11 +73,15 @@ export async function buildLanceDbIndex(
     return { tableName, metadataKeys };
   }
 
+  const onProgress = options.onProgress;
+
   const db = await connect(options.dbPath);
 
   try {
+    onProgress?.("writing-table");
     const table = await db.createTable(tableName, rows, { mode: "overwrite" });
 
+    onProgress?.("indexing-fts");
     await table.createIndex("content_text", {
       config: Index.fts({ withPosition: true }),
       replace: true
@@ -80,6 +91,7 @@ export async function buildLanceDbIndex(
       replace: true
     });
 
+    onProgress?.("indexing-scalar");
     await Promise.all([
       safeCreateScalarIndex(table, "chunk_id"),
       safeCreateScalarIndex(table, "filepath"),
@@ -88,6 +100,7 @@ export async function buildLanceDbIndex(
 
     // Create IVF-PQ vector index when there are enough rows with vectors
     if (options.vectorsByChunkId && options.vectorsByChunkId.size >= 256) {
+      onProgress?.("indexing-vector");
       const numPartitions = Math.max(1, Math.round(Math.sqrt(options.vectorsByChunkId.size)));
       try {
         await table.createIndex("vector", {

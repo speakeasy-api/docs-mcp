@@ -87,7 +87,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly configFingerprint: string;
 
   private readonly apiKey: string;
-  private readonly batchSize: number;
+  readonly batchSize: number;
   private readonly baseUrl: string;
   private readonly concurrency: number;
   private readonly maxRetries: number;
