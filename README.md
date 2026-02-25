@@ -61,64 +61,26 @@ operations, pull in the most relevant documentation on demand, and answer
 questions with concrete, API‑aware detail—all without you hand‑writing tools or
 duplicating any of your docs.
 
-## Getting Started
+## Quickstart
 
-### Prerequisites
-
-- **Node.js >= 22**
-- **An embedding provider (optional).** For best search quality, set an
-  `OPENAI_API_KEY` environment variable. If you don't have one, the CLI supports
-  a free deterministic `hash` provider or a text-only `none` mode — see the
-  [CLI documentation](./packages/cli/README.md) for details on all providers.
-
-### Step 1: Build the Index
-
-Point the CLI at a directory of markdown files to produce a search index:
+Requires Node.js >= 22. For best results set `OPENAI_API_KEY`, or use
+`--embedding-provider hash` for a free local alternative.
 
 ```bash
+# 1. Build an index from your markdown docs
 npx @speakeasy-api/docs-mcp-cli build \
-  --docs-dir ./docs \
-  --out ./dist \
-  --embedding-provider openai          # or "hash" / "none"
-```
+  --docs-dir ./docs --out ./dist --embedding-provider openai
 
-This reads your markdown, chunks it intelligently, generates embeddings, and
-writes the index artifacts to `./dist`.
+# 2. Start the MCP server
+npx @speakeasy-api/docs-mcp-server --index-dir ./dist --transport http --port 20310
 
-### Step 2: Start the MCP Server
-
-Run the server against the index you just built:
-
-```bash
-npx @speakeasy-api/docs-mcp-server \
-  --index-dir ./dist \
-  --transport http \
-  --port 20310
-```
-
-Your MCP server is now live at `http://localhost:20310/mcp`. Any MCP-compatible
-client can connect to it. For stdio transport (e.g. Claude Desktop), omit the
-`--transport` and `--port` flags.
-
-### Step 3: Explore with the Playground
-
-The playground gives you a web UI for testing searches against your running
-server:
-
-```bash
+# 3. Open the playground at http://localhost:3001
 npx @speakeasy-api/docs-mcp-playground
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser. The
-playground proxies requests to `http://localhost:20310` by default — set
-`MCP_TARGET` to point it elsewhere.
+For stdio transport (e.g. Claude Desktop), omit `--transport` and `--port`.
 
 ## Deploying
-
-The recommended deployment pattern bakes the index into a Docker image at build
-time so the server starts instantly with zero external dependencies.
-
-### Dockerfile
 
 ```dockerfile
 FROM node:22-slim
@@ -129,12 +91,8 @@ EXPOSE 20310
 CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
 ```
 
-### CI Example (GitHub Actions)
-
-Add a step to your workflow that builds and pushes the image whenever your docs
-change:
-
 ```yaml
+# .github/workflows/deploy-docs-mcp.yml
 name: Deploy Docs MCP
 on:
   push:
@@ -146,24 +104,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: your-registry/docs-mcp:latest
 ```
 
-Drop the Dockerfile above into your repo root, replace `your-registry` with
-your container registry, and your docs MCP server will rebuild and deploy on
-every push to `main` that touches the `docs/` directory.
-
 ## Reference
 
-For full CLI flags and configuration options, see the package docs:
-
-- [CLI documentation](./packages/cli/README.md)
-- [Server documentation](./packages/server/README.md)
-- [Playground documentation](./packages/playground/README.md)
+- [CLI docs](./packages/cli/README.md)
+- [Server docs](./packages/server/README.md)
+- [Playground docs](./packages/playground/README.md)
 
