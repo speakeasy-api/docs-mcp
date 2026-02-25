@@ -84,7 +84,7 @@ program
     "--query-embedding-provider <provider>",
     "Query embedding provider: auto | none | hash | openai",
     parseQueryEmbeddingProvider,
-    "auto"
+    "none"
   )
   .option("--query-embedding-model <value>", "Query embedding model override")
   .option("--query-embedding-dimensions <number>", "Query embedding dimensions", parseNumberOption)
@@ -158,6 +158,7 @@ program
     const app = new McpDocsServer({
       index,
       metadata,
+      vectorSearchAvailable: queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
       ...(options.toolPrefix ? { toolPrefix: options.toolPrefix } : {}),
       ...(rrfWeights ? { rrfWeights } : {})
     });

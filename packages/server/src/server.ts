@@ -13,12 +13,14 @@ export interface McpDocsServerOptions {
   metadata: CorpusMetadata;
   toolPrefix?: string;
   rrfWeights?: RrfWeights;
+  vectorSearchAvailable?: boolean;
 }
 
 export class McpDocsServer {
   private readonly index: SearchEngine;
   private readonly metadata: CorpusMetadata;
   private readonly rrfWeights: RrfWeights | undefined;
+  private readonly vectorSearchAvailable: boolean;
   private readonly searchToolName: string;
   private readonly getDocToolName: string;
 
@@ -26,16 +28,21 @@ export class McpDocsServer {
     this.index = options.index;
     this.metadata = options.metadata;
     this.rrfWeights = options.rrfWeights;
+    this.vectorSearchAvailable = options.vectorSearchAvailable ?? false;
     const prefix = options.toolPrefix;
     this.searchToolName = prefix ? `${prefix}_search_docs` : "search_docs";
     this.getDocToolName = prefix ? `${prefix}_get_doc` : "get_doc";
   }
 
   getTools(): ToolDefinition[] {
+    const searchDescription = this.vectorSearchAvailable
+      ? `Search ${this.metadata.corpus_description} with one hybrid query. Exact identifiers match lexically; conceptual phrasing matches semantically. Apply any known schema-enum filters for precision.`
+      : `Search ${this.metadata.corpus_description} with a lexical query. Use exact identifiers and keywords for best results. Apply any known schema-enum filters for precision.`;
+
     return [
       {
         name: this.searchToolName,
-        description: `Search ${this.metadata.corpus_description} with one hybrid query. Exact identifiers match lexically; conceptual phrasing matches semantically. Apply any known schema-enum filters for precision.`,
+        description: searchDescription,
         inputSchema: buildSearchDocsSchema(this.metadata)
       },
       {

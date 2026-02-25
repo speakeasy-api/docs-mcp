@@ -17,6 +17,7 @@ export default function Playground() {
   const mcpUrl = `${window.location.origin}/mcp`;
   const [token, setToken] = useState<string | undefined>();
   const [serverName, setServerName] = useState<string | undefined>();
+  const [chatEnabled, setChatEnabled] = useState(false);
 
   useEffect(() => {
     fetch("/api/config")
@@ -24,9 +25,22 @@ export default function Playground() {
       .then((data) => {
         setToken(data.token);
         if (data.serverName) setServerName(data.serverName);
+        setChatEnabled(!!data.chatEnabled);
       })
       .catch(() => {});
   }, []);
+
+  const infoPanel = (
+    <div className="pg-info-panel">
+      <ServerUrl url={mcpUrl} />
+      <InstallMethods serverUrl={mcpUrl} serverName={serverName} token={token} />
+      <ToolsList chatEnabled={chatEnabled} />
+    </div>
+  );
+
+  if (!chatEnabled) {
+    return infoPanel;
+  }
 
   const config: ElementsConfig = {
     projectSlug: "thomas",
@@ -39,11 +53,7 @@ export default function Playground() {
 
   return (
     <GramElementsProvider config={config}>
-      <div className="pg-info-panel">
-        <ServerUrl url={mcpUrl} />
-        <InstallMethods serverUrl={mcpUrl} serverName={serverName} token={token} />
-        <ToolsList />
-      </div>
+      {infoPanel}
       <Chat />
     </GramElementsProvider>
   );

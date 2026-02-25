@@ -28,8 +28,8 @@ run = "pnpm --filter @speakeasy-api/docs-mcp-server test"
 depends = ["index-fixtures"]
 
 [tasks.playground]
-description = "Start playground (MCP server + API server + Vite dev server)"
-run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback" "node packages/playground/src/server.ts" "cd packages/playground && npx vite"'
+description = "Start playground (MCP server + Vite dev server)"
+run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback" "cd packages/playground && npx vite"'
 depends = ["index-fixtures"]
 
 [tasks."playground:server"]
@@ -42,10 +42,10 @@ description = "Start only the playground Vite dev server"
 run = "cd packages/playground && npx vite"
 
 [tasks.nuke]
-description = "Kill all processes attached to dev ports (20310, 3001, 3000)"
+description = "Kill all processes attached to dev ports (20310, 3000)"
 run = '''
 set +e
-for port in 20310 3001 3000; do
+for port in 20310 3000; do
   pids=$(lsof -ti :$port)
   if [ -n "$pids" ]; then
     echo "Killing processes on port $port: $pids"

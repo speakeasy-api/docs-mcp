@@ -111,16 +111,89 @@ function authPlugin(): Plugin {
   };
 }
 
+function apiPlugin(): Plugin {
+  return {
+    name: "playground-api",
+    configureServer(server) {
+      const password = process.env.PLAYGROUND_PASSWORD;
+      const serverName = process.env.SERVER_NAME || "speakeasy-docs";
+      const chatEnabled = !!process.env.GRAM_API_KEY;
+
+      server.middlewares.use((req, res, next) => {
+        if (req.url === "/api/config" && req.method === "GET") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ...(password ? { token: password } : {}),
+              serverName,
+              chatEnabled,
+            }),
+          );
+          return;
+        }
+        next();
+      });
+
+      if (chatEnabled) {
+        const USER_ID_COOKIE = "pg_uid";
+        let handlersPromise: ReturnType<
+          typeof import("@gram-ai/elements/server").createElementsServerHandlers
+        > | null = null;
+
+        async function getHandlers() {
+          if (!handlersPromise) {
+            const { createElementsServerHandlers } = await import(
+              "@gram-ai/elements/server"
+            );
+            handlersPromise = createElementsServerHandlers();
+          }
+          return handlersPromise;
+        }
+
+        server.middlewares.use((req, res, next) => {
+          if (req.url === "/chat/session" && req.method === "POST") {
+            const cookies: Record<string, string> = {};
+            for (const pair of (req.headers.cookie || "").split(";")) {
+              const [key, ...rest] = pair.trim().split("=");
+              if (key) cookies[key] = rest.join("=");
+            }
+            let userId = cookies[USER_ID_COOKIE];
+            if (!userId) {
+              userId = crypto.randomUUID();
+              res.setHeader(
+                "Set-Cookie",
+                `${USER_ID_COOKIE}=${userId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${365 * 86400}`,
+              );
+            }
+            getHandlers().then((handlers) => {
+              handlers.session(
+                req as any,
+                res as any,
+                {
+                  embedOrigin:
+                    process.env.EMBED_ORIGIN || "http://localhost:3000",
+                  userIdentifier: userId,
+                  expiresAfter: 3600,
+                },
+              );
+            });
+            return;
+          }
+          next();
+        });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [authPlugin(), react()],
+  plugins: [authPlugin(), apiPlugin(), react()],
   build: {
     outDir: "dist/client",
   },
   server: {
     port: 3000,
     proxy: {
-      "/api": "http://localhost:3001",
-      "/chat": "http://localhost:3001",
       "/mcp": "http://localhost:20310",
     },
   },

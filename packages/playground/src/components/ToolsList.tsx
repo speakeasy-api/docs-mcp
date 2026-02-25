@@ -8,10 +8,9 @@ interface ToolEntry {
   jsonSchema?: Record<string, unknown>;
 }
 
-export function ToolsList() {
+function useToolsFromElements(): ToolEntry[] | undefined {
   const { mcpTools } = useElements();
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [tools, setTools] = useState<ToolEntry[]>([]);
+  const [tools, setTools] = useState<ToolEntry[]>();
 
   useEffect(() => {
     if (!mcpTools) return;
@@ -32,11 +31,72 @@ export function ToolsList() {
     ).then(setTools);
   }, [mcpTools]);
 
-  const loading = !mcpTools;
+  return tools;
+}
+
+function useToolsFromMcp(): ToolEntry[] | undefined {
+  const [tools, setTools] = useState<ToolEntry[] | undefined>();
+
+  useEffect(() => {
+    fetch("/mcp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {},
+      }),
+    })
+      .then(async (res) => {
+        const contentType = res.headers.get("content-type") ?? "";
+        if (contentType.includes("text/event-stream")) {
+          const text = await res.text();
+          for (const line of text.split("\n")) {
+            if (line.startsWith("data: ")) {
+              return JSON.parse(line.slice(6));
+            }
+          }
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return setTools([]);
+        const result = data.result?.tools ?? [];
+        setTools(
+          result.map(
+            (t: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
+              name: t.name,
+              description: t.description,
+              jsonSchema: t.inputSchema,
+            }),
+          ),
+        );
+      })
+      .catch(() => setTools([]));
+  }, []);
+
+  return tools;
+}
+
+function ToolsListInner({ tools }: { tools: ToolEntry[] | undefined }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const loading = tools === undefined;
+  const ftsOnly = tools?.some((t) => t.description?.includes("lexical query")) ?? false;
 
   return (
     <div className="pg-section">
       <h2 className="pg-heading">Available Tools</h2>
+      {ftsOnly && (
+        <p className="pg-warning">
+          Semantic search is unavailable — set OPENAI_API_KEY to enable semantic
+          search results.
+        </p>
+      )}
       {loading && (
         <div className="pg-skeleton-list">
           {[1, 2].map((i) => (
@@ -48,7 +108,7 @@ export function ToolsList() {
         <p className="pg-muted">No tools available.</p>
       )}
       <div className="pg-tools-grid">
-        {tools.map((tool) => (
+        {(tools ?? []).map((tool) => (
           <div key={tool.name} className="pg-tool-card">
             <button
               className="pg-tool-header"
@@ -87,4 +147,21 @@ export function ToolsList() {
       </div>
     </div>
   );
+}
+
+function ToolsListWithElements() {
+  const tools = useToolsFromElements();
+  return <ToolsListInner tools={tools} />;
+}
+
+function ToolsListWithMcp() {
+  const tools = useToolsFromMcp();
+  return <ToolsListInner tools={tools} />;
+}
+
+export function ToolsList({ chatEnabled }: { chatEnabled: boolean }) {
+  if (chatEnabled) {
+    return <ToolsListWithElements />;
+  }
+  return <ToolsListWithMcp />;
 }

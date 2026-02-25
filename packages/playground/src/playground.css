@@ -1,3 +1,25 @@
+/* Fallback theme variables (used when Gram Elements is not active) */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --secondary: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+}
+
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+
 /* Playground info panel — clean, minimal design inspired by mcp.unkey.com */
 
 .pg-info-panel {
@@ -386,6 +408,17 @@
 }
 
 /* ─── States ─── */
+
+.pg-warning {
+  font-size: 13px;
+  margin: 0;
+  padding: 10px 14px;
+  background: oklch(0.90 0.08 85 / 0.15);
+  color: oklch(0.45 0.12 85);
+  border: 1px solid oklch(0.70 0.12 85 / 0.25);
+  border-radius: var(--radius);
+  line-height: 1.5;
+}
 
 .pg-error {
   color: var(--destructive);

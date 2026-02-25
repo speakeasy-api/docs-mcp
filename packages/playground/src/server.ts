@@ -2,13 +2,12 @@
 import express from "express";
 import crypto from "crypto";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import { createElementsServerHandlers } from "@gram-ai/elements/server";
 import path from "path";
 import { fileURLToPath } from "url";
 import type { IncomingMessage, ServerResponse } from "http";
 
 const app = express();
-const handlers = createElementsServerHandlers();
+const chatEnabled = !!process.env.GRAM_API_KEY;
 const port = parseInt(process.env.PORT || "3001", 10);
 const mcpTarget = process.env.MCP_TARGET || "http://localhost:20310";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,32 +140,39 @@ app.get("/api/config", (_req, res) => {
   res.json({
     ...(password ? { token: password } : {}),
     serverName: serverDisplayName,
+    chatEnabled,
   });
 });
 
-const USER_ID_COOKIE = "pg_uid";
-
-app.post("/chat/session", (req, res) => {
-  const cookies = Object.fromEntries(
-    (req.headers.cookie || "")
-      .split(";")
-      .map((c) => c.trim().split("="))
-      .filter(([k]) => k),
+if (chatEnabled) {
+  const { createElementsServerHandlers } = await import(
+    "@gram-ai/elements/server"
   );
-  let userId = cookies[USER_ID_COOKIE];
-  if (!userId) {
-    userId = crypto.randomUUID();
-    res.setHeader(
-      "Set-Cookie",
-      `${USER_ID_COOKIE}=${userId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${365 * 86400}`,
+  const handlers = createElementsServerHandlers();
+  const USER_ID_COOKIE = "pg_uid";
+
+  app.post("/chat/session", (req, res) => {
+    const cookies = Object.fromEntries(
+      (req.headers.cookie || "")
+        .split(";")
+        .map((c) => c.trim().split("="))
+        .filter(([k]) => k),
     );
-  }
-  handlers.session(req, res, {
-    embedOrigin: process.env.EMBED_ORIGIN || `http://localhost:${port}`,
-    userIdentifier: userId,
-    expiresAfter: 3600,
+    let userId = cookies[USER_ID_COOKIE];
+    if (!userId) {
+      userId = crypto.randomUUID();
+      res.setHeader(
+        "Set-Cookie",
+        `${USER_ID_COOKIE}=${userId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${365 * 86400}`,
+      );
+    }
+    handlers.session(req, res, {
+      embedOrigin: process.env.EMBED_ORIGIN || `http://localhost:${port}`,
+      userIdentifier: userId,
+      expiresAfter: 3600,
+    });
   });
-});
+}
 
 // Serve built client assets in production
 const clientDir = path.resolve(__dirname, "../dist/client");
