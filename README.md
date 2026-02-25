@@ -11,7 +11,7 @@
 
 # Speakeasy Docs MCP
 
-A lightweight, domain-agnostic hybrid search engine for markdown corpora, exposed via the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP). While it can index and serve **any** markdown corpus, it is deeply optimized for serving SDK documentation to AI coding agents. **Beta.**
+A lightweight, domain-agnostic hybrid search engine for markdown (`.md`) corpora, exposed via the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP). While it can index and serve **any** markdown corpus, it is deeply optimized for serving SDK documentation to AI coding agents. **Beta.**
 
 ## Features
 
@@ -96,6 +96,10 @@ We recommend starting with FTS-only search. While embeddings improve relevance f
 1. **No embeddings** (`--embedding-provider none`): FTS-only search, zero cost, zero API keys. Already effective for exact-match and lexical queries.
 2. **With embeddings** (`--embedding-provider openai`): Hybrid search with better recall on conceptual and paraphrased queries. ~$1 one-time embedding cost per 28.8MB corpus.
 3. **Runtime degradation**: If the embedding API is unavailable at query time, the server automatically falls back to FTS-only with a one-time warning.
+
+## Supported File Types
+
+The indexer processes **`.md` (Markdown)** files. Files are discovered via the `**/*.md` glob pattern within the configured docs directory. YAML frontmatter is supported for per-file metadata and chunking overrides.
 
 ## Corpus Structure
 
@@ -212,6 +216,35 @@ The tools exposed to the agent are dynamically generated based on your `corpus_d
 
 ## Quick Start
 
+### FTS-Only (Recommended)
+
+No API keys required. Zero-config full-text search:
+
+```dockerfile
+# --- build stage ---
+FROM node:22-slim AS build
+RUN npm install -g @speakeasy-api/docs-mcp-cli
+ARG DOCS_DIR=docs
+COPY ${DOCS_DIR} /corpus
+RUN docs-mcp build --docs-dir /corpus --out /index --embedding-provider none
+
+# --- runtime stage ---
+FROM node:22-slim
+RUN npm install -g @speakeasy-api/docs-mcp-server
+COPY --from=build /index /index
+EXPOSE 20310
+CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
+```
+
+```bash
+docker build --build-arg DOCS_DIR=./docs -t docs-mcp .
+docker run -p 20310:20310 docs-mcp
+```
+
+### With Embeddings (Optional)
+
+For hybrid FTS + semantic search, add an OpenAI embedding provider. This improves recall on conceptual and paraphrased queries at the cost of higher latency and ~$1 one-time embedding cost per 28.8MB corpus.
+
 ```dockerfile
 # --- build stage ---
 FROM node:22-slim AS build
@@ -238,10 +271,69 @@ docker run -p 20310:20310 -e OPENAI_API_KEY docs-mcp
 
 The build secret embeds the corpus; the runtime `-e OPENAI_API_KEY` lets the server embed search queries.
 
+### Docker Compose (Server + Playground)
+
+To get a server and interactive playground running together:
+
+```yaml
+# docker-compose.yml
+services:
+  server:
+    build:
+      context: .
+      # Uses the Dockerfile above (FTS-only or embeddings variant)
+    ports:
+      - "20310:20310"
+    # Uncomment for embeddings:
+    # environment:
+    #   - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  playground:
+    image: node:22-slim
+    command: >
+      sh -c "npm install -g @speakeasy-api/docs-mcp-playground &&
+             npx @speakeasy-api/docs-mcp-playground"
+    ports:
+      - "3001:3001"
+    environment:
+      - MCP_TARGET=http://server:20310
+    depends_on:
+      - server
+```
+
+```bash
+docker compose up
+```
+
+Open `http://localhost:3001` to explore the index interactively.
+
+## Transport Options
+
+The MCP server supports two transport modes:
+
+| Flag | Transport | Default | Use case |
+|---|---|---|---|
+| `--transport stdio` | Standard I/O | Yes (default) | Direct MCP client integration (e.g. Claude Desktop, Cursor) |
+| `--transport http` | Streamable HTTP | | Containerized deployments, playground, multi-client access |
+
+When using HTTP transport, the server listens on port `20310` by default (configurable with `--port`).
+
+**stdio example** (MCP client config):
+```bash
+npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb
+```
+
+**HTTP example**:
+```bash
+npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
+```
+
 ## Usage & Deployment
 
 **1. Authoring (Local Dev)**
-If you have legacy docs without chunking strategies, use the CLI locally to bootstrap a baseline `.docs-mcp.json`.
+
+The `fix` command scans all `.md` files in your docs directory, analyzes their heading structure (h1/h2/h3 frequency), and generates a `.docs-mcp.json` manifest with the best-fit chunking strategy per file. The most common strategy becomes the default; files that differ get pattern-based overrides.
+
 ```bash
 npx @speakeasy-api/docs-mcp-cli fix --docs-dir ./docs
 ```
@@ -267,11 +359,22 @@ npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb
 ```
 
 **4. Playground (Optional)**
-Explore the index interactively in a browser:
+
+Explore the index interactively in a browser. The playground connects to a running HTTP server and provides a search UI.
+
 ```bash
 npx @speakeasy-api/docs-mcp-playground
 ```
+
 Open `http://localhost:3001`. Requires a running HTTP server (step 3 with `--transport http`).
+
+| Environment Variable | Description | Default |
+|---|---|---|
+| `MCP_TARGET` | HTTP endpoint of the MCP server | `http://localhost:20310` |
+| `PORT` | Playground server port | `3001` |
+| `SERVER_NAME` | Display name shown in the playground UI | `speakeasy-docs` |
+| `PLAYGROUND_PASSWORD` | Password-protect the playground (hashed via SHA256) | *(none — open access)* |
+| `GRAM_API_KEY` | Enables chat mode when set | *(none — chat disabled)* |
 
 ## Evaluation
 
