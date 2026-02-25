@@ -61,13 +61,109 @@ operations, pull in the most relevant documentation on demand, and answer
 questions with concrete, API‑aware detail—all without you hand‑writing tools or
 duplicating any of your docs.
 
-## Usage
+## Getting Started
 
-### CLI
+### Prerequisites
+
+- **Node.js >= 22**
+- **An embedding provider (optional).** For best search quality, set an
+  `OPENAI_API_KEY` environment variable. If you don't have one, the CLI supports
+  a free deterministic `hash` provider or a text-only `none` mode — see the
+  [CLI documentation](./packages/cli/README.md) for details on all providers.
+
+### Step 1: Build the Index
+
+Point the CLI at a directory of markdown files to produce a search index:
 
 ```bash
-npm install -g @speakeasy-api/docs-mcp-cli
+npx @speakeasy-api/docs-mcp-cli build \
+  --docs-dir ./docs \
+  --out ./dist \
+  --embedding-provider openai          # or "hash" / "none"
 ```
 
-Refer to the [CLI documentation](./packages/cli/README.md) for usage instructions.
+This reads your markdown, chunks it intelligently, generates embeddings, and
+writes the index artifacts to `./dist`.
+
+### Step 2: Start the MCP Server
+
+Run the server against the index you just built:
+
+```bash
+npx @speakeasy-api/docs-mcp-server \
+  --index-dir ./dist \
+  --transport http \
+  --port 20310
+```
+
+Your MCP server is now live at `http://localhost:20310/mcp`. Any MCP-compatible
+client can connect to it. For stdio transport (e.g. Claude Desktop), omit the
+`--transport` and `--port` flags.
+
+### Step 3: Explore with the Playground
+
+The playground gives you a web UI for testing searches against your running
+server:
+
+```bash
+npx @speakeasy-api/docs-mcp-playground
+```
+
+Open [http://localhost:3001](http://localhost:3001) in your browser. The
+playground proxies requests to `http://localhost:20310` by default — set
+`MCP_TARGET` to point it elsewhere.
+
+## Deploying
+
+The recommended deployment pattern bakes the index into a Docker image at build
+time so the server starts instantly with zero external dependencies.
+
+### Dockerfile
+
+```dockerfile
+FROM node:22-slim
+RUN npm install -g @speakeasy-api/docs-mcp-cli @speakeasy-api/docs-mcp-server
+COPY docs /corpus
+RUN docs-mcp build --docs-dir /corpus --out /index --embedding-provider hash
+EXPOSE 20310
+CMD ["docs-mcp-server", "--index-dir", "/index", "--transport", "http", "--port", "20310"]
+```
+
+### CI Example (GitHub Actions)
+
+Add a step to your workflow that builds and pushes the image whenever your docs
+change:
+
+```yaml
+name: Deploy Docs MCP
+on:
+  push:
+    branches: [main]
+    paths: [docs/**]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: your-registry/docs-mcp:latest
+```
+
+Drop the Dockerfile above into your repo root, replace `your-registry` with
+your container registry, and your docs MCP server will rebuild and deploy on
+every push to `main` that touches the `docs/` directory.
+
+## Reference
+
+For full CLI flags and configuration options, see the package docs:
+
+- [CLI documentation](./packages/cli/README.md)
+- [Server documentation](./packages/server/README.md)
+- [Playground documentation](./packages/playground/README.md)
 
