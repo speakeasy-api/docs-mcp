@@ -11,3 +11,6 @@ tests/fixtures/index/
 .agents/
 .claude/
 package-lock.json
+.env
+.env.local
+!.env.example

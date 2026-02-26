@@ -1,0 +1,60 @@
+[
+  {
+    "name": "Create a Mistral chat completion",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that creates a chat completion with a simple user message. Use the SDK's chat.complete method. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "mistral" },
+      { "type": "not_contains", "value": "I don't know" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'mistralai' package.json", "name": "mistral-in-deps" },
+      { "type": "script", "command": "grep -q 'chat' solution.ts", "name": "uses-chat-api" }
+    ]
+  },
+  {
+    "name": "Generate Mistral embeddings",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that generates embeddings for a list of text strings using the embeddings API. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "mistral" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'embed' solution.ts", "name": "uses-embeddings" }
+    ]
+  },
+  {
+    "name": "List Mistral models",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that lists all available models. Use the SDK's models API. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "mistral" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'model' solution.ts", "name": "uses-models-api" }
+    ]
+  },
+  {
+    "name": "Mistral function calling",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that demonstrates function/tool calling with a chat completion. Define a simple tool (e.g., a weather lookup function) and pass it to the chat completion. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "advanced",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "mistral" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'tool' solution.ts", "name": "uses-tools" }
+    ]
+  }
+]

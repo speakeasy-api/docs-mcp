@@ -1,0 +1,59 @@
+[
+  {
+    "name": "List PushPress members",
+    "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists members (customers) from the PushPress API. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "pushpress" },
+      { "type": "not_contains", "value": "I don't know" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'pushpress' package.json", "name": "pushpress-in-deps" }
+    ]
+  },
+  {
+    "name": "Get PushPress checkins",
+    "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that retrieves recent checkins from the PushPress API. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "pushpress" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'checkin' solution.ts", "name": "uses-checkins-api" }
+    ]
+  },
+  {
+    "name": "Create PushPress webhook",
+    "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that registers a webhook to listen for events. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "advanced",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "pushpress" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'webhook\\|event' solution.ts", "name": "uses-webhooks" }
+    ]
+  },
+  {
+    "name": "List PushPress classes",
+    "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists available classes or scheduled sessions. Install all dependencies first with npm.",
+    "docsDir": "../realistic",
+    "category": "sdk-usage",
+    "maxTurns": 15,
+    "maxBudgetUsd": 0.50,
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "pushpress" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'class\\|schedule\\|session' solution.ts", "name": "uses-classes-api" }
+    ]
+  }
+]

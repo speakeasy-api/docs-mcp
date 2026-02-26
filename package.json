@@ -21,7 +21,8 @@
     "typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "agent-eval": "node packages/eval/dist/bin.js agent-eval"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
