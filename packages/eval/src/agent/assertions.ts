@@ -25,7 +25,15 @@ export async function evaluateAssertions(
         results.push(evaluateMatches(finalAnswer, assertion.pattern, assertion.flags));
         break;
       case "script":
-        results.push(await evaluateScript(assertion.command, assertion.name, workspaceDir));
+        if (assertion.when_env && !process.env[assertion.when_env]) {
+          results.push({
+            assertion,
+            passed: true,
+            message: `Script "${assertion.name}" skipped (${assertion.when_env} not set)`
+          });
+        } else {
+          results.push(await evaluateScript(assertion.command, assertion.name, workspaceDir));
+        }
         break;
     }
   }

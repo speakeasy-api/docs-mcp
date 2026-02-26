@@ -1,0 +1,131 @@
+[
+  {
+    "name": "Initialize the TypeScript client",
+    "prompt": "Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in solution.ts that initializes the AcmeAuth client with an API key from the environment and fetches a user by ID. Use the docs-mcp tools to look up the correct SDK usage — do not guess the API.",
+    "description": "AcmeAuth SDK — multi-language authentication client covering API keys, OAuth, JWT, pagination, webhooks, and error handling",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "AcmeAuth" },
+      { "type": "contains", "value": "acmeauth" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'apiKey' solution.ts", "name": "uses-api-key" }
+    ]
+  },
+  {
+    "name": "Initialize the Python client",
+    "prompt": "Using the AcmeAuth Python SDK (`acmeauth`), write a script in solution.py that initializes the AcmeAuth client with an API key and fetches a user by ID. Use the docs-mcp tools to look up the correct SDK usage — do not guess the API.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "assertions": [
+      { "type": "contains", "value": "AcmeAuth" },
+      { "type": "contains", "value": "acmeauth" },
+      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'api_key' solution.py", "name": "uses-api-key" }
+    ]
+  },
+  {
+    "name": "Handle rate limit errors in TypeScript",
+    "prompt": "Write TypeScript code in solution.ts that calls the AcmeAuth API and properly handles rate limit (429) errors using the SDK's typed error classes. Use the docs-mcp tools to find the correct error handling patterns — do not guess the class names.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "error-handling",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'RateLimitError' solution.ts", "name": "uses-rate-limit-error" },
+      { "type": "script", "command": "grep -q 'retryAfter\\|retry_after' solution.ts", "name": "uses-retry-after" }
+    ]
+  },
+  {
+    "name": "Verify webhook signatures",
+    "prompt": "Write TypeScript code in solution.ts that verifies incoming AcmeAuth webhook signatures. Use the docs-mcp tools to find the correct SDK function and the expected header name — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "webhooks",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'verifyWebhookSignature\\|verify_webhook' solution.ts", "name": "uses-verify-function" },
+      { "type": "script", "command": "grep -q 'x-acmeauth-signature' solution.ts", "name": "correct-header-name" }
+    ]
+  },
+  {
+    "name": "Paginate through users",
+    "prompt": "Write TypeScript code in solution.ts that lists all AcmeAuth users using cursor-based pagination. Use the docs-mcp tools to find the correct pagination pattern — do not guess the API.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "pagination",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'list\\|paginate' solution.ts", "name": "uses-list-api" },
+      { "type": "script", "command": "grep -qi 'for.*await\\|cursor\\|next' solution.ts", "name": "iterates-pages" }
+    ]
+  },
+  {
+    "name": "Python async client usage",
+    "prompt": "Write Python code in solution.py that uses the AcmeAuth async client to fetch a user. Use the docs-mcp tools to find the correct async client class name — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'AsyncAcmeAuth' solution.py", "name": "uses-async-client" },
+      { "type": "script", "command": "grep -q 'await' solution.py", "name": "uses-await" }
+    ]
+  },
+  {
+    "name": "OAuth authentication setup",
+    "prompt": "Explain how OAuth 2.0 authentication works with AcmeAuth and write TypeScript code in solution.ts that initializes the client with an OAuth access token. Use the docs-mcp tools to look up the authentication methods — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "auth",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "accessToken" },
+      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'accessToken' solution.ts", "name": "uses-access-token" },
+      { "type": "matches", "pattern": "authorization.code|PKCE|refresh.token", "flags": "i" }
+    ]
+  },
+  {
+    "name": "Cross-cutting: rate limits and best practices",
+    "prompt": "What are the rate limits for each AcmeAuth plan tier, and what are the recommended best practices for staying within limits? Use the docs-mcp tools to find the exact numbers — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "guide-discovery",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "assertions": [
+      { "type": "matches", "pattern": "60|600|6000", "flags": "" },
+      { "type": "contains", "value": "429" },
+      { "type": "matches", "pattern": "cache|batch|circuit.breaker", "flags": "i" }
+    ]
+  },
+  {
+    "name": "Webhook event types and retry policy",
+    "prompt": "List all webhook event types that AcmeAuth supports and describe the retry policy for failed deliveries. Use the docs-mcp tools — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "guide-discovery",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "assertions": [
+      { "type": "contains", "value": "user.created" },
+      { "type": "contains", "value": "session.revoked" },
+      { "type": "matches", "pattern": "5.*failed|5.*attempts|24.hours", "flags": "i" }
+    ]
+  },
+  {
+    "name": "JWT token verification",
+    "prompt": "Explain how to verify AcmeAuth JWT tokens locally, including what claims are in the token and where to find the public keys. Use the docs-mcp tools — do not guess.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "auth",
+    "systemPrompt": "You are an expert developer. You have a docs-mcp server with pre-indexed SDK documentation for a fictional AcmeAuth API. Always use the docs-mcp tools (search_docs, get_doc) to look up SDK usage — they contain the authoritative API reference. Write clean, correct code.",
+    "assertions": [
+      { "type": "contains", "value": "jwks" },
+      { "type": "matches", "pattern": "sub|iat|exp|scope|aud" },
+      { "type": "matches", "pattern": "\\.well-known|JWKS", "flags": "i" }
+    ]
+  }
+]

@@ -4,7 +4,7 @@ export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, 
   const properties: Record<string, unknown> = {
     query: {
       type: "string",
-      description: "The search query (e.g., 'how to paginate', 'RateLimitError')."
+      description: "The search query — use method names, class names, error types, or describe what you want to do (e.g., 'links.create', 'RateLimitError', 'how to paginate')."
     },
     limit: {
       type: "integer",

@@ -21,16 +21,14 @@ import type {
 const execFileAsync = promisify(execFile);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "server", "dist", "bin.js");
+const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dist", "bin.js");
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.50;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
-const DEFAULT_SYSTEM_PROMPT = `You are an expert TypeScript developer. You have access to documentation search tools for an SDK.
-Use the docs-mcp tools (search_docs, get_doc) to find relevant documentation, then write code based on what you learn.
-Always install dependencies before writing code. Write clean, working TypeScript code.`;
+const DEFAULT_SYSTEM_PROMPT = `You are an expert TypeScript developer. You have a docs-mcp server with pre-indexed SDK documentation. Always use the docs-mcp tools (search_docs, get_doc) for API references — they are faster and more accurate than web search for this SDK. Write clean, correct TypeScript code. Install dependencies before writing code.`;
 
 export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOutput> {
   const observer = config.observer ?? new NoopObserver();
@@ -152,11 +150,13 @@ export async function runAgentScenario(
         options: {
           model: config.model ?? DEFAULT_MODEL,
           systemPrompt,
-          allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+          allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"],
+          // disallowedTools: ["WebSearch", "WebFetch"],
           mcpServers: { "docs-mcp": mcpServerConfig },
           maxTurns,
           maxBudgetUsd,
           cwd: workspaceDir,
+          env: process.env as Record<string, string>,
           permissionMode: "bypassPermissions",
           allowDangerouslySkipPermissions: true,
           persistSession: false
@@ -165,9 +165,25 @@ export async function runAgentScenario(
         const nowMs = performance.now() - startMs;
 
         if (message.type === "system" && message.subtype === "init") {
+          // Verify docs-mcp tools are registered
+          const mcpTools = message.tools.filter((t: string) => t.startsWith("mcp__docs"));
+          const mcpServers = (message.mcp_servers ?? []) as Array<{ name: string; status: string }>;
+          const docsMcpServer = mcpServers.find((s) => s.name === "docs-mcp");
+
+          const parts = [
+            `model=${message.model}`,
+            `tools=${message.tools.length}`,
+            `mcp_tools=[${mcpTools.join(", ")}]`,
+            `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`
+          ];
+
+          if (mcpTools.length === 0) {
+            errors.push("docs-mcp tools not registered — server may have failed to start");
+          }
+
           observer?.onAgentMessage(scenario, {
             type: "system_init",
-            summary: `Session initialized: model=${message.model}, tools=${message.tools.length}`,
+            summary: parts.join(", "),
             timestampMs: nowMs
           });
         }
@@ -230,7 +246,7 @@ export async function runAgentScenario(
           observer?.onAgentMessage(scenario, {
             type: "tool_result",
             summary: "Tool result received",
-            toolResultPreview: resultText.slice(0, 200) + (resultText.length > 200 ? "..." : ""),
+            toolResultPreview: resultText.slice(0, 2000),
             timestampMs: performance.now() - startMs
           });
         }

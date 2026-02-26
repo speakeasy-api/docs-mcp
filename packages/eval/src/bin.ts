@@ -7,7 +7,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ensureIndex } from "./agent/build-cache.js";
+import { loadPreviousResult, saveResult, generateTrendSummary } from "./agent/history.js";
 import { ConsoleObserver, NoopObserver } from "./agent/observer.js";
+import { ensureRepo } from "./agent/repo-cache.js";
 import { runAgentEval } from "./agent/runner.js";
 import type { AgentScenario } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
@@ -174,6 +176,7 @@ program
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--debug", "Keep workspaces after run for inspection", false)
+  .option("--no-save", "Skip auto-saving results to .eval-results/")
   .option("--out <path>", "Output JSON path")
   .action(async (options: {
     suite?: string;
@@ -191,6 +194,7 @@ program
     maxConcurrency: number;
     systemPrompt?: string;
     debug: boolean;
+    save: boolean;
     out?: string;
   }) => {
     // Validate mutually exclusive options
@@ -214,10 +218,13 @@ program
     // Resolve docsDir → build indexes → set indexDir on each scenario
     const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
     const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
+    const indexDescriptions = new Map<string, string>(); // first description per docsDir
 
     for (const scenario of scenarios) {
       let resolvedDocsDir: string | undefined;
-      if (scenario.docsDir) {
+      if (scenario.docsSpec) {
+        resolvedDocsDir = await ensureRepo(scenario.docsSpec);
+      } else if (scenario.docsDir) {
         const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
         resolvedDocsDir = path.resolve(base, scenario.docsDir);
       } else if (defaultDocsDir) {
@@ -225,10 +232,17 @@ program
       }
 
       if (resolvedDocsDir) {
-        let indexDir = indexCache.get(resolvedDocsDir);
+        // Use scenario description for the corpus; first one wins per docsDir
+        const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
+        if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
+          indexDescriptions.set(resolvedDocsDir, scenario.description);
+        }
+
+        const cacheKey = `${resolvedDocsDir}\0${description ?? ""}`;
+        let indexDir = indexCache.get(cacheKey);
         if (!indexDir) {
-          indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH);
-          indexCache.set(resolvedDocsDir, indexDir);
+          indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH, undefined, description);
+          indexCache.set(cacheKey, indexDir);
         }
         scenario.indexDir = indexDir;
       }
@@ -250,7 +264,14 @@ program
         }
       : undefined;
 
-    const observer = new ConsoleObserver();
+    const suiteName = options.suite
+      ?? (options.scenarios ? path.basename(options.scenarios, path.extname(options.scenarios)) : "ad-hoc");
+
+    const observer = new ConsoleObserver({
+      model: options.model,
+      suite: suiteName,
+      debug: options.debug
+    });
 
     const output = await runAgentEval({
       scenarios,
@@ -265,13 +286,24 @@ program
       debug: options.debug
     });
 
-    const serialized = `${JSON.stringify(output, null, 2)}\n`;
+    // Auto-persist + trend comparison
+    if (options.save !== false) {
+      const previous = await loadPreviousResult(suiteName);
+      const savedPath = await saveResult(output, suiteName);
+      process.stderr.write(`\nResults saved to ${savedPath}\n`);
+
+      if (previous) {
+        const trend = generateTrendSummary(output, previous);
+        process.stderr.write(`${trend}\n`);
+      }
+    }
+
+    // Write JSON only when explicitly requested via --out
     if (options.out) {
+      const serialized = `${JSON.stringify(output, null, 2)}\n`;
       const outPath = path.resolve(options.out);
       await writeFile(outPath, serialized);
-      console.error(`wrote agent eval result to ${outPath}`);
-    } else {
-      process.stdout.write(serialized);
+      process.stderr.write(`Wrote agent eval result to ${outPath}\n`);
     }
   });
 

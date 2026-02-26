@@ -1,3 +1,14 @@
+export interface DocsRepoSpec {
+  /** Git clone URL */
+  url: string;
+  /** Branch, tag, or commit (default: "main") */
+  ref?: string;
+  /** Subdirectory within the repo that contains docs (default: "." — repo root) */
+  docsPath?: string;
+  /** Inline .docs-mcp.json manifest if the repo lacks one */
+  docsConfig?: Record<string, unknown>;
+}
+
 export interface AgentScenario {
   name: string;
   prompt: string;
@@ -8,6 +19,10 @@ export interface AgentScenario {
   systemPrompt?: string;
   /** Shell command run in workspace before agent starts */
   setup?: string;
+  /** Corpus description for the docs index. Flows into MCP tool descriptions. */
+  description?: string;
+  /** Git repo to clone and index docs from. Takes precedence over docsDir. */
+  docsSpec?: DocsRepoSpec;
   /** Path to docs directory. Resolved relative to scenario file. CLI auto-builds + caches the index. */
   docsDir?: string;
   /** Resolved index directory path. Set at runtime by the CLI after building the index. */
@@ -18,7 +33,7 @@ export type AgentAssertion =
   | { type: "contains"; value: string }
   | { type: "not_contains"; value: string }
   | { type: "matches"; pattern: string; flags?: string }
-  | { type: "script"; command: string; name: string };
+  | { type: "script"; command: string; name: string; when_env?: string };
 
 export interface AssertionResult {
   assertion: AgentAssertion;

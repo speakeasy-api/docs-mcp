@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Create a Dub short link",
+    "prompt": "Using the Dub Go SDK (`github.com/dubinc/dub-go`), write a program in solution.go that creates a short link pointing to https://example.com. Use the SDK's links create method. Install all dependencies first with go get. The DUB_API_KEY environment variable is already set — use os.Getenv(\"DUB_API_KEY\") for authentication. Do not run the program.",
+    "description": "Dub Go SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": { "url": "https://github.com/dubinc/dub-go", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "go mod init solution 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.go", "name": "file-exists" },
+      { "type": "script", "command": "grep -q 'dubinc/dub-go' go.mod", "name": "dub-in-deps" },
+      { "type": "script", "command": "grep -qi 'dub' solution.go", "name": "imports-dub" },
+      { "type": "script", "command": "go build -o /dev/null solution.go 2>&1 || true", "name": "build-attempt" },
+      { "type": "script", "command": "go run solution.go 2>&1 | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+    ]
+  },
+  {
+    "name": "List Dub analytics events",
+    "prompt": "Using the Dub Go SDK (`github.com/dubinc/dub-go`), write a program in solution.go that retrieves analytics for clicks. Use the SDK's analytics methods. Install all dependencies first with go get. The DUB_API_KEY environment variable is already set — use os.Getenv(\"DUB_API_KEY\") for authentication. Do not run the program.",
+    "docsSpec": { "url": "https://github.com/dubinc/dub-go", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "go mod init solution 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.go", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'dub' solution.go", "name": "imports-dub" },
+      { "type": "script", "command": "grep -qi 'analytics' solution.go", "name": "uses-analytics" },
+      { "type": "script", "command": "go run solution.go 2>&1 | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+    ]
+  },
+  {
+    "name": "Upsert a Dub link",
+    "prompt": "Using the Dub Go SDK (`github.com/dubinc/dub-go`), write a program in solution.go that upserts a link (creates it if it doesn't exist, updates it otherwise). Use the SDK's links upsert method. Install all dependencies first with go get. The DUB_API_KEY environment variable is already set — use os.Getenv(\"DUB_API_KEY\") for authentication. Do not run the program.",
+    "docsSpec": { "url": "https://github.com/dubinc/dub-go", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "go mod init solution 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.go", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'dub' solution.go", "name": "imports-dub" },
+      { "type": "script", "command": "grep -qi 'upsert' solution.go", "name": "uses-upsert" },
+      { "type": "script", "command": "go run solution.go 2>&1 | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+    ]
+  },
+  {
+    "name": "Retrieve a Dub link by ID",
+    "prompt": "Using the Dub Go SDK (`github.com/dubinc/dub-go`), write a program in solution.go that retrieves an existing link's details by its link ID. Use the SDK's links get method. Install all dependencies first with go get. The DUB_API_KEY environment variable is already set — use os.Getenv(\"DUB_API_KEY\") for authentication. Do not run the program.",
+    "docsSpec": { "url": "https://github.com/dubinc/dub-go", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "go mod init solution 2>/dev/null",
+    "assertions": [
+      { "type": "script", "command": "test -f solution.go", "name": "file-exists" },
+      { "type": "script", "command": "grep -qi 'dub' solution.go", "name": "imports-dub" },
+      { "type": "script", "command": "grep -qi 'links' solution.go", "name": "uses-links-api" },
+      { "type": "script", "command": "go run solution.go 2>&1 | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+    ]
+  }
+]

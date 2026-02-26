@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
-const DEFAULT_CACHE_DIR = "node_modules/.cache/docs-mcp-eval";
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const DEFAULT_CACHE_DIR = path.join(PROJECT_ROOT, ".cache", "indexes");
 
 /**
  * Ensures an index exists for the given docs directory, building it if necessary.
@@ -12,10 +14,11 @@ const DEFAULT_CACHE_DIR = "node_modules/.cache/docs-mcp-eval";
 export async function ensureIndex(
   docsDir: string,
   cliBinPath: string,
-  cacheDir?: string
+  cacheDir?: string,
+  description?: string
 ): Promise<string> {
   const resolvedCacheDir = cacheDir ?? path.resolve(DEFAULT_CACHE_DIR);
-  const cacheKey = await computeCacheKey(docsDir);
+  const cacheKey = await computeCacheKey(docsDir, description);
   const indexDir = path.join(resolvedCacheDir, cacheKey);
   const metadataPath = path.join(indexDir, "metadata.json");
 
@@ -30,12 +33,12 @@ export async function ensureIndex(
   await mkdir(indexDir, { recursive: true });
 
   console.error(`Building index for ${docsDir} → ${indexDir}`);
-  await runBuild(cliBinPath, docsDir, indexDir);
+  await runBuild(cliBinPath, docsDir, indexDir, description);
 
   return indexDir;
 }
 
-async function computeCacheKey(docsDir: string): Promise<string> {
+async function computeCacheKey(docsDir: string, description?: string): Promise<string> {
   const hash = createHash("sha256");
 
   // Hash file listing (relative paths + sizes + mtimes)
@@ -52,6 +55,11 @@ async function computeCacheKey(docsDir: string): Promise<string> {
     hash.update(configContent);
   } catch {
     // No config file — that's fine
+  }
+
+  // Hash description so changing it rebuilds the index
+  if (description) {
+    hash.update(`\0description\0${description}`);
   }
 
   return hash.digest("hex").slice(0, 16);
@@ -83,9 +91,13 @@ async function collectFiles(dir: string, base?: string): Promise<FileEntry[]> {
   return entries;
 }
 
-function runBuild(cliBinPath: string, docsDir: string, outDir: string): Promise<void> {
+function runBuild(cliBinPath: string, docsDir: string, outDir: string, description?: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn("node", [cliBinPath, "build", "--docs-dir", docsDir, "--out", outDir], {
+    const args = [cliBinPath, "build", "--docs-dir", docsDir, "--out", outDir];
+    if (description) {
+      args.push("--description", description);
+    }
+    const child = spawn("node", args, {
       env: process.env as Record<string, string>,
       stdio: ["ignore", "inherit", "inherit"]
     });
