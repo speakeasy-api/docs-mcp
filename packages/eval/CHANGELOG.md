@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.2.1
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.2.1
+
 ## 0.2.0
 
 ### Patch Changes
