@@ -4,8 +4,6 @@
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates a short link pointing to https://example.com. Use the Dub SDK's `links.create` method. Install all dependencies first with npm. The script should import the Dub client, instantiate it, and call the create link method.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "dub" },
@@ -20,8 +18,6 @@
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that retrieves analytics for clicks. Use the SDK's analytics methods. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "dub" },
@@ -35,8 +31,6 @@
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that upserts a link (creates it if it doesn't exist, updates it otherwise). Use the SDK's `links.upsert` method. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "dub" },
@@ -49,8 +43,6 @@
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that retrieves an existing link's details by its link ID. Use the SDK's `links.get` method. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "dub" },

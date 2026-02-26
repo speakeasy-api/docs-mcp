@@ -6,7 +6,7 @@ import type {
   AgentScenarioResult
 } from "./types.js";
 
-const useColor = !process.env.NO_COLOR;
+const useColor = !process.env.NO_COLOR && (process.stderr.isTTY ?? false);
 
 const colors = {
   reset: useColor ? "\x1b[0m" : "",

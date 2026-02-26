@@ -6,8 +6,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
-import { runAgentEval } from "./agent/runner.js";
+import { ensureIndex } from "./agent/build-cache.js";
 import { ConsoleObserver, NoopObserver } from "./agent/observer.js";
+import { runAgentEval } from "./agent/runner.js";
 import type { AgentScenario } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
@@ -208,70 +209,52 @@ program
     }
 
     // Load scenarios
-    let scenarios: AgentScenario[];
-    let scenariosFilePath: string | undefined;
+    const { scenarios, scenariosFilePath } = await loadScenarios(options);
 
-    if (options.suite) {
-      scenariosFilePath = path.join(FIXTURES_DIR, `${options.suite}.json`);
-      const raw = await readFile(scenariosFilePath, "utf8");
-      scenarios = JSON.parse(raw) as AgentScenario[];
-    } else if (options.scenarios) {
-      scenariosFilePath = path.resolve(options.scenarios);
-      const raw = await readFile(scenariosFilePath, "utf8");
-      scenarios = JSON.parse(raw) as AgentScenario[];
-    } else {
-      // --prompt mode: create inline ad-hoc scenario
-      scenarios = [{
-        name: "ad-hoc",
-        prompt: options.prompt!,
-        assertions: [],
-        docsDir: options.docsDir!
-      }];
-    }
-
-    // Resolve docsDir for each scenario
-    const resolvedDocsDirs = new Map<number, string>();
+    // Resolve docsDir → build indexes → set indexDir on each scenario
     const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
+    const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
 
-    for (let i = 0; i < scenarios.length; i++) {
-      const scenario = scenarios[i]!;
+    for (const scenario of scenarios) {
+      let resolvedDocsDir: string | undefined;
       if (scenario.docsDir) {
-        // Resolve relative to scenario file, or cwd if no file
         const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
-        resolvedDocsDirs.set(i, path.resolve(base, scenario.docsDir));
+        resolvedDocsDir = path.resolve(base, scenario.docsDir);
       } else if (defaultDocsDir) {
-        resolvedDocsDirs.set(i, defaultDocsDir);
+        resolvedDocsDir = defaultDocsDir;
+      }
+
+      if (resolvedDocsDir) {
+        let indexDir = indexCache.get(resolvedDocsDir);
+        if (!indexDir) {
+          indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH);
+          indexCache.set(resolvedDocsDir, indexDir);
+        }
+        scenario.indexDir = indexDir;
       }
     }
 
-    // Determine if we need a server command fallback (for scenarios without docsDir)
-    const hasDocsDirScenarios = resolvedDocsDirs.size > 0;
-    const allHaveDocsDir = resolvedDocsDirs.size === scenarios.length;
-
-    // Server config: required only when some scenarios don't have docsDir
-    if (!allHaveDocsDir && !options.serverCommand) {
+    // Server config: only needed when some scenarios don't have indexDir
+    const allHaveIndex = scenarios.every((s) => s.indexDir);
+    if (!allHaveIndex && !options.serverCommand) {
       console.error("Error: --server-command is required when scenarios don't specify docsDir");
       process.exit(1);
     }
 
-    const serverCommand = options.serverCommand ?? "node";
-    const serverArgs = options.serverCommand ? options.serverArg : [SERVER_BIN_PATH];
+    const server = options.serverCommand
+      ? {
+          command: options.serverCommand,
+          args: options.serverArg,
+          ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
+          ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {})
+        }
+      : undefined;
 
     const observer = new ConsoleObserver();
 
     const output = await runAgentEval({
       scenarios,
-      server: {
-        command: serverCommand,
-        args: serverArgs,
-        ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
-        ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {})
-      },
-      ...(hasDocsDirScenarios ? {
-        resolvedDocsDirs,
-        cliBinPath: CLI_BIN_PATH,
-        serverBinPath: SERVER_BIN_PATH,
-      } : {}),
+      ...(server ? { server } : {}),
       ...(options.workspaceDir ? { workspaceDir: path.resolve(options.workspaceDir) } : {}),
       model: options.model,
       maxTurns: options.maxTurns,
@@ -293,6 +276,33 @@ program
   });
 
 void program.parseAsync(process.argv);
+
+async function loadScenarios(options: {
+  suite?: string;
+  scenarios?: string;
+  prompt?: string;
+  docsDir?: string;
+}): Promise<{ scenarios: AgentScenario[]; scenariosFilePath?: string }> {
+  if (options.suite) {
+    const filePath = path.join(FIXTURES_DIR, `${options.suite}.json`);
+    const raw = await readFile(filePath, "utf8");
+    return { scenarios: JSON.parse(raw) as AgentScenario[], scenariosFilePath: filePath };
+  }
+  if (options.scenarios) {
+    const filePath = path.resolve(options.scenarios);
+    const raw = await readFile(filePath, "utf8");
+    return { scenarios: JSON.parse(raw) as AgentScenario[], scenariosFilePath: filePath };
+  }
+  // --prompt mode
+  return {
+    scenarios: [{
+      name: "ad-hoc",
+      prompt: options.prompt!,
+      assertions: [],
+      docsDir: options.docsDir!
+    }]
+  };
+}
 
 function collectValues(value: string, previous: string[]): string[] {
   return [...previous, value];

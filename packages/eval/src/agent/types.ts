@@ -8,8 +8,10 @@ export interface AgentScenario {
   systemPrompt?: string;
   /** Shell command run in workspace before agent starts */
   setup?: string;
-  /** Path to docs directory. Resolved relative to scenario file. Runner auto-builds + caches the index. */
+  /** Path to docs directory. Resolved relative to scenario file. CLI auto-builds + caches the index. */
   docsDir?: string;
+  /** Resolved index directory path. Set at runtime by the CLI after building the index. */
+  indexDir?: string;
 }
 
 export type AgentAssertion =
@@ -80,7 +82,8 @@ export interface AgentEvalSummary {
 
 export interface AgentEvalConfig {
   scenarios: AgentScenario[];
-  server: { command: string; args?: string[]; cwd?: string; env?: Record<string, string> };
+  /** Server config for scenarios without an indexDir. Optional when all scenarios have indexDir set. */
+  server?: { command: string; args?: string[]; cwd?: string; env?: Record<string, string> };
   workspaceDir?: string;
   model?: string;
   maxTurns?: number;
@@ -89,14 +92,6 @@ export interface AgentEvalConfig {
   maxConcurrency?: number;
   observer?: AgentEvalObserver;
   debug?: boolean;
-  /** Resolved docsDir paths per scenario (keyed by scenario index). Set by bin.ts after resolving relative paths. */
-  resolvedDocsDirs?: Map<number, string>;
-  /** Path to CLI binary for building indexes */
-  cliBinPath?: string;
-  /** Path to server binary for auto-spawning */
-  serverBinPath?: string;
-  /** Cache directory for built indexes */
-  cacheDir?: string;
 }
 
 export interface AgentEvalOutput {

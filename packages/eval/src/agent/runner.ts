@@ -4,9 +4,9 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { evaluateAssertions } from "./assertions.js";
-import { ensureIndex } from "./build-cache.js";
 import { computeAgentEvalSummary } from "./metrics.js";
 import { NoopObserver } from "./observer.js";
 import type {
@@ -19,6 +19,9 @@ import type {
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "server", "dist", "bin.js");
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_MAX_TURNS = 15;
@@ -42,7 +45,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
     for (let i = 0; i < config.scenarios.length; i++) {
       const scenario = config.scenarios[i]!;
       observer.onScenarioStart(scenario, i, config.scenarios.length);
-      const result = await runAgentScenario(scenario, i, config, observer);
+      const result = await runAgentScenario(scenario, config, observer);
       results.push(result);
       observer.onScenarioComplete(scenario, result);
     }
@@ -55,7 +58,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
         const idx = cursor++;
         const item = queue[idx]!;
         observer.onScenarioStart(item.scenario, item.index, config.scenarios.length);
-        const result = await runAgentScenario(item.scenario, item.index, config, observer);
+        const result = await runAgentScenario(item.scenario, config, observer);
         results[item.index] = result;
         observer.onScenarioComplete(item.scenario, result);
       }
@@ -79,7 +82,6 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
 
 export async function runAgentScenario(
   scenario: AgentScenario,
-  scenarioIndex: number,
   config: AgentEvalConfig,
   observer?: AgentEvalObserver
 ): Promise<AgentScenarioResult> {
@@ -121,27 +123,27 @@ export async function runAgentScenario(
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) serverEnv[k] = v;
     }
-    if (config.server.env) {
+    if (config.server?.env) {
       Object.assign(serverEnv, config.server.env);
     }
 
-    // Per-scenario server config: if docsDir is set, auto-build index and spawn server
-    const resolvedDocsDir = config.resolvedDocsDirs?.get(scenarioIndex);
+    // Per-scenario server config: if indexDir is pre-built, spawn server against it
     let mcpServerConfig: { command: string; args?: string[]; env?: Record<string, string> };
 
-    if (resolvedDocsDir && config.cliBinPath && config.serverBinPath) {
-      const indexDir = await ensureIndex(resolvedDocsDir, config.cliBinPath, config.cacheDir);
+    if (scenario.indexDir) {
       mcpServerConfig = {
         command: "node",
-        args: [config.serverBinPath, "--index-dir", indexDir],
+        args: [SERVER_BIN_PATH, "--index-dir", scenario.indexDir],
         env: serverEnv
       };
-    } else {
+    } else if (config.server) {
       mcpServerConfig = {
         command: config.server.command,
         ...(config.server.args ? { args: config.server.args } : {}),
         env: serverEnv
       };
+    } else {
+      throw new Error(`Scenario "${scenario.name}" has no indexDir and no server config provided`);
     }
 
     try {

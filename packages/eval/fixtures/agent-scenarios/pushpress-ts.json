@@ -4,8 +4,6 @@
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists members (customers) from the PushPress API. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "pushpress" },
@@ -19,8 +17,6 @@
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that retrieves recent checkins from the PushPress API. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "pushpress" },
@@ -33,8 +29,6 @@
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that registers a webhook to listen for events. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "advanced",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "pushpress" },
@@ -47,8 +41,6 @@
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists available classes or scheduled sessions. Install all dependencies first with npm.",
     "docsDir": "../realistic",
     "category": "sdk-usage",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "pushpress" },
