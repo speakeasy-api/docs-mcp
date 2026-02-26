@@ -46,6 +46,9 @@ export default function Playground() {
     projectSlug: "thomas",
     mcp: mcpUrl,
     variant: "standalone",
+    model: {
+      showModelPicker: true,
+    },
     api: {
       session: getSession,
     },
