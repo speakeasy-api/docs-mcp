@@ -7,7 +7,7 @@ import {
   type CallToolResult,
   type ListToolsResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { McpDocsServer } from "./server.js";
+import type { ToolCallContext, ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json") as {
@@ -20,7 +20,7 @@ export interface StartStdioServerOptions {
 }
 
 export async function startStdioServer(
-  app: McpDocsServer,
+  app: ToolProvider,
   options: StartStdioServerOptions = {},
 ): Promise<void> {
   const server = new Server(
@@ -45,8 +45,13 @@ export async function startStdioServer(
     return { tools } satisfies ListToolsResult;
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const result = await app.callTool(request.params.name, request.params.arguments ?? {});
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const context: ToolCallContext = { signal: extra.signal };
+    const clientVersion = server.getClientVersion();
+    if (clientVersion) {
+      context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
+    }
+    const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
     return result as CallToolResult;
   });
 

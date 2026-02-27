@@ -7,7 +7,7 @@ import { ManifestSchema } from "../src/manifest-schema.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outPath = resolve(__dirname, "../../../schemas/docs-mcp.schema.json");
 
-const jsonSchema = z.toJSONSchema(ManifestSchema, { target: "draft-2020-12" });
+const jsonSchema = z.toJSONSchema(ManifestSchema, { target: "draft-7" });
 
 const content = JSON.stringify(jsonSchema, null, 2) + "\n";
 writeFileSync(outPath, content);

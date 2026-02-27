@@ -19,18 +19,109 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 # Stdio transport (for MCP host integration)
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
-
 ## Programmatic Usage
 
-```typescript
-import { McpDocsServer } from "@speakeasy-api/docs-mcp-server";
+### Boot with defaults
 
-const server = new McpDocsServer({
-  dbPath: "./dist/.lancedb",
+```typescript
+import { createDocsServer, startStdioServer } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({ indexDir: "./my-index" });
+await startStdioServer(server);
+```
+
+### Inject a custom tool
+
+```typescript
+import { createDocsServer, startStdioServer } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({
+  indexDir: "./my-index",
+  customTools: [
+    {
+      name: "submit_feedback",
+      description: "Submit user feedback about a doc page",
+      inputSchema: {
+        type: "object",
+        properties: {
+          chunk_id: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5 }
+        },
+        required: ["chunk_id", "rating"]
+      },
+      handler: async (args) => {
+        console.log("Feedback:", args);
+        return { content: [{ type: "text", text: "Thanks!" }], isError: false };
+      }
+    }
+  ]
+});
+await startStdioServer(server);
+```
+
+### Run over HTTP
+
+```typescript
+import { createDocsServer, startHttpServer } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({ indexDir: "./my-index" });
+const { port } = await startHttpServer(server, { port: 3000 });
+console.log(`Listening on http://localhost:${port}/mcp`);
+```
+
+### HTTP authentication
+
+The `authenticate` hook runs before each request. Return `AuthInfo` to attach
+caller identity to the request context, or throw to reject with 401.
+
+```typescript
+import { createDocsServer, startHttpServer } from "@speakeasy-api/docs-mcp-server";
+import type { AuthInfo } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({
+  indexDir: "./my-index",
+  customTools: [
+    {
+      name: "whoami",
+      description: "Return the authenticated caller's client ID",
+      inputSchema: { type: "object", properties: {} },
+      handler: async (_args, context) => ({
+        content: [{ type: "text", text: `You are: ${context.authInfo?.clientId ?? "unknown"}` }],
+        isError: false
+      })
+    }
+  ]
 });
 
-server.start();
+await startHttpServer(server, {
+  port: 3000,
+  authenticate: async ({ headers }) => {
+    const token = (headers.authorization as string | undefined)?.replace("Bearer ", "");
+    if (!token) throw new Error("Missing bearer token");
+    // Validate the token and return AuthInfo
+    return { token, clientId: "my-client", scopes: ["read"] };
+  }
+});
 ```
+
+Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
+`clientInfo`, and an abort `signal`.
+
+## Option Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `indexDir` | `string` | *required* | Directory containing `chunks.json` and `metadata.json` from `docs-mcp build`. |
+| `toolPrefix` | `string` | — | Prefix for built-in tool names, e.g. `"acme"` → `acme_search_docs`. Does not affect custom tool names. Alphanumeric, dash, or underscore. |
+| `queryEmbeddingApiKey` | `string` | `OPENAI_API_KEY` env | API key for query-time embeddings. |
+| `queryEmbeddingBaseUrl` | `string` | Provider default | Base URL for the embedding API. Defaults to the provider's official endpoint (e.g. `https://api.openai.com/v1` for OpenAI). Override to use a proxy or compatible API. |
+| `queryEmbeddingBatchSize` | `number` | `128` | Number of texts per embedding API call. Reduce if hitting provider rate or payload limits. Positive integer. |
+| `proximityWeight` | `number` | `1.25` | RRF blend weight for lexical phrase-proximity matches. Higher values boost results where query terms appear close together. Positive. |
+| `phraseSlop` | `number` | `0` | Maximum word distance allowed for phrase matches (0 = exact phrase only, up to 5). |
+| `vectorWeight` | `number` | `1` | RRF blend weight for vector (semantic) search results. Higher values boost semantically similar results. Positive. |
+| `customTools` | `CustomTool[]` | `[]` | Additional tools registered alongside the built-in `search_docs` and `get_doc`. |
+
+The exported `CreateDocsServerOptionsSchema` (Zod) is the canonical machine-readable spec for these options.
 
 ## MCP Tools
 

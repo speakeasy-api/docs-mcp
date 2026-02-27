@@ -6,7 +6,7 @@ import type {
   SearchRequest,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
-import type { CallToolResult, ToolDefinition } from "./types.js";
+import type { CallToolResult, CustomTool, ToolCallContext, ToolDefinition, ToolProvider } from "./types.js";
 
 export interface McpDocsServerOptions {
   index: SearchEngine;
@@ -14,15 +14,19 @@ export interface McpDocsServerOptions {
   toolPrefix?: string;
   rrfWeights?: RrfWeights;
   vectorSearchAvailable?: boolean;
+  customTools?: CustomTool[];
 }
 
-export class McpDocsServer {
+const MCP_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
+
+export class McpDocsServer implements ToolProvider {
   private readonly index: SearchEngine;
   private readonly metadata: CorpusMetadata;
   private readonly rrfWeights: RrfWeights | undefined;
   private readonly vectorSearchAvailable: boolean;
   private readonly searchToolName: string;
   private readonly getDocToolName: string;
+  private readonly customTools: CustomTool[];
 
   constructor(options: McpDocsServerOptions) {
     this.index = options.index;
@@ -32,6 +36,36 @@ export class McpDocsServer {
     const prefix = options.toolPrefix;
     this.searchToolName = prefix ? `${prefix}_search_docs` : "search_docs";
     this.getDocToolName = prefix ? `${prefix}_get_doc` : "get_doc";
+    this.customTools = options.customTools ?? [];
+
+    // Validate built-in tool names fit within 64-char MCP limit
+    for (const name of [this.searchToolName, this.getDocToolName]) {
+      if (!MCP_TOOL_NAME_PATTERN.test(name)) {
+        throw new Error(
+          `Built-in tool name '${name}' exceeds 64 characters or contains invalid characters. Use a shorter toolPrefix.`
+        );
+      }
+    }
+
+    // Validate custom tool names
+    const builtInNames = new Set([this.searchToolName, this.getDocToolName]);
+    const seenCustomNames = new Set<string>();
+    for (const tool of this.customTools) {
+      if (!MCP_TOOL_NAME_PATTERN.test(tool.name)) {
+        throw new Error(
+          `Custom tool name '${tool.name}' must match MCP spec: alphanumeric/dash/underscore, 1-64 chars.`
+        );
+      }
+      if (builtInNames.has(tool.name)) {
+        throw new Error(
+          `Custom tool name '${tool.name}' collides with a built-in tool name.`
+        );
+      }
+      if (seenCustomNames.has(tool.name)) {
+        throw new Error(`Duplicate custom tool name '${tool.name}'.`);
+      }
+      seenCustomNames.add(tool.name);
+    }
   }
 
   getTools(): ToolDefinition[] {
@@ -40,7 +74,7 @@ export class McpDocsServer {
     const defaultGetDocDescription =
       "Retrieve the full content of a documentation page by its chunk_id (returned by search_docs). Each chunk is self-contained — do NOT set context on your first read. Only use context=1..3 if, after reading, you find the chunk references adjacent sections you need.";
 
-    return [
+    const builtIn: ToolDefinition[] = [
       {
         name: this.searchToolName,
         description: this.metadata.tool_descriptions?.search_docs ?? defaultSearchDescription,
@@ -52,15 +86,32 @@ export class McpDocsServer {
         inputSchema: buildGetDocSchema(),
       },
     ];
+
+    const custom: ToolDefinition[] = this.customTools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema
+    }));
+
+    return [...builtIn, ...custom];
   }
 
-  async callTool(name: string, args: unknown): Promise<CallToolResult> {
+  async callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult> {
     if (name === this.searchToolName) {
       return this.handleSearchDocs(args);
     }
 
     if (name === this.getDocToolName) {
       return this.handleGetDoc(args);
+    }
+
+    const customTool = this.customTools.find((t) => t.name === name);
+    if (customTool) {
+      try {
+        return await customTool.handler(args, context);
+      } catch (error) {
+        return errorResult(error instanceof Error ? error.message : String(error));
+      }
     }
 
     return errorResult(`Unknown tool '${name}'.`);

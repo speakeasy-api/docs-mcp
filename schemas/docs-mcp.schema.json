@@ -1,12 +1,18 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
+    "$schema": {
+      "description": "JSON Schema URI for editor validation. Typically set automatically by SchemaStore; can be added explicitly.",
+      "type": "string"
+    },
     "version": {
       "type": "string",
       "const": "1",
       "description": "Schema version. Must be '1'.",
-      "examples": ["1"]
+      "examples": [
+        "1"
+      ]
     },
     "strategy": {
       "description": "Default chunking strategy applied to all files in this directory tree unless overridden by a more specific rule.",
@@ -14,26 +20,39 @@
       "properties": {
         "chunk_by": {
           "type": "string",
-          "enum": ["h1", "h2", "h3", "file"],
+          "enum": [
+            "h1",
+            "h2",
+            "h3",
+            "file"
+          ],
           "description": "The heading level at which to split markdown into chunks. 'h1' splits at top-level headings, 'h2'/'h3' at progressively finer granularity, and 'file' treats the entire file as one chunk.",
-          "examples": ["h2"]
+          "examples": [
+            "h2"
+          ]
         },
         "max_chunk_size": {
           "description": "Maximum chunk size in characters (default: 20000). Oversized chunks are first split recursively at finer heading levels (e.g. h2→h3→h4→…→h6), preserving semantic structure and breadcrumbs. Only when no further sub-headings exist does it fall back to AST node boundary splitting.",
-          "examples": [8000],
+          "examples": [
+            8000
+          ],
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         },
         "min_chunk_size": {
           "description": "Minimum chunk size in characters. Trailing chunks smaller than this are merged into the preceding chunk to avoid fragments.",
-          "examples": [200],
+          "examples": [
+            200
+          ],
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         }
       },
-      "required": ["chunk_by"],
+      "required": [
+        "chunk_by"
+      ],
       "additionalProperties": false
     },
     "metadata": {
@@ -73,7 +92,9 @@
             "type": "boolean"
           }
         },
-        "required": ["vector_collapse"],
+        "required": [
+          "vector_collapse"
+        ],
         "additionalProperties": false,
         "description": "Configuration for a taxonomy field's search-time behavior."
       },
@@ -89,7 +110,9 @@
             "type": "string",
             "minLength": 1,
             "description": "A glob pattern matched against file paths relative to the directory containing the manifest.",
-            "examples": ["guides/advanced/*.md"]
+            "examples": [
+              "guides/advanced/*.md"
+            ]
           },
           "strategy": {
             "description": "Chunking strategy override for files matching this pattern. Replaces the root strategy entirely.",
@@ -97,26 +120,39 @@
             "properties": {
               "chunk_by": {
                 "type": "string",
-                "enum": ["h1", "h2", "h3", "file"],
+                "enum": [
+                  "h1",
+                  "h2",
+                  "h3",
+                  "file"
+                ],
                 "description": "The heading level at which to split markdown into chunks. 'h1' splits at top-level headings, 'h2'/'h3' at progressively finer granularity, and 'file' treats the entire file as one chunk.",
-                "examples": ["h2"]
+                "examples": [
+                  "h2"
+                ]
               },
               "max_chunk_size": {
                 "description": "Maximum chunk size in characters (default: 20000). Oversized chunks are first split recursively at finer heading levels (e.g. h2→h3→h4→…→h6), preserving semantic structure and breadcrumbs. Only when no further sub-headings exist does it fall back to AST node boundary splitting.",
-                "examples": [8000],
+                "examples": [
+                  8000
+                ],
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               },
               "min_chunk_size": {
                 "description": "Minimum chunk size in characters. Trailing chunks smaller than this are merged into the preceding chunk to avoid fragments.",
-                "examples": [200],
+                "examples": [
+                  200
+                ],
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               }
             },
-            "required": ["chunk_by"],
+            "required": [
+              "chunk_by"
+            ],
             "additionalProperties": false
           },
           "metadata": {
@@ -135,13 +171,17 @@
             }
           }
         },
-        "required": ["pattern"],
+        "required": [
+          "pattern"
+        ],
         "additionalProperties": false,
         "description": "Overrides the default chunking strategy and/or metadata for files matching a glob pattern. Within the overrides array, later matches take precedence."
       }
     }
   },
-  "required": ["version"],
+  "required": [
+    "version"
+  ],
   "additionalProperties": false,
   "description": "Docs MCP configuration file (.docs-mcp.json) that controls how documentation is chunked, tagged, and indexed for search."
 }

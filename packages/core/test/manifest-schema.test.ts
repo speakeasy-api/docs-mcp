@@ -11,7 +11,7 @@ const schemaPath = resolve(__dirname, "../../../schemas/docs-mcp.schema.json");
 describe("manifest JSON schema", () => {
   it("committed schema matches generated schema from Zod", () => {
     const generated = z.toJSONSchema(ManifestSchema, {
-      target: "draft-2020-12",
+      target: "draft-7",
     });
     const committed = JSON.parse(readFileSync(schemaPath, "utf-8"));
 

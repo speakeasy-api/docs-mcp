@@ -70,6 +70,12 @@ export const ManifestTaxonomyConfigSchema = z
 
 export const ManifestSchema = z
   .object({
+    $schema: z
+      .string()
+      .optional()
+      .describe(
+        "JSON Schema URI for editor validation. Typically set automatically by SchemaStore; can be added explicitly.",
+      ),
     version: z
       .literal("1")
       .describe("Schema version. Must be '1'.")
