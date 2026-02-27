@@ -5,9 +5,13 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
   type ListToolsResult,
+  type ListResourcesResult,
+  type ListResourceTemplatesResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { McpDocsServer } from "./server.js";
 
@@ -45,6 +49,7 @@ function createPerRequestServer(
     {
       capabilities: {
         tools: {},
+        resources: {},
       },
     },
   );
@@ -56,6 +61,14 @@ function createPerRequestServer(
       inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"],
     }));
     return { tools } satisfies ListToolsResult;
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return { resources: [] } satisfies ListResourcesResult;
+  });
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
