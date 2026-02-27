@@ -1,5 +1,12 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.6.0
+
+### Minor Changes
+
+- bd9980c: Add resources panel to playground UI with expandable markdown previews and extract shared MCP session helpers
+- 4f93b52: Added support for exposing documents as MCP resources that can be added into agent context.
+
 ## 0.5.0
 
 ## 0.4.2
