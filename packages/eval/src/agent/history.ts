@@ -120,6 +120,41 @@ export function generateTrendSummary(
     true
   ));
 
+  // Avg MCP calls — informational (higher may be fine)
+  const prevMcp = prev.avgMcpToolCalls ?? 0;
+  const currMcp = curr.avgMcpToolCalls ?? 0;
+  lines.push(formatTrendRow(
+    "MCP calls",
+    prevMcp.toFixed(1),
+    currMcp.toFixed(1),
+    currMcp - prevMcp,
+    "",
+    "higher"
+  ));
+
+  // Cache tokens — informational
+  const prevCacheRead = prev.avgCacheReadInputTokens ?? 0;
+  const currCacheRead = curr.avgCacheReadInputTokens ?? 0;
+  lines.push(formatTrendRow(
+    "Cache read",
+    Math.round(prevCacheRead).toString(),
+    Math.round(currCacheRead).toString(),
+    currCacheRead - prevCacheRead,
+    "",
+    "higher"
+  ));
+
+  const prevCacheCreate = prev.avgCacheCreationInputTokens ?? 0;
+  const currCacheCreate = curr.avgCacheCreationInputTokens ?? 0;
+  lines.push(formatTrendRow(
+    "Cache create",
+    Math.round(prevCacheCreate).toString(),
+    Math.round(currCacheCreate).toString(),
+    currCacheCreate - prevCacheCreate,
+    "",
+    "lower"
+  ));
+
   // Per-scenario regressions and improvements
   const regressions: string[] = [];
   const improvements: string[] = [];

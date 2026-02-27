@@ -18,19 +18,19 @@ export async function evaluateAssertions(
   for (const assertion of assertions) {
     switch (assertion.type) {
       case "contains":
-        results.push(evaluateContains(finalAnswer, assertion.value));
+        results.push(evaluateContains(assertion, finalAnswer));
         break;
       case "not_contains":
-        results.push(evaluateNotContains(finalAnswer, assertion.value));
+        results.push(evaluateNotContains(assertion, finalAnswer));
         break;
       case "matches":
-        results.push(evaluateMatches(finalAnswer, assertion.pattern, assertion.flags));
+        results.push(evaluateMatches(assertion, finalAnswer));
         break;
       case "file_contains":
-        results.push(await evaluateFileContains(workspaceDir, assertion.path, assertion.value));
+        results.push(await evaluateFileContains(assertion, workspaceDir));
         break;
       case "file_matches":
-        results.push(await evaluateFileMatches(workspaceDir, assertion.path, assertion.pattern, assertion.flags));
+        results.push(await evaluateFileMatches(assertion, workspaceDir));
         break;
       case "script":
         if (assertion.when_env && !process.env[assertion.when_env]) {
@@ -40,7 +40,7 @@ export async function evaluateAssertions(
             message: `Script "${assertion.name}" skipped (${assertion.when_env} not set)`
           });
         } else {
-          results.push(await evaluateScript(assertion.command, assertion.name, workspaceDir));
+          results.push(await evaluateScript(assertion, workspaceDir));
         }
         break;
     }
@@ -49,114 +49,110 @@ export async function evaluateAssertions(
   return results;
 }
 
-function evaluateContains(text: string, value: string): AssertionResult {
-  const passed = text.includes(value);
+function evaluateContains(assertion: AgentAssertion & { type: "contains" }, text: string): AssertionResult {
+  const passed = text.includes(assertion.value);
   return {
-    assertion: { type: "contains", value },
+    assertion,
     passed,
     message: passed
-      ? `Output contains "${value}"`
-      : `Output does not contain "${value}"`
+      ? `Output contains "${assertion.value}"`
+      : `Output does not contain "${assertion.value}"`
   };
 }
 
-function evaluateNotContains(text: string, value: string): AssertionResult {
-  const passed = !text.includes(value);
+function evaluateNotContains(assertion: AgentAssertion & { type: "not_contains" }, text: string): AssertionResult {
+  const passed = !text.includes(assertion.value);
   return {
-    assertion: { type: "not_contains", value },
+    assertion,
     passed,
     message: passed
-      ? `Output does not contain "${value}"`
-      : `Output unexpectedly contains "${value}"`
+      ? `Output does not contain "${assertion.value}"`
+      : `Output unexpectedly contains "${assertion.value}"`
   };
 }
 
-function evaluateMatches(text: string, pattern: string, flags?: string): AssertionResult {
-  const re = new RegExp(pattern, flags);
+function evaluateMatches(assertion: AgentAssertion & { type: "matches" }, text: string): AssertionResult {
+  const re = new RegExp(assertion.pattern, assertion.flags);
   const passed = re.test(text);
   return {
-    assertion: { type: "matches", pattern, ...(flags !== undefined ? { flags } : {}) },
+    assertion,
     passed,
     message: passed
-      ? `Output matches /${pattern}/${flags ?? ""}`
-      : `Output does not match /${pattern}/${flags ?? ""}`
+      ? `Output matches /${assertion.pattern}/${assertion.flags ?? ""}`
+      : `Output does not match /${assertion.pattern}/${assertion.flags ?? ""}`
   };
 }
 
 async function evaluateFileContains(
-  workspaceDir: string,
-  filePath: string,
-  value: string
+  assertion: AgentAssertion & { type: "file_contains" },
+  workspaceDir: string
 ): Promise<AssertionResult> {
-  const fullPath = join(workspaceDir, filePath);
+  const fullPath = join(workspaceDir, assertion.path);
   try {
     const content = await readFile(fullPath, "utf-8");
-    const passed = content.includes(value);
+    const passed = content.includes(assertion.value);
     return {
-      assertion: { type: "file_contains", path: filePath, value },
+      assertion,
       passed,
       message: passed
-        ? `File "${filePath}" contains "${value}"`
-        : `File "${filePath}" does not contain "${value}"`
+        ? `File "${assertion.path}" contains "${assertion.value}"`
+        : `File "${assertion.path}" does not contain "${assertion.value}"`
     };
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return {
-      assertion: { type: "file_contains", path: filePath, value },
+      assertion,
       passed: false,
       message: code === "ENOENT"
-        ? `File "${filePath}" not found in ${workspaceDir}`
-        : `File "${filePath}" unreadable: ${code ?? err}`
+        ? `File "${assertion.path}" not found in ${workspaceDir}`
+        : `File "${assertion.path}" unreadable: ${code ?? err}`
     };
   }
 }
 
 async function evaluateFileMatches(
-  workspaceDir: string,
-  filePath: string,
-  pattern: string,
-  flags?: string
+  assertion: AgentAssertion & { type: "file_matches" },
+  workspaceDir: string
 ): Promise<AssertionResult> {
-  const fullPath = join(workspaceDir, filePath);
+  const fullPath = join(workspaceDir, assertion.path);
   try {
     const content = await readFile(fullPath, "utf-8");
-    const re = new RegExp(pattern, flags);
+    const re = new RegExp(assertion.pattern, assertion.flags);
     const passed = re.test(content);
     return {
-      assertion: { type: "file_matches", path: filePath, pattern, ...(flags !== undefined ? { flags } : {}) },
+      assertion,
       passed,
       message: passed
-        ? `File "${filePath}" matches /${pattern}/${flags ?? ""}`
-        : `File "${filePath}" does not match /${pattern}/${flags ?? ""}`
+        ? `File "${assertion.path}" matches /${assertion.pattern}/${assertion.flags ?? ""}`
+        : `File "${assertion.path}" does not match /${assertion.pattern}/${assertion.flags ?? ""}`
     };
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return {
-      assertion: { type: "file_matches", path: filePath, pattern, ...(flags !== undefined ? { flags } : {}) },
+      assertion,
       passed: false,
       message: code === "ENOENT"
-        ? `File "${filePath}" not found in ${workspaceDir}`
-        : `File "${filePath}" unreadable: ${code ?? err}`
+        ? `File "${assertion.path}" not found in ${workspaceDir}`
+        : `File "${assertion.path}" unreadable: ${code ?? err}`
     };
   }
 }
 
 async function evaluateScript(
-  command: string,
-  name: string,
+  assertion: AgentAssertion & { type: "script" },
   workspaceDir: string
 ): Promise<AssertionResult> {
   try {
-    const { stdout, stderr } = await execFileAsync("sh", ["-c", command], {
+    const { stdout, stderr } = await execFileAsync("sh", ["-c", assertion.command], {
       cwd: workspaceDir,
       timeout: SCRIPT_TIMEOUT_MS,
       env: process.env as Record<string, string>,
       maxBuffer: 10 * 1024 * 1024
     });
     return {
-      assertion: { type: "script", command, name },
+      assertion,
       passed: true,
-      message: `Script "${name}" passed${stdout.trim() ? `: ${stdout.trim().slice(0, 200)}` : ""}${stderr.trim() ? ` (stderr: ${stderr.trim().slice(0, 200)})` : ""}`
+      message: `Script "${assertion.name}" passed${stdout.trim() ? `: ${stdout.trim().slice(0, 200)}` : ""}${stderr.trim() ? ` (stderr: ${stderr.trim().slice(0, 200)})` : ""}`
     };
   } catch (err: unknown) {
     const error = err as { code?: number; killed?: boolean; stdout?: string; stderr?: string; message?: string };
@@ -164,9 +160,9 @@ async function evaluateScript(
       ? "timed out"
       : error.stderr?.trim()?.slice(0, 500) || error.stdout?.trim()?.slice(0, 500) || error.message || "unknown error";
     return {
-      assertion: { type: "script", command, name },
+      assertion,
       passed: false,
-      message: `Script "${name}" failed: ${detail}`
+      message: `Script "${assertion.name}" failed: ${detail}`
     };
   }
 }

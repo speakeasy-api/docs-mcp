@@ -46,7 +46,7 @@ docs-mcp-eval agent-eval --suite acmeauth --include ts-init
 | `docsSpec` | `DocsRepoSpec` | no | — | Git repo to clone and index docs from (takes precedence over `docsDir`) |
 | `docsDir` | `string` | no | — | Path to a local docs directory, resolved relative to the scenario file |
 
-A scenario **passes** only if it has at least one assertion and all assertions pass.
+A scenario **passes** only if it has at least one hard assertion and all hard assertions pass. Soft assertions (`"soft": true`) are still evaluated and displayed in output, but their results do not affect pass/fail.
 
 ## Docs Sources
 
@@ -97,6 +97,14 @@ For `docsSpec` scenarios, cloned repositories are cached at `.cache/repos/` keye
 Multiple scenarios sharing the same docs directory and description share a single index build.
 
 ## Assertion Types
+
+All assertion types support an optional `soft` flag:
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `soft` | `boolean` | no | `false` | When `true`, the assertion is evaluated and shown in output (as yellow `⚠` on failure) but does **not** count toward the scenario's pass/fail |
+
+Soft assertions are useful for typecheck or compilation checks that provide signal without blocking the overall result.
 
 ### `contains`
 
@@ -172,6 +180,7 @@ Runs a shell command in the agent's workspace directory. Passes if exit code is 
 | `command` | `string` | yes | Shell command to execute (via `sh -c`) |
 | `name` | `string` | yes | Human-readable label for the assertion |
 | `when_env` | `string` | no | Environment variable guard — if set but the variable is absent, the assertion is auto-passed (skipped) |
+| `soft` | `boolean` | no | When `true`, failure is shown as `⚠` but doesn't affect scenario pass/fail |
 
 The `when_env` field is useful for assertions that require API keys to run (e.g. actually executing generated code against a live SDK). In CI without the key, the assertion is skipped rather than failed.
 
@@ -228,6 +237,11 @@ docs-mcp-eval agent-eval [options]
 
 ## Using from Another Repo
 
+The eval framework works in two main contexts:
+
+1. **Testing your own SDK docs quality** — point scenarios at your documentation to measure how well an AI agent can use them to complete tasks.
+2. **Evaluating docs-mcp against any OSS project** — clone any project's docs via `docsSpec` to benchmark search and retrieval quality.
+
 The only thing you need in a consumer repo is a scenario JSON file. Invoke the eval via npx:
 
 ```bash
@@ -235,6 +249,8 @@ npx @speakeasy-api/docs-mcp-eval agent-eval \
   --scenarios ./agent-scenarios.json \
   --model claude-sonnet-4-20250514
 ```
+
+### Pointing at an OSS project
 
 Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs checkout is needed:
 
@@ -255,6 +271,10 @@ Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs c
 }
 ```
 
+This works with any project that has markdown documentation — not just SDKs. For example, you could evaluate how well docs-mcp serves framework guides, API references, or operational runbooks.
+
+### Using a local docs directory
+
 Or point to a local docs directory with `--docs-dir`:
 
 ```bash
@@ -264,6 +284,38 @@ npx @speakeasy-api/docs-mcp-eval agent-eval \
 ```
 
 When scenarios use `docsDir` or `docsSpec`, the CLI auto-resolves the MCP server command — no `--server-command` is needed.
+
+### Portable JSON output
+
+The `--out` flag produces a self-contained JSON artifact suitable for CI comparison:
+
+```bash
+npx @speakeasy-api/docs-mcp-eval agent-eval \
+  --scenarios ./agent-scenarios.json \
+  --out eval-results.json
+```
+
+The eval also auto-saves results to `.eval-results/<suite>/` and compares against the most recent prior run. This trend comparison highlights regressions and improvements in pass rate, activation, turns, and cost.
+
+## CI Integration
+
+The recommended CI workflow runs the eval on both the base branch and the PR, then compares results:
+
+1. **Run on base:** Check out the base branch, build, and run the eval with `--out base-results.json`
+2. **Run on PR:** Check out the PR branch, build, and run the eval with `--out pr-results.json`
+3. **Diff results:** Compare the two JSON files — the `summary` fields contain pass rate, activation rate, avg turns, and cost. Surface regressions as a PR comment.
+
+The eval outputs structured JSON designed for this pattern. The `--out` flag writes a deterministic artifact, and the `history.ts` module provides `generateTrendSummary()` for local delta comparison.
+
+```bash
+# Example: run eval and save results for later comparison
+npx @speakeasy-api/docs-mcp-eval agent-eval \
+  --suite my-sdk \
+  --out eval-results.json
+
+# The auto-saved results in .eval-results/ also work as a local baseline
+# for trend tracking across development iterations.
+```
 
 ## Result Format
 
@@ -338,4 +390,4 @@ When previous results exist in `.eval-results/`, the CLI automatically compares 
 | SDK-specific keys (e.g. `DUB_API_KEY`) | no | For `script` assertions guarded by `when_env` — skipped if absent |
 | `NO_COLOR` | no | Disables ANSI color output |
 
-The `.env` file in the eval package directory is loaded automatically via `dotenv`.
+When running from the monorepo via mise, copy `mise.local.toml.example` to `mise.local.toml` and fill in your API keys. The `.env` file in the eval package directory is also loaded automatically via `dotenv`.

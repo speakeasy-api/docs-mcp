@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -15,7 +15,8 @@ import type {
   AgentEvalOutput,
   AgentScenario,
   AgentScenarioResult,
-  ToolCallRecord
+  ToolCallRecord,
+  WorkspaceFile
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -28,7 +29,11 @@ const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.50;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
-const DEFAULT_SYSTEM_PROMPT = `You are an expert TypeScript developer. You have a docs-mcp server with pre-indexed SDK documentation. Always use the docs-mcp tools (search_docs, get_doc) for API references — they are faster and more accurate than web search for this SDK. Write clean, correct TypeScript code. Install dependencies before writing code.`;
+const DEFAULT_SYSTEM_PROMPT = `You are an interactive assistant that helps users with software engineering tasks. Use the tools available to you to assist the user.
+
+You have access to documentation tools for this project. Use search_docs and get_doc when you need exact API signatures, supported options, or authoritative SDK behavior. Otherwise, rely on your own knowledge and reasoning.
+
+Write clean, correct code. Write all files in the current working directory using relative paths (e.g. ./solution.ts, not absolute paths).`;
 
 export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOutput> {
   const observer = config.observer ?? new NoopObserver();
@@ -94,12 +99,19 @@ export async function runAgentScenario(
   try {
     await mkdir(workspaceDir, { recursive: true });
 
+    const errors: string[] = [];
+
     if (scenario.setup) {
-      await execFileAsync("sh", ["-c", scenario.setup], {
-        cwd: workspaceDir,
-        timeout: 60_000,
-        env: process.env as Record<string, string>
-      });
+      try {
+        await execFileAsync("sh", ["-c", scenario.setup], {
+          cwd: workspaceDir,
+          timeout: 60_000,
+          env: process.env as Record<string, string>
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`Setup warning: ${msg}`);
+      }
     }
 
     const startMs = performance.now();
@@ -113,36 +125,43 @@ export async function runAgentScenario(
     let durationApiMs = 0;
     let inputTokens = 0;
     let outputTokens = 0;
-    const errors: string[] = [];
+    let cacheReadInputTokens = 0;
+    let cacheCreationInputTokens = 0;
 
     const pendingToolCalls = new Map<string, { name: string; args: Record<string, unknown>; startMs: number }>();
 
-    const serverEnv: Record<string, string> = {};
-    for (const [k, v] of Object.entries(process.env)) {
-      if (v !== undefined) serverEnv[k] = v;
-    }
-    if (config.server?.env) {
-      Object.assign(serverEnv, config.server.env);
+    // Build MCP server config (skipped in noMcp baseline mode)
+    let mcpServerConfig: { command: string; args?: string[]; env?: Record<string, string> } | undefined;
+
+    if (!config.noMcp) {
+      const serverEnv: Record<string, string> = {};
+      for (const [k, v] of Object.entries(process.env)) {
+        if (v !== undefined) serverEnv[k] = v;
+      }
+      if (config.server?.env) {
+        Object.assign(serverEnv, config.server.env);
+      }
+
+      if (scenario.indexDir) {
+        mcpServerConfig = {
+          command: "node",
+          args: [SERVER_BIN_PATH, "--index-dir", scenario.indexDir],
+          env: serverEnv
+        };
+      } else if (config.server) {
+        mcpServerConfig = {
+          command: config.server.command,
+          ...(config.server.args ? { args: config.server.args } : {}),
+          env: serverEnv
+        };
+      } else {
+        throw new Error(`Scenario "${scenario.name}" has no indexDir and no server config provided`);
+      }
     }
 
-    // Per-scenario server config: if indexDir is pre-built, spawn server against it
-    let mcpServerConfig: { command: string; args?: string[]; env?: Record<string, string> };
-
-    if (scenario.indexDir) {
-      mcpServerConfig = {
-        command: "node",
-        args: [SERVER_BIN_PATH, "--index-dir", scenario.indexDir],
-        env: serverEnv
-      };
-    } else if (config.server) {
-      mcpServerConfig = {
-        command: config.server.command,
-        ...(config.server.args ? { args: config.server.args } : {}),
-        env: serverEnv
-      };
-    } else {
-      throw new Error(`Scenario "${scenario.name}" has no indexDir and no server config provided`);
-    }
+    const allowedTools = mcpServerConfig
+      ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"]
+      : ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
     try {
       for await (const message of query({
@@ -150,9 +169,8 @@ export async function runAgentScenario(
         options: {
           model: config.model ?? DEFAULT_MODEL,
           systemPrompt,
-          allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"],
-          // disallowedTools: ["WebSearch", "WebFetch"],
-          mcpServers: { "docs-mcp": mcpServerConfig },
+          allowedTools,
+          ...(mcpServerConfig ? { mcpServers: { "docs-mcp": mcpServerConfig } } : {}),
           maxTurns,
           maxBudgetUsd,
           cwd: workspaceDir,
@@ -191,8 +209,11 @@ export async function runAgentScenario(
         if (message.type === "assistant") {
           numTurns++;
           if (message.message.usage) {
-            inputTokens += message.message.usage.input_tokens ?? 0;
-            outputTokens += message.message.usage.output_tokens ?? 0;
+            const usage = message.message.usage as Record<string, number>;
+            inputTokens += usage.input_tokens ?? 0;
+            outputTokens += usage.output_tokens ?? 0;
+            cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
+            cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
           }
 
           for (const block of message.message.content) {
@@ -256,8 +277,11 @@ export async function runAgentScenario(
           totalCostUsd = message.total_cost_usd;
           durationApiMs = message.duration_api_ms;
           numTurns = message.num_turns;
-          inputTokens = message.usage.input_tokens;
-          outputTokens = message.usage.output_tokens;
+          const resultUsage = message.usage as Record<string, number>;
+          inputTokens = resultUsage.input_tokens ?? 0;
+          outputTokens = resultUsage.output_tokens ?? 0;
+          cacheReadInputTokens = resultUsage.cache_read_input_tokens ?? 0;
+          cacheCreationInputTokens = resultUsage.cache_creation_input_tokens ?? 0;
           if (message.subtype === "success") {
             finalAnswer = message.result;
           } else {
@@ -279,7 +303,21 @@ export async function runAgentScenario(
     const durationMs = performance.now() - startMs;
 
     const assertionResults = await evaluateAssertions(finalAnswer, scenario.assertions, workspaceDir);
-    const passed = assertionResults.length > 0 && assertionResults.every((r) => r.passed);
+    const hard = assertionResults.filter((r) => !r.assertion.soft);
+    const passed = hard.length > 0 && hard.every((r) => r.passed);
+
+    // Collect workspace files written by the agent
+    const workspaceFiles = await collectWorkspaceFiles(toolCallTrace, workspaceDir);
+
+    // MCP-specific metrics
+    let mcpToolCalls = 0;
+    for (const [tool, count] of Object.entries(toolsCalled)) {
+      if (DOCS_MCP_TOOLS.has(tool)) mcpToolCalls += count;
+    }
+    let mcpToolResultChars = 0;
+    for (const trace of toolCallTrace) {
+      if (DOCS_MCP_TOOLS.has(trace.name)) mcpToolResultChars += trace.result.length;
+    }
 
     return {
       id: scenario.id,
@@ -296,6 +334,11 @@ export async function runAgentScenario(
       toolCallTrace,
       inputTokens,
       outputTokens,
+      cacheReadInputTokens,
+      cacheCreationInputTokens,
+      mcpToolCalls,
+      mcpToolResultChars,
+      workspaceFiles,
       finalAnswer,
       resultSubtype,
       ...(errors.length > 0 ? { errors } : {})
@@ -316,6 +359,51 @@ function summarizeArgs(args: Record<string, unknown>): string {
   });
   if (entries.length > 3) parts.push("...");
   return parts.join(", ");
+}
+
+const MAX_FILE_CONTENT = 5000;
+
+const EXT_LANG: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  py: "python", rb: "ruby", go: "go", rs: "rust", java: "java",
+  json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+  sh: "bash", bash: "bash", zsh: "bash",
+  md: "markdown", html: "html", css: "css", sql: "sql"
+};
+
+async function collectWorkspaceFiles(
+  trace: ToolCallRecord[],
+  workspaceDir: string
+): Promise<WorkspaceFile[]> {
+  // Dedupe file paths from Write/Edit tool calls (preserving last-seen order)
+  const filePaths = new Map<string, true>();
+  for (const record of trace) {
+    if ((record.name === "Write" || record.name === "Edit") && typeof record.args.file_path === "string") {
+      filePaths.set(record.args.file_path, true);
+    }
+  }
+
+  const files: WorkspaceFile[] = [];
+  for (const relPath of filePaths.keys()) {
+    const absPath = path.resolve(workspaceDir, relPath);
+    // Ensure it's within workspace
+    if (!absPath.startsWith(workspaceDir)) continue;
+    try {
+      let content = await readFile(absPath, "utf8");
+      if (content.length > MAX_FILE_CONTENT) {
+        content = content.slice(0, MAX_FILE_CONTENT);
+      }
+      const ext = path.extname(relPath).replace(/^\./, "");
+      files.push({
+        path: relPath,
+        content,
+        ...(EXT_LANG[ext] ? { lang: EXT_LANG[ext] } : ext ? { lang: ext } : {})
+      });
+    } catch {
+      // File may have been deleted by the agent
+    }
+  }
+  return files;
 }
 
 function extractToolResultText(toolResult: Record<string, unknown>): string {

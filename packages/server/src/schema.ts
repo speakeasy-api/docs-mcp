@@ -49,7 +49,7 @@ export function buildGetDocSchema(): Record<string, unknown> {
       context: {
         type: "integer",
         description:
-          "Number of adjacent chunks to include before and after the target chunk. Default is 0.",
+          "Number of adjacent chunks to include before and after the target chunk. Default 0 (recommended). Chunks are self-contained; only increase after an initial read if you need broader page context.",
         minimum: 0,
         maximum: 5,
         default: 0

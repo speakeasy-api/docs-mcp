@@ -15,10 +15,11 @@ export async function ensureIndex(
   docsDir: string,
   cliBinPath: string,
   cacheDir?: string,
-  description?: string
+  description?: string,
+  toolDescriptions?: { search_docs?: string; get_doc?: string }
 ): Promise<string> {
   const resolvedCacheDir = cacheDir ?? path.resolve(DEFAULT_CACHE_DIR);
-  const cacheKey = await computeCacheKey(docsDir, description);
+  const cacheKey = await computeCacheKey(docsDir, description, toolDescriptions);
   const indexDir = path.join(resolvedCacheDir, cacheKey);
   const metadataPath = path.join(indexDir, "metadata.json");
 
@@ -33,12 +34,16 @@ export async function ensureIndex(
   await mkdir(indexDir, { recursive: true });
 
   console.error(`Building index for ${docsDir} → ${indexDir}`);
-  await runBuild(cliBinPath, docsDir, indexDir, description);
+  await runBuild(cliBinPath, docsDir, indexDir, description, toolDescriptions);
 
   return indexDir;
 }
 
-async function computeCacheKey(docsDir: string, description?: string): Promise<string> {
+async function computeCacheKey(
+  docsDir: string,
+  description?: string,
+  toolDescriptions?: { search_docs?: string; get_doc?: string }
+): Promise<string> {
   const hash = createHash("sha256");
 
   // Hash file listing (relative paths + sizes + mtimes)
@@ -60,6 +65,11 @@ async function computeCacheKey(docsDir: string, description?: string): Promise<s
   // Hash description so changing it rebuilds the index
   if (description) {
     hash.update(`\0description\0${description}`);
+  }
+
+  // Hash tool descriptions so changing them rebuilds the index
+  if (toolDescriptions) {
+    hash.update(`\0tool_descriptions\0${JSON.stringify(toolDescriptions)}`);
   }
 
   return hash.digest("hex").slice(0, 16);
@@ -91,11 +101,23 @@ async function collectFiles(dir: string, base?: string): Promise<FileEntry[]> {
   return entries;
 }
 
-function runBuild(cliBinPath: string, docsDir: string, outDir: string, description?: string): Promise<void> {
+function runBuild(
+  cliBinPath: string,
+  docsDir: string,
+  outDir: string,
+  description?: string,
+  toolDescriptions?: { search_docs?: string; get_doc?: string }
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [cliBinPath, "build", "--docs-dir", docsDir, "--out", outDir];
     if (description) {
       args.push("--description", description);
+    }
+    if (toolDescriptions?.search_docs) {
+      args.push("--tool-description-search", toolDescriptions.search_docs);
+    }
+    if (toolDescriptions?.get_doc) {
+      args.push("--tool-description-get-doc", toolDescriptions.get_doc);
     }
     const child = spawn("node", args, {
       env: process.env as Record<string, string>,

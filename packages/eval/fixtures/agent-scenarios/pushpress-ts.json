@@ -9,7 +9,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
       { "type": "script", "command": "grep -q 'pushpress' package.json", "name": "pushpress-in-deps" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'member\\|customer\\|name\\|email'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'member\\|customer\\|name\\|email'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
     ]
   },
   "get-checkins": {
@@ -21,7 +22,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
       { "type": "file_matches", "path": "solution.ts", "pattern": "checkin", "flags": "i" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'checkin\\|check'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'checkin\\|check'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
     ]
   },
   "create-webhook": {
@@ -33,7 +35,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
       { "type": "file_matches", "path": "solution.ts", "pattern": "webhook|event", "flags": "i" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'webhook\\|event\\|created'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'webhook\\|event\\|created'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
     ]
   },
   "list-classes": {
@@ -45,7 +48,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
       { "type": "file_matches", "path": "solution.ts", "pattern": "class|schedule|session", "flags": "i" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'class\\|schedule\\|session'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'class\\|schedule\\|session'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
     ]
   }
 }

@@ -8,7 +8,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
       { "type": "script", "command": "pip show dub >/dev/null 2>&1", "name": "dub-installed" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "list-analytics": {
@@ -19,7 +20,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.py", "pattern": "analytics", "flags": "i" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "upsert-link": {
@@ -30,7 +32,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.py", "pattern": "upsert", "flags": "i" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "get-link": {
@@ -41,7 +44,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.py", "pattern": "links", "flags": "i" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   }
 }

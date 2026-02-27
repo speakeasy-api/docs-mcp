@@ -9,8 +9,8 @@
     "assertions": [
       { "type": "file_contains", "path": "solution.ts", "value": "dub" },
       { "type": "script", "command": "grep -q 'dub' package.json", "name": "dub-in-deps" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts 2>&1 || true", "name": "typecheck" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "list-analytics": {
@@ -22,7 +22,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "analytics" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "upsert-link": {
@@ -34,7 +35,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "upsert" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "get-link": {
@@ -46,7 +48,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "links" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   }
 }

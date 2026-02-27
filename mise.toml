@@ -1,3 +1,5 @@
+# Environment setup: copy mise.local.toml.example → mise.local.toml and fill in API keys.
+
 [tasks."index-fixtures"]
 description = "Build test fixture index from tests/fixtures/docs"
 run = "node packages/cli/dist/index.js build --docs-dir tests/fixtures/docs --out tests/fixtures/index --embedding-provider hash"

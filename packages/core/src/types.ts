@@ -104,12 +104,18 @@ export interface EmbeddingMetadata {
   dimensions: number;
 }
 
+export interface ToolDescriptions {
+  search_docs?: string;
+  get_doc?: string;
+}
+
 export interface CorpusMetadata {
   metadata_version: string;
   corpus_description: string;
   taxonomy: Record<string, TaxonomyField>;
   stats: MetadataStats;
   embedding: EmbeddingMetadata | null;
+  tool_descriptions?: ToolDescriptions;
 }
 
 export interface GetDocRequest {

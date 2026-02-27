@@ -16,6 +16,11 @@ function makeResult(overrides: Partial<AgentScenarioResult> = {}): AgentScenario
     toolCallTrace: [],
     inputTokens: 5000,
     outputTokens: 1000,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    mcpToolCalls: 0,
+    mcpToolResultChars: 0,
+    workspaceFiles: [],
     finalAnswer: "done",
     resultSubtype: "success",
     ...overrides
@@ -106,5 +111,44 @@ describe("computeAgentEvalSummary", () => {
     const summary = computeAgentEvalSummary(results);
     expect(summary.medianTurns).toBe(5);
     expect(summary.medianDurationMs).toBe(6000);
+  });
+
+  it("aggregates MCP tool usage distribution", () => {
+    const results = [
+      makeResult({
+        toolsCalled: { "mcp__docs-mcp__search_docs": 3, "mcp__docs-mcp__get_doc": 1, Read: 2 },
+        mcpToolCalls: 4
+      }),
+      makeResult({
+        toolsCalled: { "mcp__docs-mcp__search_docs": 1, Write: 1 },
+        mcpToolCalls: 1
+      })
+    ];
+    const summary = computeAgentEvalSummary(results);
+    expect(summary.avgMcpToolCalls).toBe(2.5);
+    expect(summary.mcpToolUsageDistribution).toEqual({
+      "mcp__docs-mcp__search_docs": 4,
+      "mcp__docs-mcp__get_doc": 1
+    });
+    // Non-MCP tools should not appear in mcpToolUsageDistribution
+    expect(summary.mcpToolUsageDistribution.Read).toBeUndefined();
+  });
+
+  it("computes cache token averages", () => {
+    const results = [
+      makeResult({ cacheReadInputTokens: 10000, cacheCreationInputTokens: 400 }),
+      makeResult({ cacheReadInputTokens: 14000, cacheCreationInputTokens: 600 })
+    ];
+    const summary = computeAgentEvalSummary(results);
+    expect(summary.avgCacheReadInputTokens).toBe(12000);
+    expect(summary.avgCacheCreationInputTokens).toBe(500);
+  });
+
+  it("defaults new fields to zero for empty results", () => {
+    const summary = computeAgentEvalSummary([]);
+    expect(summary.avgMcpToolCalls).toBe(0);
+    expect(summary.avgCacheReadInputTokens).toBe(0);
+    expect(summary.avgCacheCreationInputTokens).toBe(0);
+    expect(summary.mcpToolUsageDistribution).toEqual({});
   });
 });

@@ -86,10 +86,6 @@ function padRight(str: string, width: number): string {
   return visible >= width ? str : str + " ".repeat(width - visible);
 }
 
-function truncate(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max) + "..." : str;
-}
-
 /** Truncate a string that may contain ANSI codes to `max` visible characters. */
 function truncateAnsi(str: string, max: number): string {
   // eslint-disable-next-line no-control-regex
@@ -196,6 +192,7 @@ export class ConsoleObserver implements AgentEvalObserver {
 
   onAgentMessage(_scenario: AgentScenario, message: AgentObservedMessage): void {
     const ts = `${c.dim}[${(message.timestampMs / 1000).toFixed(1)}s]${c.reset}`;
+    const debug = this.opts.debug;
 
     switch (message.type) {
       case "system_init":
@@ -203,7 +200,9 @@ export class ConsoleObserver implements AgentEvalObserver {
         break;
 
       case "assistant_text":
-        write(`${ts} ${c.green}◆${c.reset} ${message.summary}\n`);
+        if (debug) {
+          write(`${ts} ${c.green}◆${c.reset} ${message.summary}\n`);
+        }
         break;
 
       case "tool_call": {
@@ -212,8 +211,8 @@ export class ConsoleObserver implements AgentEvalObserver {
         const color = toolColor(toolName);
         write(`${ts} ${color}▸ ${toolName}${c.reset}\n`);
 
-        // Show args in a panel (indented)
-        if (message.toolArgs && Object.keys(message.toolArgs).length > 0) {
+        // Show args panel only in debug mode
+        if (debug && message.toolArgs && Object.keys(message.toolArgs).length > 0) {
           const argsStr = formatToolArgs(message.toolArgs);
           write(indent(panel(argsStr, undefined, color), 6) + "\n");
         }
@@ -221,13 +220,15 @@ export class ConsoleObserver implements AgentEvalObserver {
       }
 
       case "tool_result": {
-        const preview = message.toolResultPreview ?? message.summary;
-        const formatted = formatToolResult(preview);
-        if (formatted.includes("\n")) {
-          write(`${ts} ${c.dim}  ↳ result${c.reset}\n`);
-          write(indent(panel(formatted, undefined, c.dim), 6) + "\n");
-        } else {
-          write(`${ts} ${c.dim}  ↳ ${formatted}${c.reset}\n`);
+        if (debug) {
+          const preview = message.toolResultPreview ?? message.summary;
+          const formatted = formatToolResult(preview);
+          if (formatted.includes("\n")) {
+            write(`${ts} ${c.dim}  ↳ result${c.reset}\n`);
+            write(indent(panel(formatted, undefined, c.dim), 6) + "\n");
+          } else {
+            write(`${ts} ${c.dim}  ↳ ${formatted}${c.reset}\n`);
+          }
         }
         break;
       }
@@ -258,7 +259,11 @@ export class ConsoleObserver implements AgentEvalObserver {
 
     // Assertion details
     for (const ar of result.assertionResults) {
-      const icon = ar.passed ? `${c.green}✓` : `${c.red}✗`;
+      const icon = ar.passed
+        ? `${c.green}✓`
+        : ar.assertion.soft
+          ? `${c.yellow}⚠`
+          : `${c.red}✗`;
       write(`  ${icon} ${ar.message}${c.reset}\n`);
     }
 
@@ -268,13 +273,18 @@ export class ConsoleObserver implements AgentEvalObserver {
       }
     }
 
-    // Code snippet with syntax highlighting
-    const snippet = extractCodeSnippet(result.finalAnswer);
-    if (snippet) {
-      const label = snippet.truncated ? "Code (excerpt)" : "Code";
-      const header = label + (snippet.lang ? ` [${snippet.lang}]` : "");
-      const highlighted = highlightCode(snippet.lines.join("\n"), snippet.lang);
-      write("\n" + panel(highlighted, `${c.dim}${header}${c.reset}`, c.dim) + "\n");
+    // Show workspace files written by the agent
+    if (result.workspaceFiles?.length) {
+      for (const file of result.workspaceFiles) {
+        const lines = file.content.split("\n");
+        const truncated = lines.length > MAX_SNIPPET_LINES;
+        const displayLines = truncated
+          ? [...lines.slice(0, MAX_SNIPPET_LINES), `... (${lines.length - MAX_SNIPPET_LINES} more lines)`]
+          : lines;
+        const header = file.path + (truncated ? " (excerpt)" : "");
+        const highlighted = highlightCode(displayLines.join("\n"), file.lang);
+        write("\n" + panel(highlighted, `${c.dim}${header}${c.reset}`, c.dim) + "\n");
+      }
     }
   }
 
@@ -318,8 +328,9 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${padRight("Avg turns", 16)}${s.avgTurns.toFixed(1)} ${c.dim}(median ${s.medianTurns})${c.reset}`,
       `${padRight("Avg cost", 16)}$${s.avgCostUsd.toFixed(4)} ${c.dim}(total $${s.totalCostUsd.toFixed(4)})${c.reset}`,
       `${padRight("Avg duration", 16)}${(s.avgDurationMs / 1000).toFixed(1)}s ${c.dim}(median ${(s.medianDurationMs / 1000).toFixed(1)}s)${c.reset}`,
-      `${padRight("Avg tokens", 16)}${s.avgInputTokens.toFixed(0)}in / ${s.avgOutputTokens.toFixed(0)}out`
-    ];
+      `${padRight("Avg tokens", 16)}${s.avgInputTokens.toFixed(0)}in / ${s.avgOutputTokens.toFixed(0)}out${formatCacheTokens(s.avgCacheReadInputTokens, s.avgCacheCreationInputTokens)}`,
+      formatMcpCallsLine(s)
+    ].filter(Boolean);
 
     write("\n" + panel(summaryLines.join("\n"), `${c.cyan}Summary${c.reset}`) + "\n");
 
@@ -337,37 +348,29 @@ export class ConsoleObserver implements AgentEvalObserver {
   }
 }
 
-// ── Code snippet extraction ────────────────────────────────────────────
+// ── Summary line helpers ───────────────────────────────────────────────
+
+function formatCacheTokens(avgRead: number, avgCreate: number): string {
+  if (avgRead === 0 && avgCreate === 0) return "";
+  return ` ${c.dim}(cache: ${Math.round(avgRead)} read, ${Math.round(avgCreate)} create)${c.reset}`;
+}
+
+function formatMcpCallsLine(s: import("./types.js").AgentEvalSummary): string {
+  const dist = s.mcpToolUsageDistribution ?? {};
+  const total = Object.values(dist).reduce((a, b) => a + b, 0);
+  if (total === 0) return "";
+
+  const parts = Object.entries(dist)
+    .sort(([, a], [, b]) => b - a)
+    .map(([tool, count]) => `${tool.replace("mcp__docs-mcp__", "")}: ${count}`)
+    .join(", ");
+
+  return `${padRight("MCP calls", 16)}${(s.avgMcpToolCalls ?? 0).toFixed(1)} avg ${c.dim}(${parts})${c.reset}`;
+}
+
+// ── Workspace file display ──────────────────────────────────────────────
 
 const MAX_SNIPPET_LINES = 20;
-
-function extractCodeSnippet(text: string): { lines: string[]; lang?: string; truncated: boolean } | null {
-  if (!text || text.length < 10) return null;
-
-  const fenceMatch = text.match(/```(\w*)\n([\s\S]*?)```/);
-  if (fenceMatch) {
-    const lang = fenceMatch[1] || undefined;
-    const codeLines = fenceMatch[2]!.trimEnd().split("\n");
-    if (codeLines.length <= MAX_SNIPPET_LINES) {
-      return { lines: codeLines, ...(lang ? { lang } : {}), truncated: false };
-    }
-    return {
-      lines: [...codeLines.slice(0, MAX_SNIPPET_LINES), `... (${codeLines.length - MAX_SNIPPET_LINES} more lines)`],
-      ...(lang ? { lang } : {}),
-      truncated: true
-    };
-  }
-
-  const allLines = text.trimEnd().split("\n");
-  if (allLines.length <= 3) return null;
-  const excerptLines = allLines.slice(0, Math.min(8, allLines.length));
-  return {
-    lines: allLines.length > 8
-      ? [...excerptLines, `... (${allLines.length - 8} more lines)`]
-      : excerptLines,
-    truncated: allLines.length > 8
-  };
-}
 
 // ── Syntax highlighting (cli-highlight) ────────────────────────────────
 

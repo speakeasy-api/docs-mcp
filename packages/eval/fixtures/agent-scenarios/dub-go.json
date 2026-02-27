@@ -9,8 +9,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.go", "pattern": "dub", "flags": "i" },
       { "type": "script", "command": "grep -q 'dubinc/dub-go' go.mod", "name": "dub-in-deps" },
-      { "type": "script", "command": "go build -o /dev/null solution.go 2>&1 || true", "name": "compiles-check" },
-      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "go build -o /dev/null solution.go", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "list-analytics": {
@@ -22,7 +22,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.go", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.go", "pattern": "analytics", "flags": "i" },
-      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "go build -o /dev/null solution.go", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "upsert-link": {
@@ -34,7 +35,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.go", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.go", "pattern": "upsert", "flags": "i" },
-      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "go build -o /dev/null solution.go", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   },
   "get-link": {
@@ -46,7 +48,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.go", "pattern": "dub", "flags": "i" },
       { "type": "file_matches", "path": "solution.go", "pattern": "links", "flags": "i" },
-      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "go build -o /dev/null solution.go", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY", "soft": true }
     ]
   }
 }

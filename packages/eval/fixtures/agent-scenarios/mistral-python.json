@@ -9,7 +9,8 @@
       { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
       { "type": "script", "command": "pip show mistralai >/dev/null 2>&1", "name": "mistral-installed" },
       { "type": "file_contains", "path": "solution.py", "value": "chat" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "embeddings": {
@@ -20,7 +21,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
       { "type": "file_matches", "path": "solution.py", "pattern": "embed", "flags": "i" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "list-models": {
@@ -31,7 +33,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
       { "type": "file_matches", "path": "solution.py", "pattern": "model", "flags": "i" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "function-calling": {
@@ -42,7 +45,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
       { "type": "file_contains", "path": "solution.py", "value": "tool" },
-      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   }
 }

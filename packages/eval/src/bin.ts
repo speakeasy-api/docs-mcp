@@ -176,6 +176,7 @@ program
   .option("--max-budget-usd <number>", "Default max budget per scenario in USD", parseFloatOption, 0.50)
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
+  .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
   .option("--debug", "Keep workspaces after run for inspection", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
   .option("--out <path>", "Output JSON path")
@@ -195,6 +196,7 @@ program
     maxBudgetUsd: number;
     maxConcurrency: number;
     systemPrompt?: string;
+    mcp: boolean;
     debug: boolean;
     save: boolean;
     out?: string;
@@ -227,57 +229,64 @@ program
       }
     }
 
-    // Resolve docsDir → build indexes → set indexDir on each scenario
-    const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
-    const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
-    const indexDescriptions = new Map<string, string>(); // first description per docsDir
+    const noMcp = !options.mcp;
 
-    for (const scenario of scenarios) {
-      let resolvedDocsDir: string | undefined;
-      if (scenario.docsSpec) {
-        resolvedDocsDir = await ensureRepo(scenario.docsSpec);
-      } else if (scenario.docsDir) {
-        const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
-        resolvedDocsDir = path.resolve(base, scenario.docsDir);
-      } else if (defaultDocsDir) {
-        resolvedDocsDir = defaultDocsDir;
+    // Resolve docsDir → build indexes → set indexDir on each scenario (skip in no-mcp mode)
+    let server: { command: string; args: string[]; cwd?: string; env?: Record<string, string> } | undefined;
+
+    if (!noMcp) {
+      const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
+      const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
+      const indexDescriptions = new Map<string, string>(); // first description per docsDir
+
+      for (const scenario of scenarios) {
+        let resolvedDocsDir: string | undefined;
+        if (scenario.docsSpec) {
+          resolvedDocsDir = await ensureRepo(scenario.docsSpec);
+        } else if (scenario.docsDir) {
+          const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
+          resolvedDocsDir = path.resolve(base, scenario.docsDir);
+        } else if (defaultDocsDir) {
+          resolvedDocsDir = defaultDocsDir;
+        }
+
+        if (resolvedDocsDir) {
+          // Use scenario description for the corpus; first one wins per docsDir
+          const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
+          if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
+            indexDescriptions.set(resolvedDocsDir, scenario.description);
+          }
+
+          const cacheKey = `${resolvedDocsDir}\0${description ?? ""}\0${JSON.stringify(scenario.toolDescriptions ?? {})}`;
+          let indexDir = indexCache.get(cacheKey);
+          if (!indexDir) {
+            indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH, undefined, description, scenario.toolDescriptions);
+            indexCache.set(cacheKey, indexDir);
+          }
+          scenario.indexDir = indexDir;
+        }
       }
 
-      if (resolvedDocsDir) {
-        // Use scenario description for the corpus; first one wins per docsDir
-        const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
-        if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
-          indexDescriptions.set(resolvedDocsDir, scenario.description);
-        }
-
-        const cacheKey = `${resolvedDocsDir}\0${description ?? ""}`;
-        let indexDir = indexCache.get(cacheKey);
-        if (!indexDir) {
-          indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH, undefined, description);
-          indexCache.set(cacheKey, indexDir);
-        }
-        scenario.indexDir = indexDir;
+      // Server config: only needed when some scenarios don't have indexDir
+      const allHaveIndex = scenarios.every((s) => s.indexDir);
+      if (!allHaveIndex && !options.serverCommand) {
+        console.error("Error: --server-command is required when scenarios don't specify docsDir");
+        process.exit(1);
       }
+
+      server = options.serverCommand
+        ? {
+            command: options.serverCommand,
+            args: options.serverArg,
+            ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
+            ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {})
+          }
+        : undefined;
     }
 
-    // Server config: only needed when some scenarios don't have indexDir
-    const allHaveIndex = scenarios.every((s) => s.indexDir);
-    if (!allHaveIndex && !options.serverCommand) {
-      console.error("Error: --server-command is required when scenarios don't specify docsDir");
-      process.exit(1);
-    }
-
-    const server = options.serverCommand
-      ? {
-          command: options.serverCommand,
-          args: options.serverArg,
-          ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
-          ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {})
-        }
-      : undefined;
-
-    const suiteName = options.suite
+    const baseSuiteName = options.suite
       ?? (options.scenarios ? path.basename(options.scenarios, path.extname(options.scenarios)) : "ad-hoc");
+    const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
 
     const observer = new ConsoleObserver({
       model: options.model,
@@ -295,7 +304,8 @@ program
       maxConcurrency: options.maxConcurrency,
       ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
       observer,
-      debug: options.debug
+      debug: options.debug,
+      noMcp
     });
 
     // Auto-persist + trend comparison

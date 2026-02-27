@@ -10,7 +10,8 @@
       { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
       { "type": "script", "command": "grep -q 'mistralai' package.json", "name": "mistral-in-deps" },
       { "type": "file_contains", "path": "solution.ts", "value": "chat" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "embeddings": {
@@ -22,7 +23,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "embed" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "list-models": {
@@ -34,7 +36,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "model" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   },
   "function-calling": {
@@ -46,7 +49,8 @@
     "assertions": [
       { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
       { "type": "file_contains", "path": "solution.ts", "value": "tool" },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
     ]
   }
 }

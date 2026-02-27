@@ -14,11 +14,18 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
   const durations = results.map((r) => r.durationMs);
   const inputTokens = results.map((r) => r.inputTokens);
   const outputTokens = results.map((r) => r.outputTokens);
+  const cacheReadTokens = results.map((r) => r.cacheReadInputTokens ?? 0);
+  const cacheCreateTokens = results.map((r) => r.cacheCreationInputTokens ?? 0);
+  const mcpCalls = results.map((r) => r.mcpToolCalls ?? 0);
 
   const toolUsageDistribution: Record<string, number> = {};
+  const mcpToolUsageDistribution: Record<string, number> = {};
   for (const r of results) {
     for (const [tool, count] of Object.entries(r.toolsCalled)) {
       toolUsageDistribution[tool] = (toolUsageDistribution[tool] ?? 0) + count;
+      if (tool.startsWith("mcp__docs-mcp__")) {
+        mcpToolUsageDistribution[tool] = (mcpToolUsageDistribution[tool] ?? 0) + count;
+      }
     }
   }
 
@@ -34,6 +41,10 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     medianDurationMs: round(median(durations)),
     avgInputTokens: round(avg(inputTokens)),
     avgOutputTokens: round(avg(outputTokens)),
+    avgCacheReadInputTokens: round(avg(cacheReadTokens)),
+    avgCacheCreationInputTokens: round(avg(cacheCreateTokens)),
+    avgMcpToolCalls: round(avg(mcpCalls)),
+    mcpToolUsageDistribution,
     toolUsageDistribution,
     categoryBreakdown: computeCategoryBreakdown(results)
   };
@@ -80,6 +91,10 @@ function emptySummary(): AgentEvalSummary {
     medianDurationMs: 0,
     avgInputTokens: 0,
     avgOutputTokens: 0,
+    avgCacheReadInputTokens: 0,
+    avgCacheCreationInputTokens: 0,
+    avgMcpToolCalls: 0,
+    mcpToolUsageDistribution: {},
     toolUsageDistribution: {},
     categoryBreakdown: []
   };
