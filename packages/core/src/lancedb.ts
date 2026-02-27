@@ -267,8 +267,6 @@ export class LanceDbSearchEngine implements SearchEngine {
       );
     }
 
-    const context = Math.max(0, Math.min(5, request.context ?? 0));
-
     const targetRows = await this.table
       .query()
       .where(`chunk_id = '${escapeSqlString(request.chunk_id)}'`)
@@ -283,6 +281,21 @@ export class LanceDbSearchEngine implements SearchEngine {
 
     const target = targetRows[0] as ChunkRow;
     const filepath = expectStringField(target, "filepath");
+
+    if (request.context === -1) {
+      const escapedFilepath = escapeSqlString(filepath);
+      const allRows = await this.table.query().where(`filepath = '${escapedFilepath}'`).toArray();
+
+      const sorted = allRows
+        .map((row) => row as ChunkRow)
+        .sort((a, b) => toNumberField(a, "chunk_index") - toNumberField(b, "chunk_index"));
+
+      return {
+        text: sorted.map((row) => expectStringField(row, "content")).join("\n\n"),
+      };
+    }
+
+    const context = Math.max(0, Math.min(5, request.context ?? 0));
     const targetIndex = toNumberField(target, "chunk_index");
 
     const minIndex = Math.max(0, targetIndex - context);

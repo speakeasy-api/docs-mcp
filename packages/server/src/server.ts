@@ -194,7 +194,7 @@ export class McpDocsServer implements ToolProvider {
     // Change this to grab the full document, not chunks.
     const result = await this.index.getDoc({
       chunk_id: entry.firstChunkId,
-      context: 5,
+      context: -1,
     });
 
     return {

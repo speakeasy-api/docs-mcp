@@ -105,7 +105,6 @@ export class InMemorySearchEngine implements SearchEngine {
       );
     }
 
-    const context = Math.max(0, Math.min(5, request.context ?? 0));
     const target = this.byId.get(request.chunk_id);
     if (!target) {
       throw new Error(
@@ -118,6 +117,13 @@ export class InMemorySearchEngine implements SearchEngine {
       throw new Error(`Internal error: file '${target.filepath}' is missing from index`);
     }
 
+    if (request.context === -1) {
+      return {
+        text: fileChunks.map((chunk) => chunk.content).join("\n\n"),
+      };
+    }
+
+    const context = Math.max(0, Math.min(5, request.context ?? 0));
     const indexInFile = fileChunks.findIndex((chunk) => chunk.chunk_id === target.chunk_id);
     const start = Math.max(0, indexInFile - context);
     const end = Math.min(fileChunks.length - 1, indexInFile + context);

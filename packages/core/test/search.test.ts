@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DocsIndex } from "../src/search.js";
 import type { Chunk } from "../src/types.js";
+import { buildChunks } from "../src/chunking.js";
 
 const baseChunks: Chunk[] = [
   {
@@ -243,5 +244,100 @@ describe("DocsIndex.getDoc", () => {
     expect(doc.text).toContain("(Target)");
     expect(doc.text).toContain("Context: -1");
     expect(doc.text).toContain("Context: +1");
+  });
+
+  it("returns entire document when context is -1", async () => {
+    const doc = `
+# Heading 1
+# Auth
+
+## Login
+first
+
+## Login
+second
+
+# Billing
+
+## Retry
+third
+`.trim();
+    const chunks = buildChunks({
+      filepath: "docs/example.md",
+      markdown: doc,
+      strategy: {
+        chunk_by: "h2",
+      },
+    });
+
+    const index = new DocsIndex(chunks);
+    const result = await index.getDoc({
+      chunk_id: chunks[1].chunk_id,
+      context: -1,
+    });
+
+    expect(result.text).toContain(doc);
+  });
+
+  it("returns entire document without other documents when context is -1", async () => {
+    const doc1 = `
+Example document before
+`.trim();
+    const chunks = buildChunks({
+      filepath: "docs/example-1.md",
+      markdown: doc1,
+      strategy: {
+        chunk_by: "h2",
+      },
+    });
+
+    const doc2 = `
+# Heading 1
+# Auth
+
+## Login
+first
+
+## Login
+second
+
+# Billing
+
+## Retry
+third
+`.trim();
+    const target = buildChunks({
+      filepath: "docs/example-2.md",
+      markdown: doc2,
+      strategy: {
+        chunk_by: "h2",
+      },
+    });
+    chunks.push(...target);
+
+    const doc3 = `
+# Testing with multiple documents
+
+## Section 1
+
+Greetings friend!
+`.trim();
+    chunks.push(
+      ...buildChunks({
+        filepath: "docs/example-3.md",
+        markdown: doc3,
+        strategy: {
+          chunk_by: "h2",
+        },
+      }),
+    );
+
+    const index = new DocsIndex(chunks);
+    const result = await index.getDoc({
+      chunk_id: target[1].chunk_id,
+      context: -1,
+    });
+
+    expect(result.text).toContain(doc2);
   });
 });
