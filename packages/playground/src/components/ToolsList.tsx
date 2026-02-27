@@ -34,50 +34,73 @@ function useToolsFromElements(): ToolEntry[] | undefined {
   return tools;
 }
 
+async function mcpPost(body: unknown): Promise<unknown> {
+  const res = await fetch("/mcp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify(body),
+  });
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/event-stream")) {
+    const text = await res.text();
+    for (const line of text.split("\n")) {
+      if (line.startsWith("data: ")) {
+        return JSON.parse(line.slice(6));
+      }
+    }
+    return null;
+  }
+  return res.json();
+}
+
 function useToolsFromMcp(): ToolEntry[] | undefined {
   const [tools, setTools] = useState<ToolEntry[] | undefined>();
 
   useEffect(() => {
-    fetch("/mcp", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
-      body: JSON.stringify({
+    (async () => {
+      // 1. Initialize handshake
+      await mcpPost({
         jsonrpc: "2.0",
         id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "docs-mcp-playground", version: "0.1.0" },
+        },
+      });
+
+      // 2. Send initialized notification (no id — it's a notification)
+      await mcpPost({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      });
+
+      // 3. Now list tools
+      const data = (await mcpPost({
+        jsonrpc: "2.0",
+        id: 2,
         method: "tools/list",
         params: {},
-      }),
-    })
-      .then(async (res) => {
-        const contentType = res.headers.get("content-type") ?? "";
-        if (contentType.includes("text/event-stream")) {
-          const text = await res.text();
-          for (const line of text.split("\n")) {
-            if (line.startsWith("data: ")) {
-              return JSON.parse(line.slice(6));
-            }
-          }
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return setTools([]);
-        const result = data.result?.tools ?? [];
-        setTools(
-          result.map(
-            (t: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
-              name: t.name,
-              description: t.description,
-              jsonSchema: t.inputSchema,
-            }),
-          ),
-        );
-      })
-      .catch(() => setTools([]));
+      })) as {
+        result?: {
+          tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+        };
+      } | null;
+
+      if (!data) return setTools([]);
+      const result = data.result?.tools ?? [];
+      setTools(
+        result.map((t) => ({
+          name: t.name,
+          description: t.description,
+          jsonSchema: t.inputSchema,
+        })),
+      );
+    })().catch(() => setTools([]));
   }, []);
 
   return tools;
