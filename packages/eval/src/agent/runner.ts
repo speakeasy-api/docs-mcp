@@ -195,7 +195,7 @@ export async function runAgentScenario(
             `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`
           ];
 
-          if (mcpTools.length === 0) {
+          if (mcpTools.length === 0 && !config.noMcp) {
             errors.push("docs-mcp tools not registered — server may have failed to start");
           }
 
