@@ -177,21 +177,10 @@ function createSessionServer(
     onsessioninitialized: (sid: string) => {
       sessionManager.add(sid, server, transport);
     },
+    onsessionclosed: (sid: string) => {
+      sessionManager.remove(sid);
+    },
   });
-
-  transport.onclose = () => {
-    const sid = transport.sessionId;
-    if (sid) {
-      sessionManager.remove(sid);
-    }
-  };
-
-  server.onclose = () => {
-    const sid = transport.sessionId;
-    if (sid) {
-      sessionManager.remove(sid);
-    }
-  };
 
   return { server, transport };
 }
