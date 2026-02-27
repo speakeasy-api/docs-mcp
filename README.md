@@ -21,8 +21,8 @@ A lightweight, domain-agnostic hybrid search engine for markdown (`.md`) corpora
 - **Vector collapse** — deduplicates near-identical cross-language results at search time
 - **Incremental builds** — embedding cache fingerprints each chunk; only changed content is re-embedded
 - **Graceful degradation**
-  - *Chunking* — chunk sizes adapt to the configured embedding provider's context window; falls back to conservative defaults when no provider is set
-  - *Query* — if the embedding API errors at runtime (downtime, expired credits, network issues), the server falls back to FTS-only search with a one-time warning
+  - _Chunking_ — chunk sizes adapt to the configured embedding provider's context window; falls back to conservative defaults when no provider is set
+  - _Query_ — if the embedding API errors at runtime (downtime, expired credits, network issues), the server falls back to FTS-only search with a one-time warning
 
 ## How It Works
 
@@ -62,30 +62,30 @@ On a realistic ~300-operation API with hand-written guides (~28.8MB corpus, 5 ev
 
 ### Summary
 
-| Metric | none | openai | Takeaway |
-| --- | ---: | ---: | --- |
-| MRR@5 | 0.2141 | 0.2833 | Embeddings lift relevant-result ranking by 32% |
-| NDCG@5 | 0.2536 | 0.3218 | Graded relevance improves 27% with embeddings |
-| Facet Precision | 0.3750 | 0.4375 | Embeddings improve filter accuracy by 17% |
-| Search p50 (ms) | 5.2 | 258.4 | FTS-only is ~50x faster at median |
-| Search p95 (ms) | 6.5 | 11101.1 | Tail latency dominated by embedding API |
-| Build Time (ms) | 6022 | 1569703 | Embedding uses batch API for large corpora |
-| Peak RSS (MB) | 221.1 | 283.8 | Modest memory overhead |
-| Index Size (corpus 28.8MB) | 104.9MB | 356.9MB | Vectors ~3.4x the FTS-only index |
-| Embed Cost (est.) | $0 | $0.9825 | ~$1 one-time cost per corpus |
-| Query Cost (est.) | $0 | $0.000003 | Negligible per-query cost |
+| Metric                     |    none |    openai | Takeaway                                       |
+| -------------------------- | ------: | --------: | ---------------------------------------------- |
+| MRR@5                      |  0.2141 |    0.2833 | Embeddings lift relevant-result ranking by 32% |
+| NDCG@5                     |  0.2536 |    0.3218 | Graded relevance improves 27% with embeddings  |
+| Facet Precision            |  0.3750 |    0.4375 | Embeddings improve filter accuracy by 17%      |
+| Search p50 (ms)            |     5.2 |     258.4 | FTS-only is ~50x faster at median              |
+| Search p95 (ms)            |     6.5 |   11101.1 | Tail latency dominated by embedding API        |
+| Build Time (ms)            |    6022 |   1569703 | Embedding uses batch API for large corpora     |
+| Peak RSS (MB)              |   221.1 |     283.8 | Modest memory overhead                         |
+| Index Size (corpus 28.8MB) | 104.9MB |   356.9MB | Vectors ~3.4x the FTS-only index               |
+| Embed Cost (est.)          |      $0 |   $0.9825 | ~$1 one-time cost per corpus                   |
+| Query Cost (est.)          |      $0 | $0.000003 | Negligible per-query cost                      |
 
 ### Per-Category MRR@5
 
 > MRR@5 (Mean Reciprocal Rank at 5) measures how high the first relevant result appears in the top 5. 1.0 = always ranked first; 0.0 = never appears in top 5.
 
-| Category | none | openai | Takeaway |
-| --- | ---: | ---: | --- |
-| clarification | 0.3000 | 0.3000 | FTS matches embeddings |
-| cross-service | 0.1667 | 0.3333 | Embeddings double rank |
-| exact-name | 0.3625 | 0.3792 | FTS nearly matches embeddings |
-| natural-language | 0.0731 | 0.1692 | Embeddings lift 130% |
-| workflow | 0.3333 | 0.4444 | Embeddings lift 33% |
+| Category         |   none | openai | Takeaway                      |
+| ---------------- | -----: | -----: | ----------------------------- |
+| clarification    | 0.3000 | 0.3000 | FTS matches embeddings        |
+| cross-service    | 0.1667 | 0.3333 | Embeddings double rank        |
+| exact-name       | 0.3625 | 0.3792 | FTS nearly matches embeddings |
+| natural-language | 0.0731 | 0.1692 | Embeddings lift 130%          |
+| workflow         | 0.3333 | 0.4444 | Embeddings lift 33%           |
 
 ### Recommendation
 
@@ -133,22 +133,22 @@ my-docs/
 
   // Chunking strategy applied to all files in this directory tree.
   "strategy": {
-    "chunk_by": "h2",         // Split at ## headings. Options: h1, h2, h3, file
-    "max_chunk_size": 8000,   // Oversized chunks split recursively at finer headings
-    "min_chunk_size": 200     // Tiny trailing chunks merge into preceding chunk
+    "chunk_by": "h2", // Split at ## headings. Options: h1, h2, h3, file
+    "max_chunk_size": 8000, // Oversized chunks split recursively at finer headings
+    "min_chunk_size": 200, // Tiny trailing chunks merge into preceding chunk
   },
 
   // Key-value pairs attached to every chunk. Each key becomes a filterable
   // enum parameter on the search_docs tool.
   "metadata": {
     "language": "typescript",
-    "scope": "sdk-specific"
+    "scope": "sdk-specific",
   },
 
   // Per-field search behavior. vector_collapse deduplicates cross-language
   // variants at search time (only active when no filter is set for that field).
   "taxonomy": {
-    "language": { "vector_collapse": true }
+    "language": { "vector_collapse": true },
   },
 
   // File-pattern overrides. Evaluated top-to-bottom; last match wins.
@@ -157,9 +157,9 @@ my-docs/
   "overrides": [
     {
       "pattern": "models/**/*.md",
-      "strategy": { "chunk_by": "file" }
-    }
-  ]
+      "strategy": { "chunk_by": "file" },
+    },
+  ],
 }
 ```
 
@@ -171,12 +171,12 @@ Individual files can also override their manifest via YAML frontmatter (`mcp_chu
 
 Structured as a Turborepo with four packages:
 
-| Package | Role |
-|---|---|
-| `@speakeasy-api/docs-mcp-cli` | CLI for validation, manifest bootstrap (`fix`), and deterministic indexing (`build`) |
-| `@speakeasy-api/docs-mcp-core` | Core retrieval primitives, AST parsing, chunking, and LanceDB queries |
-| `@speakeasy-api/docs-mcp-server` | Lean runtime MCP server surface |
-| `@speakeasy-api/docs-mcp-eval` | Standalone evaluation harness — search-quality benchmarks and end-to-end agent evaluation |
+| Package                          | Role                                                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| `@speakeasy-api/docs-mcp-cli`    | CLI for validation, manifest bootstrap (`fix`), and deterministic indexing (`build`)      |
+| `@speakeasy-api/docs-mcp-core`   | Core retrieval primitives, AST parsing, chunking, and LanceDB queries                     |
+| `@speakeasy-api/docs-mcp-server` | Lean runtime MCP server surface                                                           |
+| `@speakeasy-api/docs-mcp-eval`   | Standalone evaluation harness — search-quality benchmarks and end-to-end agent evaluation |
 
 ```text
                 +---------------------------+
@@ -209,10 +209,10 @@ Structured as a Turborepo with four packages:
 
 The tools exposed to the agent are dynamically generated based on your `corpus_description` and indexed metadata.
 
-| Tool | What it does |
-|---|---|
+| Tool          | What it does                                                                                                                                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `search_docs` | Performs hybrid search. Tool names and descriptions are user-configurable. Parameters are dynamically generated with valid taxonomy injected as JSON Schema `enum`s. Supports stateless cursor pagination. Returns fallback hints on zero results. |
-| `get_doc` | Returns a specific chunk, plus `context: N` neighboring chunks for surrounding detail. |
+| `get_doc`     | Returns a specific chunk, plus `context: N` neighboring chunks for surrounding detail.                                                                                                                                                             |
 
 ## Quick Start
 
@@ -311,19 +311,21 @@ Open `http://localhost:3001` to explore the index interactively.
 
 The MCP server supports two transport modes:
 
-| Flag | Transport | Default | Use case |
-|---|---|---|---|
-| `--transport stdio` | Standard I/O | Yes (default) | Direct MCP client integration (e.g. Claude Desktop, Cursor) |
-| `--transport http` | Streamable HTTP | | Containerized deployments, playground, multi-client access |
+| Flag                | Transport       | Default       | Use case                                                    |
+| ------------------- | --------------- | ------------- | ----------------------------------------------------------- |
+| `--transport stdio` | Standard I/O    | Yes (default) | Direct MCP client integration (e.g. Claude Desktop, Cursor) |
+| `--transport http`  | Streamable HTTP |               | Containerized deployments, playground, multi-client access  |
 
 When using HTTP transport, the server listens on port `20310` by default (configurable with `--port`).
 
 **stdio example** (MCP client config):
+
 ```bash
 npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb
 ```
 
 **HTTP example**:
+
 ```bash
 npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 ```
@@ -340,6 +342,7 @@ npx @speakeasy-api/docs-mcp-cli fix --docs-dir ./docs
 
 **2. Indexing (CI Build Step)**
 Run the deterministic indexer against your corpus. The indexer reads manifests and frontmatter to chunk the docs, generates embeddings, and saves the local `.lancedb` directory. Cache the output directory across CI runs to make builds incremental — only changed chunks are re-embedded.
+
 ```yaml
 - uses: actions/cache@v4
   with:
@@ -354,6 +357,7 @@ Run the deterministic indexer against your corpus. The indexer reads manifests a
 
 **3. Runtime (MCP Server)**
 The `.lancedb` directory is packaged with the MCP server. FTS search is fully local. If the index was built with embeddings, the server calls the embedding API at query time to embed the search query.
+
 ```bash
 npx @speakeasy-api/docs-mcp-server --index-dir ./dist/.lancedb
 ```
@@ -368,13 +372,13 @@ npx @speakeasy-api/docs-mcp-playground
 
 Open `http://localhost:3001`. Requires a running HTTP server (step 3 with `--transport http`).
 
-| Environment Variable | Description | Default |
-|---|---|---|
-| `MCP_TARGET` | HTTP endpoint of the MCP server | `http://localhost:20310` |
-| `PORT` | Playground server port | `3001` |
-| `SERVER_NAME` | Display name shown in the playground UI | `speakeasy-docs` |
-| `PLAYGROUND_PASSWORD` | Password-protect the playground (hashed via SHA256) | *(none — open access)* |
-| `GRAM_API_KEY` | Enables chat mode when set | *(none — chat disabled)* |
+| Environment Variable  | Description                                         | Default                  |
+| --------------------- | --------------------------------------------------- | ------------------------ |
+| `MCP_TARGET`          | HTTP endpoint of the MCP server                     | `http://localhost:20310` |
+| `PORT`                | Playground server port                              | `3001`                   |
+| `SERVER_NAME`         | Display name shown in the playground UI             | `speakeasy-docs`         |
+| `PLAYGROUND_PASSWORD` | Password-protect the playground (hashed via SHA256) | _(none — open access)_   |
+| `GRAM_API_KEY`        | Enables chat mode when set                          | _(none — chat disabled)_ |
 
 ## Evaluation
 

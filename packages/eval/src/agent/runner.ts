@@ -16,7 +16,7 @@ import type {
   AgentScenario,
   AgentScenarioResult,
   ToolCallRecord,
-  WorkspaceFile
+  WorkspaceFile,
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -26,7 +26,7 @@ const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dis
 
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_MAX_TURNS = 15;
-const DEFAULT_MAX_BUDGET_USD = 0.50;
+const DEFAULT_MAX_BUDGET_USD = 0.5;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
 const DEFAULT_SYSTEM_PROMPT = `You are an interactive assistant that helps users with software engineering tasks. Use the tools available to you to assist the user.
@@ -67,7 +67,9 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(maxConcurrency, queue.length) }, () => worker()));
+    await Promise.all(
+      Array.from({ length: Math.min(maxConcurrency, queue.length) }, () => worker()),
+    );
   }
 
   const completedAt = new Date().toISOString();
@@ -76,7 +78,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
   const output: AgentEvalOutput = {
     summary: computeAgentEvalSummary(results),
     results,
-    metadata: { model, startedAt, completedAt, totalDurationMs }
+    metadata: { model, startedAt, completedAt, totalDurationMs },
   };
 
   observer.onEvalComplete(output);
@@ -86,7 +88,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
 export async function runAgentScenario(
   scenario: AgentScenario,
   config: AgentEvalConfig,
-  observer?: AgentEvalObserver
+  observer?: AgentEvalObserver,
 ): Promise<AgentScenarioResult> {
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
@@ -106,7 +108,7 @@ export async function runAgentScenario(
         await execFileAsync("sh", ["-c", scenario.setup], {
           cwd: workspaceDir,
           timeout: 60_000,
-          env: process.env as Record<string, string>
+          env: process.env as Record<string, string>,
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -128,10 +130,15 @@ export async function runAgentScenario(
     let cacheReadInputTokens = 0;
     let cacheCreationInputTokens = 0;
 
-    const pendingToolCalls = new Map<string, { name: string; args: Record<string, unknown>; startMs: number }>();
+    const pendingToolCalls = new Map<
+      string,
+      { name: string; args: Record<string, unknown>; startMs: number }
+    >();
 
     // Build MCP server config (skipped in noMcp baseline mode)
-    let mcpServerConfig: { command: string; args?: string[]; env?: Record<string, string> } | undefined;
+    let mcpServerConfig:
+      | { command: string; args?: string[]; env?: Record<string, string> }
+      | undefined;
 
     if (!config.noMcp) {
       const serverEnv: Record<string, string> = {};
@@ -146,16 +153,18 @@ export async function runAgentScenario(
         mcpServerConfig = {
           command: "node",
           args: [SERVER_BIN_PATH, "--index-dir", scenario.indexDir],
-          env: serverEnv
+          env: serverEnv,
         };
       } else if (config.server) {
         mcpServerConfig = {
           command: config.server.command,
           ...(config.server.args ? { args: config.server.args } : {}),
-          env: serverEnv
+          env: serverEnv,
         };
       } else {
-        throw new Error(`Scenario "${scenario.name}" has no indexDir and no server config provided`);
+        throw new Error(
+          `Scenario "${scenario.name}" has no indexDir and no server config provided`,
+        );
       }
     }
 
@@ -177,22 +186,25 @@ export async function runAgentScenario(
           env: process.env as Record<string, string>,
           permissionMode: "bypassPermissions",
           allowDangerouslySkipPermissions: true,
-          persistSession: false
-        }
+          persistSession: false,
+        },
       })) {
         const nowMs = performance.now() - startMs;
 
         if (message.type === "system" && message.subtype === "init") {
           // Verify docs-mcp tools are registered
           const mcpTools = message.tools.filter((t: string) => t.startsWith("mcp__docs"));
-          const mcpServers = (message.mcp_servers ?? []) as Array<{ name: string; status: string }>;
+          const mcpServers = (message.mcp_servers ?? []) as Array<{
+            name: string;
+            status: string;
+          }>;
           const docsMcpServer = mcpServers.find((s) => s.name === "docs-mcp");
 
           const parts = [
             `model=${message.model}`,
             `tools=${message.tools.length}`,
             `mcp_tools=[${mcpTools.join(", ")}]`,
-            `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`
+            `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`,
           ];
 
           if (mcpTools.length === 0 && !config.noMcp) {
@@ -202,7 +214,7 @@ export async function runAgentScenario(
           observer?.onAgentMessage(scenario, {
             type: "system_init",
             summary: parts.join(", "),
-            timestampMs: nowMs
+            timestampMs: nowMs,
           });
         }
 
@@ -222,7 +234,7 @@ export async function runAgentScenario(
               observer?.onAgentMessage(scenario, {
                 type: "assistant_text",
                 summary: block.text.slice(0, 150) + (block.text.length > 150 ? "..." : ""),
-                timestampMs: nowMs
+                timestampMs: nowMs,
               });
             }
 
@@ -235,13 +247,17 @@ export async function runAgentScenario(
                 activated = true;
               }
 
-              pendingToolCalls.set(block.id, { name: toolName, args: toolArgs, startMs: performance.now() });
+              pendingToolCalls.set(block.id, {
+                name: toolName,
+                args: toolArgs,
+                startMs: performance.now(),
+              });
 
               observer?.onAgentMessage(scenario, {
                 type: "tool_call",
                 summary: `${toolName}(${summarizeArgs(toolArgs)})`,
                 toolArgs,
-                timestampMs: nowMs
+                timestampMs: nowMs,
               });
             }
           }
@@ -249,7 +265,8 @@ export async function runAgentScenario(
 
         if (message.type === "user" && message.tool_use_result != null) {
           const toolResult = message.tool_use_result as Record<string, unknown>;
-          const toolUseId = typeof toolResult.tool_use_id === "string" ? toolResult.tool_use_id : undefined;
+          const toolUseId =
+            typeof toolResult.tool_use_id === "string" ? toolResult.tool_use_id : undefined;
           const resultText = extractToolResultText(toolResult);
           const pending = toolUseId ? pendingToolCalls.get(toolUseId) : undefined;
 
@@ -259,7 +276,7 @@ export async function runAgentScenario(
               args: pending.args,
               result: resultText,
               durationMs: performance.now() - pending.startMs,
-              timestampMs: pending.startMs - startMs
+              timestampMs: pending.startMs - startMs,
             });
             pendingToolCalls.delete(toolUseId);
           }
@@ -268,7 +285,7 @@ export async function runAgentScenario(
             type: "tool_result",
             summary: "Tool result received",
             toolResultPreview: resultText.slice(0, 2000),
-            timestampMs: performance.now() - startMs
+            timestampMs: performance.now() - startMs,
           });
         }
 
@@ -291,7 +308,7 @@ export async function runAgentScenario(
           observer?.onAgentMessage(scenario, {
             type: "result",
             summary: `Result: ${resultSubtype} ($${totalCostUsd.toFixed(4)}, ${numTurns} turns)`,
-            timestampMs: performance.now() - startMs
+            timestampMs: performance.now() - startMs,
           });
         }
       }
@@ -302,7 +319,11 @@ export async function runAgentScenario(
 
     const durationMs = performance.now() - startMs;
 
-    const assertionResults = await evaluateAssertions(finalAnswer, scenario.assertions, workspaceDir);
+    const assertionResults = await evaluateAssertions(
+      finalAnswer,
+      scenario.assertions,
+      workspaceDir,
+    );
     const hard = assertionResults.filter((r) => !r.assertion.soft);
     const passed = hard.length > 0 && hard.every((r) => r.passed);
 
@@ -341,7 +362,7 @@ export async function runAgentScenario(
       workspaceFiles,
       finalAnswer,
       resultSubtype,
-      ...(errors.length > 0 ? { errors } : {})
+      ...(errors.length > 0 ? { errors } : {}),
     };
   } finally {
     if (!config.debug && !config.workspaceDir) {
@@ -354,7 +375,12 @@ function summarizeArgs(args: Record<string, unknown>): string {
   const entries = Object.entries(args);
   if (entries.length === 0) return "";
   const parts = entries.slice(0, 3).map(([k, v]) => {
-    const val = typeof v === "string" ? (v.length > 40 ? `"${v.slice(0, 40)}..."` : `"${v}"`) : JSON.stringify(v);
+    const val =
+      typeof v === "string"
+        ? v.length > 40
+          ? `"${v.slice(0, 40)}..."`
+          : `"${v}"`
+        : JSON.stringify(v);
     return `${k}=${val}`;
   });
   if (entries.length > 3) parts.push("...");
@@ -364,21 +390,39 @@ function summarizeArgs(args: Record<string, unknown>): string {
 const MAX_FILE_CONTENT = 5000;
 
 const EXT_LANG: Record<string, string> = {
-  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-  py: "python", rb: "ruby", go: "go", rs: "rust", java: "java",
-  json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
-  sh: "bash", bash: "bash", zsh: "bash",
-  md: "markdown", html: "html", css: "css", sql: "sql"
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  py: "python",
+  rb: "ruby",
+  go: "go",
+  rs: "rust",
+  java: "java",
+  json: "json",
+  yaml: "yaml",
+  yml: "yaml",
+  toml: "toml",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  md: "markdown",
+  html: "html",
+  css: "css",
+  sql: "sql",
 };
 
 async function collectWorkspaceFiles(
   trace: ToolCallRecord[],
-  workspaceDir: string
+  workspaceDir: string,
 ): Promise<WorkspaceFile[]> {
   // Dedupe file paths from Write/Edit tool calls (preserving last-seen order)
   const filePaths = new Map<string, true>();
   for (const record of trace) {
-    if ((record.name === "Write" || record.name === "Edit") && typeof record.args.file_path === "string") {
+    if (
+      (record.name === "Write" || record.name === "Edit") &&
+      typeof record.args.file_path === "string"
+    ) {
       filePaths.set(record.args.file_path, true);
     }
   }
@@ -397,7 +441,7 @@ async function collectWorkspaceFiles(
       files.push({
         path: relPath,
         content,
-        ...(EXT_LANG[ext] ? { lang: EXT_LANG[ext] } : ext ? { lang: ext } : {})
+        ...(EXT_LANG[ext] ? { lang: EXT_LANG[ext] } : ext ? { lang: ext } : {}),
       });
     } catch {
       // File may have been deleted by the agent

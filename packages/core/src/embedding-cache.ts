@@ -44,11 +44,9 @@ export interface EmbedIncrementalStats {
  * and the exact text that would be sent to the model.
  */
 export function computeFingerprint(chunk: Chunk, config: EmbeddingConfig): string {
-  const input = [
-    EMBEDDING_FORMAT_VERSION,
-    config.configFingerprint,
-    toEmbeddingInput(chunk),
-  ].join("\0");
+  const input = [EMBEDDING_FORMAT_VERSION, config.configFingerprint, toEmbeddingInput(chunk)].join(
+    "\0",
+  );
   return sha256hex(input);
 }
 
@@ -76,7 +74,7 @@ async function cleanupStaleDirectories(baseDir: string): Promise<void> {
  */
 export async function loadCache(
   baseDir: string,
-  currentConfig: EmbeddingConfig
+  currentConfig: EmbeddingConfig,
 ): Promise<EmbeddingCache | null> {
   await cleanupStaleDirectories(baseDir);
 
@@ -90,7 +88,9 @@ export async function loadCache(
     // cache-meta.json missing — check if the cache dir itself exists (orphaned LanceDB files)
     try {
       await stat(cacheDir);
-      console.warn("warn: embedding cache invalidated: cache-meta.json missing but cache directory exists");
+      console.warn(
+        "warn: embedding cache invalidated: cache-meta.json missing but cache directory exists",
+      );
       await rm(cacheDir, { recursive: true, force: true });
     } catch {
       // No cache dir at all — normal first-build case, no warning needed
@@ -107,20 +107,29 @@ export async function loadCache(
     return null;
   }
 
-  if (typeof meta.cache_version !== "string" || meta.cache_version.split(".")[0] !== CACHE_VERSION.split(".")[0]) {
-    console.warn(`warn: embedding cache invalidated: cache_version mismatch (got ${meta.cache_version}, expected ${CACHE_VERSION})`);
+  if (
+    typeof meta.cache_version !== "string" ||
+    meta.cache_version.split(".")[0] !== CACHE_VERSION.split(".")[0]
+  ) {
+    console.warn(
+      `warn: embedding cache invalidated: cache_version mismatch (got ${meta.cache_version}, expected ${CACHE_VERSION})`,
+    );
     await rm(cacheDir, { recursive: true, force: true });
     return null;
   }
 
   if (meta.format_version !== EMBEDDING_FORMAT_VERSION) {
-    console.warn(`warn: embedding cache invalidated: format_version mismatch (got ${meta.format_version}, expected ${EMBEDDING_FORMAT_VERSION})`);
+    console.warn(
+      `warn: embedding cache invalidated: format_version mismatch (got ${meta.format_version}, expected ${EMBEDDING_FORMAT_VERSION})`,
+    );
     await rm(cacheDir, { recursive: true, force: true });
     return null;
   }
 
   if (meta.config_fingerprint !== currentConfig.configFingerprint) {
-    console.warn("warn: embedding cache invalidated: config_fingerprint mismatch (provider config changed)");
+    console.warn(
+      "warn: embedding cache invalidated: config_fingerprint mismatch (provider config changed)",
+    );
     await rm(cacheDir, { recursive: true, force: true });
     return null;
   }
@@ -167,7 +176,7 @@ export async function loadCache(
 export async function saveCache(
   baseDir: string,
   cache: EmbeddingCache,
-  config: EmbeddingConfig
+  config: EmbeddingConfig,
 ): Promise<void> {
   const tmpDir = cacheTmpDirPath(baseDir);
   const liveDir = cacheDirPath(baseDir);
@@ -196,7 +205,9 @@ export async function saveCache(
   if (rows.length > 0) {
     const db = await connect(tmpDir);
     try {
-      const table = await db.createTable(CACHE_TABLE_NAME, rows, { mode: "overwrite" });
+      const table = await db.createTable(CACHE_TABLE_NAME, rows, {
+        mode: "overwrite",
+      });
       table.close();
     } finally {
       db.close();
@@ -256,7 +267,7 @@ export async function embedChunksIncremental(
   const batchApiThreshold = options?.batchApiThreshold;
   if (missTexts.length > 0 && batchApiThreshold && missTexts.length >= batchApiThreshold) {
     // Send all at once so provider can use Batch API
-    missVectors.push(...await provider.embed(missTexts));
+    missVectors.push(...(await provider.embed(missTexts)));
   } else if (missTexts.length > 0 && batchSize && batchSize > 0) {
     let embeddedSoFar = 0;
     for (let offset = 0; offset < missTexts.length; offset += batchSize) {
@@ -272,12 +283,12 @@ export async function embedChunksIncremental(
       });
     }
   } else if (missTexts.length > 0) {
-    missVectors.push(...await provider.embed(missTexts));
+    missVectors.push(...(await provider.embed(missTexts)));
   }
 
   if (missVectors.length !== missTexts.length) {
     throw new Error(
-      `Embedding provider returned ${missVectors.length} vectors for ${missTexts.length} chunks`
+      `Embedding provider returned ${missVectors.length} vectors for ${missTexts.length} chunks`,
     );
   }
 

@@ -12,7 +12,7 @@ const baseChunks: Chunk[] = [
     content_text: "TypeScript retry docs",
     breadcrumb: "docs/ts.md > Retry",
     chunk_index: 0,
-    metadata: { language: "typescript", scope: "sdk-specific" }
+    metadata: { language: "typescript", scope: "sdk-specific" },
   },
   {
     chunk_id: "docs/global.md#retry-guide",
@@ -23,7 +23,7 @@ const baseChunks: Chunk[] = [
     content_text: "Global retry guidance",
     breadcrumb: "docs/global.md > Retry Guide",
     chunk_index: 0,
-    metadata: { scope: "global-guide" }
+    metadata: { scope: "global-guide" },
   },
   {
     chunk_id: "docs/py.md#retry",
@@ -34,7 +34,7 @@ const baseChunks: Chunk[] = [
     content_text: "Python retry docs",
     breadcrumb: "docs/py.md > Retry",
     chunk_index: 0,
-    metadata: { language: "python", scope: "sdk-specific" }
+    metadata: { language: "python", scope: "sdk-specific" },
   },
   {
     chunk_id: "docs/legacy.md#retry",
@@ -45,7 +45,7 @@ const baseChunks: Chunk[] = [
     content_text: "Legacy retry docs",
     breadcrumb: "docs/legacy.md > Retry",
     chunk_index: 0,
-    metadata: {}
+    metadata: {},
   },
   {
     chunk_id: "docs/legacy-py.md#retry",
@@ -56,8 +56,8 @@ const baseChunks: Chunk[] = [
     content_text: "Legacy Python retry docs",
     breadcrumb: "docs/legacy-py.md > Retry",
     chunk_index: 0,
-    metadata: { language: "python" }
-  }
+    metadata: { language: "python" },
+  },
 ];
 
 describe("DocsIndex.search", () => {
@@ -67,13 +67,13 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 10,
-      filters: { language: "typescript" }
+      filters: { language: "typescript" },
     });
 
     expect(result.hits.map((hit) => hit.chunk_id).sort()).toEqual([
       "docs/global.md#retry-guide",
       "docs/legacy.md#retry",
-      "docs/ts.md#retry"
+      "docs/ts.md#retry",
     ]);
   });
 
@@ -83,7 +83,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 10,
-      filters: { language: "typescript" }
+      filters: { language: "typescript" },
     });
 
     expect(result.hits.map((hit) => hit.chunk_id)).not.toContain("docs/legacy-py.md#retry");
@@ -95,7 +95,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 10,
-      filters: { language: "typescript", scope: "sdk-specific" }
+      filters: { language: "typescript", scope: "sdk-specific" },
     });
 
     expect(result.hits.map((hit) => hit.chunk_id)).toEqual(["docs/ts.md#retry"]);
@@ -107,7 +107,7 @@ describe("DocsIndex.search", () => {
     const first = await index.search({
       query: "retry",
       limit: 1,
-      filters: {}
+      filters: {},
     });
 
     expect(first.hits).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("DocsIndex.search", () => {
       query: "retry",
       limit: 1,
       ...(first.next_cursor ? { cursor: first.next_cursor } : {}),
-      filters: {}
+      filters: {},
     });
 
     expect(second.hits).toHaveLength(1);
@@ -130,7 +130,7 @@ describe("DocsIndex.search", () => {
     const first = await index.search({
       query: "retry",
       limit: 1,
-      filters: {}
+      filters: {},
     });
     expect(first.next_cursor).toBeTypeOf("string");
 
@@ -139,8 +139,8 @@ describe("DocsIndex.search", () => {
         query: "python",
         limit: 1,
         cursor: first.next_cursor ?? undefined,
-        filters: {}
-      })
+        filters: {},
+      }),
     ).rejects.toThrow(/does not match current query or filters/);
   });
 
@@ -150,7 +150,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 10,
-      filters: { language: "typescript" }
+      filters: { language: "typescript" },
     });
 
     expect(result.hits.map((hit) => hit.chunk_id)).toContain("docs/legacy.md#retry");
@@ -162,7 +162,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 0,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits).toHaveLength(1);
@@ -175,7 +175,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "retry",
       limit: 5,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits.length).toBeGreaterThan(0);
@@ -188,7 +188,7 @@ describe("DocsIndex.search", () => {
     const result = await index.search({
       query: "no-match-token",
       limit: 5,
-      filters: { language: "typescript" }
+      filters: { language: "typescript" },
     });
 
     expect(result.hits).toHaveLength(0);
@@ -208,7 +208,7 @@ describe("DocsIndex.getDoc", () => {
         content_text: "one",
         breadcrumb: "docs/file.md > One",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/file.md#two",
@@ -219,7 +219,7 @@ describe("DocsIndex.getDoc", () => {
         content_text: "two",
         breadcrumb: "docs/file.md > Two",
         chunk_index: 1,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/file.md#three",
@@ -230,12 +230,15 @@ describe("DocsIndex.getDoc", () => {
         content_text: "three",
         breadcrumb: "docs/file.md > Three",
         chunk_index: 2,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     const index = new DocsIndex(fileChunks);
-    const doc = await index.getDoc({ chunk_id: "docs/file.md#two", context: 1 });
+    const doc = await index.getDoc({
+      chunk_id: "docs/file.md#two",
+      context: 1,
+    });
 
     expect(doc.text).toContain("(Target)");
     expect(doc.text).toContain("Context: -1");

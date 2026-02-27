@@ -3,7 +3,11 @@ import path from "node:path";
 import { createEmbeddingProvider } from "@speakeasy-api/docs-mcp-core";
 import type { CategoryBreakdown } from "./metrics.js";
 import { computeCategoryBreakdown } from "./metrics.js";
-import { runEvaluationAgainstServer, type EvalHarnessOutput, type EvalQueryCase } from "./runner.js";
+import {
+  runEvaluationAgainstServer,
+  type EvalHarnessOutput,
+  type EvalQueryCase,
+} from "./runner.js";
 
 /**
  * An embedding spec parsed from CLI input like "none", "hash", or "openai/text-embedding-3-large".
@@ -56,7 +60,7 @@ function resolveCostPerMillionTokens(spec: EmbeddingSpec): number {
       provider: spec.provider as "none" | "hash" | "openai",
       // Provide a dummy key so we can instantiate the provider to read its cost
       ...(spec.model ? { model: spec.model } : {}),
-      ...(spec.provider === "openai" ? { apiKey: "dummy" } : {})
+      ...(spec.provider === "openai" ? { apiKey: "dummy" } : {}),
     });
     return provider.costPerMillionTokens;
   } catch {
@@ -69,7 +73,7 @@ const CHARS_PER_TOKEN = 4;
 
 export async function runBenchmark(
   config: BenchmarkConfig,
-  cases: EvalQueryCase[]
+  cases: EvalQueryCase[],
 ): Promise<BenchmarkResult> {
   const embeddings: BenchmarkEmbeddingResult[] = [];
 
@@ -86,15 +90,16 @@ export async function runBenchmark(
 
       const buildArgs = [
         "build",
-        "--docs-dir", config.docsDir,
-        "--out", outDir,
-        "--embedding-provider", embedding.provider,
-        ...(embedding.model ? ["--embedding-model", embedding.model] : [])
+        "--docs-dir",
+        config.docsDir,
+        "--out",
+        outDir,
+        "--embedding-provider",
+        embedding.provider,
+        ...(embedding.model ? ["--embedding-model", embedding.model] : []),
       ];
 
-      const serverArgs = [
-        "--index-dir", outDir
-      ];
+      const serverArgs = ["--index-dir", outDir];
 
       // StdioClientTransport only inherits a small allowlist of env vars
       // (HOME, PATH, SHELL, etc.), so we must pass process.env explicitly
@@ -110,15 +115,15 @@ export async function runBenchmark(
         server: {
           command: "node",
           args: [config.serverCommand, ...serverArgs],
-          env
+          env,
         },
         build: {
           command: "node",
-          args: [config.buildCommand, ...buildArgs]
+          args: [config.buildCommand, ...buildArgs],
         },
         cases,
         warmupQueries: config.warmupQueries,
-        deterministic: true
+        deterministic: true,
       });
 
       const categoryBreakdown = computeCategoryBreakdown(output.rankedCases);
@@ -134,7 +139,7 @@ export async function runBenchmark(
         corpusSizeBytes,
         indexSizeBytes,
         indexSizeMultiple,
-        costPerMillionTokens
+        costPerMillionTokens,
       });
 
       console.error(`"${embedding.label}" complete`);
@@ -161,26 +166,56 @@ export function generateBenchmarkMarkdown(result: BenchmarkResult): string {
   lines.push(`| --- | ${labels.map(() => "---:").join(" | ")} |`);
 
   const summaryRows: Array<{ label: string; values: string[] }> = [
-    { label: "MRR@5", values: result.embeddings.map((e) => e.output.summary.mrrAt5.toFixed(4)) },
-    { label: "NDCG@5", values: result.embeddings.map((e) => e.output.summary.ndcgAt5.toFixed(4)) },
-    { label: "Facet Precision", values: result.embeddings.map((e) => e.output.summary.facetPrecision.toFixed(4)) },
-    { label: "Search p50 (ms)", values: result.embeddings.map((e) => e.output.summary.searchP50Ms.toFixed(1)) },
-    { label: "Search p95 (ms)", values: result.embeddings.map((e) => e.output.summary.searchP95Ms.toFixed(1)) },
-    { label: "Build Time (ms)", values: result.embeddings.map((e) => e.output.summary.buildTimeMs.toFixed(0)) },
-    { label: "Peak RSS (MB)", values: result.embeddings.map((e) => e.output.summary.peakRssMb.toFixed(1)) },
-    { label: `Index Size (corpus ${formatMb(result.embeddings[0]?.corpusSizeBytes ?? 0)})`, values: result.embeddings.map((e) => formatMb(e.indexSizeBytes)) },
-    { label: "Embed Cost (est.)", values: result.embeddings.map((e) => {
-      if (e.costPerMillionTokens === 0) return "$0";
-      const estimatedTokens = e.corpusSizeBytes / CHARS_PER_TOKEN;
-      const cost = (estimatedTokens / 1_000_000) * e.costPerMillionTokens;
-      return `$${cost.toFixed(4)}`;
-    }) },
-    { label: "Query Cost (est.)", values: result.embeddings.map((e) => {
-      if (e.costPerMillionTokens === 0) return "$0";
-      // ~20 tokens per query
-      const cost = (20 / 1_000_000) * e.costPerMillionTokens;
-      return `$${cost.toFixed(6)}`;
-    }) }
+    {
+      label: "MRR@5",
+      values: result.embeddings.map((e) => e.output.summary.mrrAt5.toFixed(4)),
+    },
+    {
+      label: "NDCG@5",
+      values: result.embeddings.map((e) => e.output.summary.ndcgAt5.toFixed(4)),
+    },
+    {
+      label: "Facet Precision",
+      values: result.embeddings.map((e) => e.output.summary.facetPrecision.toFixed(4)),
+    },
+    {
+      label: "Search p50 (ms)",
+      values: result.embeddings.map((e) => e.output.summary.searchP50Ms.toFixed(1)),
+    },
+    {
+      label: "Search p95 (ms)",
+      values: result.embeddings.map((e) => e.output.summary.searchP95Ms.toFixed(1)),
+    },
+    {
+      label: "Build Time (ms)",
+      values: result.embeddings.map((e) => e.output.summary.buildTimeMs.toFixed(0)),
+    },
+    {
+      label: "Peak RSS (MB)",
+      values: result.embeddings.map((e) => e.output.summary.peakRssMb.toFixed(1)),
+    },
+    {
+      label: `Index Size (corpus ${formatMb(result.embeddings[0]?.corpusSizeBytes ?? 0)})`,
+      values: result.embeddings.map((e) => formatMb(e.indexSizeBytes)),
+    },
+    {
+      label: "Embed Cost (est.)",
+      values: result.embeddings.map((e) => {
+        if (e.costPerMillionTokens === 0) return "$0";
+        const estimatedTokens = e.corpusSizeBytes / CHARS_PER_TOKEN;
+        const cost = (estimatedTokens / 1_000_000) * e.costPerMillionTokens;
+        return `$${cost.toFixed(4)}`;
+      }),
+    },
+    {
+      label: "Query Cost (est.)",
+      values: result.embeddings.map((e) => {
+        if (e.costPerMillionTokens === 0) return "$0";
+        // ~20 tokens per query
+        const cost = (20 / 1_000_000) * e.costPerMillionTokens;
+        return `$${cost.toFixed(6)}`;
+      }),
+    },
   ];
 
   for (const row of summaryRows) {

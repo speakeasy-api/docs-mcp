@@ -67,7 +67,10 @@ async function testSearchEngine() {
     limit: 10,
     filters: { language: "typescript" },
   });
-  assert(result2.hits.length > 0, `Filtered search (language=typescript) returns results (got ${result2.hits.length})`);
+  assert(
+    result2.hits.length > 0,
+    `Filtered search (language=typescript) returns results (got ${result2.hits.length})`,
+  );
 
   // Auto-include rule: should include global-guide results too
   const hasGlobalGuide = result2.hits.some((h) => h.metadata.scope === "global-guide");
@@ -95,7 +98,10 @@ async function testSearchEngine() {
 
   // Test 5: getDoc with context
   const doc2 = await engine.getDoc({ chunk_id: targetChunkId, context: 1 });
-  assert(doc2.text.length >= doc1.text.length, "getDoc with context=1 returns at least as much content");
+  assert(
+    doc2.text.length >= doc1.text.length,
+    "getDoc with context=1 returns at least as much content",
+  );
 
   // Test 6: Zero-result search gives hint
   const result4 = await engine.search({
@@ -120,7 +126,10 @@ async function testSearchEngine() {
       cursor: result5.next_cursor,
       filters: {},
     });
-    assert(result6.hits.length > 0, `Cursor pagination returns page 2 results (got ${result6.hits.length})`);
+    assert(
+      result6.hits.length > 0,
+      `Cursor pagination returns page 2 results (got ${result6.hits.length})`,
+    );
   } else {
     assert(true, "No pagination cursor (few results) — OK");
   }
@@ -194,7 +203,7 @@ async function testMcpServerBoot() {
         const serverName = initResponse.result?.serverInfo?.name;
         assert(
           typeof serverName === "string" && serverName.length > 0,
-          `Server reports a name: ${serverName}`
+          `Server reports a name: ${serverName}`,
         );
       }
 

@@ -23,10 +23,10 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ## Programmatic Usage
 
 ```typescript
-import { McpDocsServer } from '@speakeasy-api/docs-mcp-server';
+import { McpDocsServer } from "@speakeasy-api/docs-mcp-server";
 
 const server = new McpDocsServer({
-  dbPath: './dist/.lancedb',
+  dbPath: "./dist/.lancedb",
 });
 
 server.start();
@@ -34,10 +34,10 @@ server.start();
 
 ## MCP Tools
 
-| Tool | Description |
-|------|-------------|
+| Tool          | Description                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `search_docs` | Hybrid search with dynamically generated parameters and JSON Schema enum validation. Supports cursor pagination. |
-| `get_doc` | Retrieve a specific chunk with optional neighboring context. |
+| `get_doc`     | Retrieve a specific chunk with optional neighboring context.                                                     |
 
 Tool names, descriptions, and parameters are dynamically generated from the `metadata.json` produced during indexing.
 

@@ -26,7 +26,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "TypeScript retry docs",
         breadcrumb: "docs/ts.md > Retry",
         chunk_index: 0,
-        metadata: { language: "typescript", scope: "sdk-specific" }
+        metadata: { language: "typescript", scope: "sdk-specific" },
       },
       {
         chunk_id: "docs/global.md#retry-guide",
@@ -37,7 +37,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Global retry guidance",
         breadcrumb: "docs/global.md > Retry Guide",
         chunk_index: 0,
-        metadata: { scope: "global-guide" }
+        metadata: { scope: "global-guide" },
       },
       {
         chunk_id: "docs/legacy.md#retry",
@@ -48,7 +48,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Legacy retry docs",
         breadcrumb: "docs/legacy.md > Retry",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/legacy-py.md#retry",
@@ -59,31 +59,31 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Legacy Python retry docs",
         breadcrumb: "docs/legacy-py.md > Retry",
         chunk_index: 0,
-        metadata: { language: "python" }
-      }
+        metadata: { language: "python" },
+      },
     ];
 
     await buildLanceDbIndex({
       dbPath: dir,
       chunks,
-      metadataKeys: ["language", "scope"]
+      metadataKeys: ["language", "scope"],
     });
 
     const engine = await LanceDbSearchEngine.open({
       dbPath: dir,
-      metadataKeys: ["language", "scope"]
+      metadataKeys: ["language", "scope"],
     });
 
     const result = await engine.search({
       query: "retry",
       limit: 10,
-      filters: { language: "typescript" }
+      filters: { language: "typescript" },
     });
 
     expect(result.hits.map((hit) => hit.chunk_id).sort()).toEqual([
       "docs/global.md#retry-guide",
       "docs/legacy.md#retry",
-      "docs/ts.md#retry"
+      "docs/ts.md#retry",
     ]);
     expect(result.hits.map((hit) => hit.chunk_id)).not.toContain("docs/legacy-py.md#retry");
   });
@@ -102,7 +102,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry backoff strategy for APIs",
         breadcrumb: "docs/a.md > One",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/b.md#two",
@@ -113,25 +113,25 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry and then maybe later do backoff",
         breadcrumb: "docs/b.md > Two",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({
       dbPath: dir,
-      chunks
+      chunks,
     });
 
     const engine = await LanceDbSearchEngine.open({
       dbPath: dir,
       metadataKeys: [],
-      proximityWeight: 2
+      proximityWeight: 2,
     });
 
     const result = await engine.search({
       query: "retry backoff",
       limit: 10,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits[0]?.chunk_id).toBe("docs/a.md#one");
@@ -151,7 +151,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Initialize the client with your API key.",
         breadcrumb: "docs/a.md > AcmeAuthClientV2",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/b.md#retry",
@@ -162,24 +162,24 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry guidance",
         breadcrumb: "docs/b.md > Retry",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({
       dbPath: dir,
-      chunks
+      chunks,
     });
 
     const engine = await LanceDbSearchEngine.open({
       dbPath: dir,
-      metadataKeys: []
+      metadataKeys: [],
     });
 
     const result = await engine.search({
       query: "AcmeAuthClientV2",
       limit: 5,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits[0]?.chunk_id).toBe("docs/a.md#acmeauthclientv2");
@@ -200,7 +200,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry strategy details",
         breadcrumb: "docs/a.md > Retry A",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/b.md#retry-b",
@@ -211,19 +211,19 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry strategy details",
         breadcrumb: "docs/b.md > Retry B",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     const vectorsByChunkId = new Map<string, number[]>([
       ["docs/a.md#retry-a", [1, 0, 0]],
-      ["docs/b.md#retry-b", [0, 1, 0]]
+      ["docs/b.md#retry-b", [0, 1, 0]],
     ]);
 
     await buildLanceDbIndex({
       dbPath: dir,
       chunks,
-      vectorsByChunkId
+      vectorsByChunkId,
     });
 
     const queryEmbeddingProvider: EmbeddingProvider = {
@@ -232,7 +232,7 @@ describe("LanceDbSearchEngine", () => {
       dimensions: 3,
       async embed(): Promise<number[][]> {
         return [[0, 1, 0]];
-      }
+      },
     };
 
     const engine = await LanceDbSearchEngine.open({
@@ -240,13 +240,13 @@ describe("LanceDbSearchEngine", () => {
       metadataKeys: [],
       proximityWeight: 1,
       vectorWeight: 50,
-      queryEmbeddingProvider
+      queryEmbeddingProvider,
     });
 
     const result = await engine.search({
       query: "retry strategy",
       limit: 10,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits[0]?.chunk_id).toBe("docs/b.md#retry-b");
@@ -266,15 +266,15 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry strategy details",
         breadcrumb: "docs/a.md > Retry",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     const vectorsByChunkId = new Map<string, number[]>([["docs/a.md#retry", [1, 0, 0]]]);
     await buildLanceDbIndex({
       dbPath: dir,
       chunks,
-      vectorsByChunkId
+      vectorsByChunkId,
     });
 
     const warnings: string[] = [];
@@ -284,7 +284,7 @@ describe("LanceDbSearchEngine", () => {
       dimensions: 3,
       async embed(): Promise<number[][]> {
         throw new Error("provider unavailable");
-      }
+      },
     };
 
     const engine = await LanceDbSearchEngine.open({
@@ -293,13 +293,13 @@ describe("LanceDbSearchEngine", () => {
       queryEmbeddingProvider,
       onWarning(message) {
         warnings.push(message);
-      }
+      },
     });
 
     const result = await engine.search({
       query: "retry",
       limit: 10,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits[0]?.chunk_id).toBe("docs/a.md#retry");
@@ -321,7 +321,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "one",
         breadcrumb: "docs/file.md > One",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/file.md#two",
@@ -332,7 +332,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "two",
         breadcrumb: "docs/file.md > Two",
         chunk_index: 1,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/file.md#three",
@@ -343,15 +343,21 @@ describe("LanceDbSearchEngine", () => {
         content_text: "three",
         breadcrumb: "docs/file.md > Three",
         chunk_index: 2,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({ dbPath: dir, chunks });
 
-    const engine = await LanceDbSearchEngine.open({ dbPath: dir, metadataKeys: [] });
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dir,
+      metadataKeys: [],
+    });
 
-    const doc = await engine.getDoc({ chunk_id: "docs/file.md#two", context: 1 });
+    const doc = await engine.getDoc({
+      chunk_id: "docs/file.md#two",
+      context: 1,
+    });
 
     expect(doc.text).toContain("(Target)");
     expect(doc.text).toContain("Context: -1");
@@ -372,17 +378,20 @@ describe("LanceDbSearchEngine", () => {
         content_text: "Retry docs",
         breadcrumb: "docs/file.md > Retry",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({ dbPath: dir, chunks });
-    const engine = await LanceDbSearchEngine.open({ dbPath: dir, metadataKeys: [] });
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dir,
+      metadataKeys: [],
+    });
 
     const result = await engine.search({
       query: "nonexistent-token",
       limit: 5,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits).toHaveLength(0);
@@ -403,7 +412,7 @@ describe("LanceDbSearchEngine", () => {
         content_text: "retry",
         breadcrumb: "docs/file.md > Retry",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "docs/file.md#python",
@@ -414,17 +423,20 @@ describe("LanceDbSearchEngine", () => {
         content_text: "python",
         breadcrumb: "docs/file.md > Python",
         chunk_index: 1,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({ dbPath: dir, chunks });
-    const engine = await LanceDbSearchEngine.open({ dbPath: dir, metadataKeys: [] });
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dir,
+      metadataKeys: [],
+    });
 
     const first = await engine.search({
       query: "retry python",
       limit: 1,
-      filters: {}
+      filters: {},
     });
     expect(first.next_cursor).toBeTypeOf("string");
 
@@ -433,8 +445,8 @@ describe("LanceDbSearchEngine", () => {
         query: "python",
         limit: 1,
         cursor: first.next_cursor ?? undefined,
-        filters: {}
-      })
+        filters: {},
+      }),
     ).rejects.toThrow(/does not match current query or filters/);
   });
 });

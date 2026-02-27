@@ -13,7 +13,6 @@
   --ring: oklch(0.705 0.015 286.067);
 }
 
-
 body {
   margin: 0;
   background: var(--background);
@@ -30,7 +29,11 @@ body {
   flex-direction: column;
   gap: 40px;
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* ─── Sections ─── */
@@ -134,7 +137,9 @@ body {
   font-weight: 400;
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .pg-client-btn:hover {
@@ -387,24 +392,29 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 25%,
-    var(--accent) 50%,
-    transparent 75%
-  );
+  background: linear-gradient(90deg, transparent 25%, var(--accent) 50%, transparent 75%);
   background-size: 200% 100%;
   animation: pg-shimmer 1.5s ease infinite;
 }
 
 @keyframes pg-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes pg-fade-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ─── States ─── */
@@ -413,9 +423,9 @@ body {
   font-size: 13px;
   margin: 0;
   padding: 10px 14px;
-  background: oklch(0.90 0.08 85 / 0.15);
+  background: oklch(0.9 0.08 85 / 0.15);
   color: oklch(0.45 0.12 85);
-  border: 1px solid oklch(0.70 0.12 85 / 0.25);
+  border: 1px solid oklch(0.7 0.12 85 / 0.25);
   border-radius: var(--radius);
   line-height: 1.5;
 }

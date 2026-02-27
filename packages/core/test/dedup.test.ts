@@ -4,8 +4,7 @@ import { InMemorySearchEngine } from "../src/search.js";
 import type { Chunk } from "../src/types.js";
 
 describe("dedupKey", () => {
-  const getter = (metadata: Record<string, string>) => (key: string) =>
-    metadata[key] ?? "";
+  const getter = (metadata: Record<string, string>) => (key: string) => metadata[key] ?? "";
 
   it("returns normalized key for sdk-specific chunk with language in filepath", () => {
     const key = dedupKey(
@@ -13,7 +12,7 @@ describe("dedupKey", () => {
       "Retry Configuration",
       "sdks/python/auth.md#retry-configuration",
       getter({ language: "python", scope: "sdk-specific" }),
-      ["language"]
+      ["language"],
     );
     expect(key).toBe("sdks/*/auth.md:Retry Configuration");
   });
@@ -24,21 +23,21 @@ describe("dedupKey", () => {
       "Retry Configuration",
       "sdks/python/auth.md#retry-configuration",
       getter({ language: "python", scope: "sdk-specific" }),
-      ["language"]
+      ["language"],
     );
     const goKey = dedupKey(
       "sdks/go/auth.md",
       "Retry Configuration",
       "sdks/go/auth.md#retry-configuration",
       getter({ language: "go", scope: "sdk-specific" }),
-      ["language"]
+      ["language"],
     );
     const tsKey = dedupKey(
       "sdks/typescript/auth.md",
       "Retry Configuration",
       "sdks/typescript/auth.md#retry-configuration",
       getter({ language: "typescript", scope: "sdk-specific" }),
-      ["language"]
+      ["language"],
     );
     expect(pyKey).toBe(goKey);
     expect(goKey).toBe(tsKey);
@@ -50,7 +49,7 @@ describe("dedupKey", () => {
       "Retry",
       "sdks/python/auth.md#retry",
       getter({ language: "python" }),
-      []
+      [],
     );
     expect(key).toBeNull();
   });
@@ -61,7 +60,7 @@ describe("dedupKey", () => {
       "Overview",
       "guides/auth.md#overview",
       getter({ scope: "global-guide" }),
-      ["language"]
+      ["language"],
     );
     expect(key).toBeNull();
   });
@@ -72,7 +71,7 @@ describe("dedupKey", () => {
       "Overview",
       "guides/auth.md#overview",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     expect(key).toBeNull();
   });
@@ -83,14 +82,14 @@ describe("dedupKey", () => {
       "Overview",
       "sdks/python/auth.md#overview",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     const modelsKey = dedupKey(
       "sdks/python/models.md",
       "Overview",
       "sdks/python/models.md#overview",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     expect(authKey).not.toBe(modelsKey);
   });
@@ -101,14 +100,14 @@ describe("dedupKey", () => {
       "AcmeAuthClientV2 Initialization",
       "sdks/typescript/auth.md#acmeauthclientv2-initialization",
       getter({ language: "typescript" }),
-      ["language"]
+      ["language"],
     );
     const clientKey = dedupKey(
       "sdks/python/auth.md",
       "Client Initialization",
       "sdks/python/auth.md#client-initialization",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     expect(initKey).not.toBe(clientKey);
   });
@@ -119,7 +118,7 @@ describe("dedupKey", () => {
       "Configuration",
       "sdks/python/auth.md#configuration-part-2",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     expect(key).toBe("sdks/*/auth.md:Configuration:2");
   });
@@ -130,14 +129,14 @@ describe("dedupKey", () => {
       "Configuration",
       "sdks/python/auth.md#configuration-part-1",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     const part2 = dedupKey(
       "sdks/python/auth.md",
       "Configuration",
       "sdks/python/auth.md#configuration-part-2",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
     expect(part1).not.toBe(part2);
   });
@@ -148,7 +147,7 @@ describe("dedupKey", () => {
       "Intro",
       "go/tutorials/go/basics.md#intro",
       getter({ language: "go" }),
-      ["language"]
+      ["language"],
     );
     expect(key).toBe("*/tutorials/go/basics.md:Intro");
   });
@@ -159,15 +158,11 @@ describe("dedupKey", () => {
       "",
       "sdks/python/auth.md",
       getter({ language: "python" }),
-      ["language"]
+      ["language"],
     );
-    const goKey = dedupKey(
-      "sdks/go/auth.md",
-      "",
-      "sdks/go/auth.md",
-      getter({ language: "go" }),
-      ["language"]
-    );
+    const goKey = dedupKey("sdks/go/auth.md", "", "sdks/go/auth.md", getter({ language: "go" }), [
+      "language",
+    ]);
     expect(pyKey).toBe(goKey);
     expect(pyKey).toBe("sdks/*/auth.md:");
   });
@@ -183,7 +178,7 @@ describe("InMemorySearchEngine dedup", () => {
       breadcrumb: "",
       chunk_index: 0,
       metadata: {},
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -194,26 +189,32 @@ describe("InMemorySearchEngine dedup", () => {
         filepath: "sdk/python/readme.md",
         heading: "Installation",
         content_text: "install pip acmeauth",
-        metadata: { language: "python", scope: "sdk-specific" }
+        metadata: { language: "python", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "sdk/typescript/readme.md#installation",
         filepath: "sdk/typescript/readme.md",
         heading: "Installation",
         content_text: "install npm acmeauth sdk",
-        metadata: { language: "typescript", scope: "sdk-specific" }
+        metadata: { language: "typescript", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "guides/auth.md#overview",
         filepath: "guides/auth.md",
         heading: "Overview",
         content_text: "authentication overview installation guide",
-        metadata: { scope: "global-guide" }
-      })
+        metadata: { scope: "global-guide" },
+      }),
     ];
 
-    const engine = new InMemorySearchEngine(chunks, { collapseKeys: ["language"] });
-    const result = await engine.search({ query: "install", limit: 10, filters: {} });
+    const engine = new InMemorySearchEngine(chunks, {
+      collapseKeys: ["language"],
+    });
+    const result = await engine.search({
+      query: "install",
+      limit: 10,
+      filters: {},
+    });
 
     // Should get 2 results: one SDK (collapsed) + one guide
     expect(result.hits).toHaveLength(2);
@@ -231,19 +232,25 @@ describe("InMemorySearchEngine dedup", () => {
         filepath: "sdk/python/readme.md",
         heading: "Installation",
         content_text: "install install install pip acmeauth", // higher score (more matches)
-        metadata: { language: "python", scope: "sdk-specific" }
+        metadata: { language: "python", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "sdk/typescript/readme.md#installation",
         filepath: "sdk/typescript/readme.md",
         heading: "Installation",
         content_text: "install npm",
-        metadata: { language: "typescript", scope: "sdk-specific" }
-      })
+        metadata: { language: "typescript", scope: "sdk-specific" },
+      }),
     ];
 
-    const engine = new InMemorySearchEngine(chunks, { collapseKeys: ["language"] });
-    const result = await engine.search({ query: "install", limit: 10, filters: {} });
+    const engine = new InMemorySearchEngine(chunks, {
+      collapseKeys: ["language"],
+    });
+    const result = await engine.search({
+      query: "install",
+      limit: 10,
+      filters: {},
+    });
 
     expect(result.hits).toHaveLength(1);
     expect(result.hits[0]!.chunk_id).toBe("sdk/python/readme.md#installation");
@@ -256,22 +263,24 @@ describe("InMemorySearchEngine dedup", () => {
         filepath: "sdk/python/readme.md",
         heading: "Installation",
         content_text: "install pip acmeauth",
-        metadata: { language: "python", scope: "sdk-specific" }
+        metadata: { language: "python", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "sdk/python/readme.md#quickstart",
         filepath: "sdk/python/readme.md",
         heading: "Quick Start",
         content_text: "install quick start guide",
-        metadata: { language: "python", scope: "sdk-specific" }
-      })
+        metadata: { language: "python", scope: "sdk-specific" },
+      }),
     ];
 
-    const engine = new InMemorySearchEngine(chunks, { collapseKeys: ["language"] });
+    const engine = new InMemorySearchEngine(chunks, {
+      collapseKeys: ["language"],
+    });
     const result = await engine.search({
       query: "install",
       limit: 10,
-      filters: { language: "python" }
+      filters: { language: "python" },
     });
 
     // Both python chunks should survive since language filter makes dedup a no-op
@@ -285,19 +294,23 @@ describe("InMemorySearchEngine dedup", () => {
         filepath: "sdk/python/readme.md",
         heading: "Installation",
         content_text: "install pip acmeauth",
-        metadata: { language: "python", scope: "sdk-specific" }
+        metadata: { language: "python", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "sdk/typescript/readme.md#installation",
         filepath: "sdk/typescript/readme.md",
         heading: "Installation",
         content_text: "install npm acmeauth",
-        metadata: { language: "typescript", scope: "sdk-specific" }
-      })
+        metadata: { language: "typescript", scope: "sdk-specific" },
+      }),
     ];
 
     const engine = new InMemorySearchEngine(chunks);
-    const result = await engine.search({ query: "install", limit: 10, filters: {} });
+    const result = await engine.search({
+      query: "install",
+      limit: 10,
+      filters: {},
+    });
 
     expect(result.hits).toHaveLength(2);
   });
@@ -309,33 +322,39 @@ describe("InMemorySearchEngine dedup", () => {
         filepath: "sdk/python/readme.md",
         heading: "Error Handling",
         content_text: "error handling retry rate limit",
-        metadata: { language: "python", scope: "sdk-specific" }
+        metadata: { language: "python", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "sdk/typescript/readme.md#error-handling",
         filepath: "sdk/typescript/readme.md",
         heading: "Error Handling",
         content_text: "error handling retry rate limit",
-        metadata: { language: "typescript", scope: "sdk-specific" }
+        metadata: { language: "typescript", scope: "sdk-specific" },
       }),
       makeChunk({
         chunk_id: "guides/rate-limiting.md#overview",
         filepath: "guides/rate-limiting.md",
         heading: "Overview",
         content_text: "rate limit error handling guide",
-        metadata: { scope: "global-guide" }
+        metadata: { scope: "global-guide" },
       }),
       makeChunk({
         chunk_id: "guides/webhooks.md#errors",
         filepath: "guides/webhooks.md",
         heading: "Errors",
         content_text: "error handling for webhook deliveries",
-        metadata: { scope: "global-guide" }
-      })
+        metadata: { scope: "global-guide" },
+      }),
     ];
 
-    const engine = new InMemorySearchEngine(chunks, { collapseKeys: ["language"] });
-    const result = await engine.search({ query: "error handling", limit: 10, filters: {} });
+    const engine = new InMemorySearchEngine(chunks, {
+      collapseKeys: ["language"],
+    });
+    const result = await engine.search({
+      query: "error handling",
+      limit: 10,
+      filters: {},
+    });
 
     // 1 SDK result (collapsed from 2) + 2 guide results
     const sdkHits = result.hits.filter((h) => h.metadata.scope === "sdk-specific");

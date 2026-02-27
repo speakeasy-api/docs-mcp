@@ -37,8 +37,20 @@ export type AgentAssertion =
   | { type: "not_contains"; value: string; soft?: boolean }
   | { type: "matches"; pattern: string; flags?: string; soft?: boolean }
   | { type: "file_contains"; path: string; value: string; soft?: boolean }
-  | { type: "file_matches"; path: string; pattern: string; flags?: string; soft?: boolean }
-  | { type: "script"; command: string; name: string; when_env?: string; soft?: boolean };
+  | {
+      type: "file_matches";
+      path: string;
+      pattern: string;
+      flags?: string;
+      soft?: boolean;
+    }
+  | {
+      type: "script";
+      command: string;
+      name: string;
+      when_env?: string;
+      soft?: boolean;
+    };
 
 export interface AssertionResult {
   assertion: AgentAssertion;
@@ -122,7 +134,12 @@ export interface AgentEvalSummary {
 export interface AgentEvalConfig {
   scenarios: AgentScenario[];
   /** Server config for scenarios without an indexDir. Optional when all scenarios have indexDir set. */
-  server?: { command: string; args?: string[]; cwd?: string; env?: Record<string, string> };
+  server?: {
+    command: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+  };
   workspaceDir?: string;
   model?: string;
   maxTurns?: number;

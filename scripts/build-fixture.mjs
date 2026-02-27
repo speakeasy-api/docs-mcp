@@ -35,10 +35,14 @@ console.log();
 const args = [
   cliBin,
   "build",
-  "--docs-dir", docsDir,
-  "--out", outDir,
-  "--description", "AcmeAuth documentation — guides for authentication, webhooks, rate limiting, plus per-language SDK references (Python, TypeScript).",
-  "--embedding-provider", embeddingProvider,
+  "--docs-dir",
+  docsDir,
+  "--out",
+  outDir,
+  "--description",
+  "AcmeAuth documentation — guides for authentication, webhooks, rate limiting, plus per-language SDK references (Python, TypeScript).",
+  "--embedding-provider",
+  embeddingProvider,
 ];
 
 if (embeddingProvider === "openai") {

@@ -32,14 +32,10 @@ function SchemaProperty({
         <span className="pg-schema-type">{typeLabel}</span>
         {required && <span className="pg-badge">required</span>}
         {schema.default !== undefined && (
-          <span className="pg-schema-default">
-            = {JSON.stringify(schema.default)}
-          </span>
+          <span className="pg-schema-default">= {JSON.stringify(schema.default)}</span>
         )}
       </div>
-      {schema.description && (
-        <p className="pg-schema-desc">{schema.description}</p>
-      )}
+      {schema.description && <p className="pg-schema-desc">{schema.description}</p>}
       {schema.type === "object" && schema.properties && (
         <div className="pg-schema-nested">
           {Object.entries(schema.properties).map(([key, val]) => (
@@ -53,30 +49,24 @@ function SchemaProperty({
           ))}
         </div>
       )}
-      {schema.type === "array" &&
-        schema.items?.type === "object" &&
-        schema.items.properties && (
-          <div className="pg-schema-nested">
-            {Object.entries(schema.items.properties).map(([key, val]) => (
-              <SchemaProperty
-                key={key}
-                name={key}
-                schema={val}
-                required={schema.items!.required?.includes(key) ?? false}
-                depth={depth + 1}
-              />
-            ))}
-          </div>
-        )}
+      {schema.type === "array" && schema.items?.type === "object" && schema.items.properties && (
+        <div className="pg-schema-nested">
+          {Object.entries(schema.items.properties).map(([key, val]) => (
+            <SchemaProperty
+              key={key}
+              name={key}
+              schema={val}
+              required={schema.items!.required?.includes(key) ?? false}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export function SchemaView({
-  schema,
-}: {
-  schema: JsonSchema;
-}) {
+export function SchemaView({ schema }: { schema: JsonSchema }) {
   if (!schema.properties) return null;
 
   return (

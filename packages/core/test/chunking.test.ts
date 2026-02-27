@@ -15,20 +15,20 @@ describe("buildChunks", () => {
       "# Billing",
       "",
       "## Retry",
-      "third"
+      "third",
     ].join("\n");
 
     const chunks = buildChunks({
       filepath: "guides/example.md",
       markdown,
-      strategy: { chunk_by: "h2" }
+      strategy: { chunk_by: "h2" },
     });
 
     expect(chunks.map((chunk) => chunk.chunk_id)).toEqual([
       "guides/example.md#_preamble",
       "guides/example.md#auth/login",
       "guides/example.md#auth/login-2",
-      "guides/example.md#billing/retry"
+      "guides/example.md#billing/retry",
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("buildChunks", () => {
     const chunks = buildChunks({
       filepath: "guides/preamble.md",
       markdown,
-      strategy: { chunk_by: "h2" }
+      strategy: { chunk_by: "h2" },
     });
 
     expect(chunks[0]?.chunk_id).toBe("guides/preamble.md#_preamble");
@@ -55,19 +55,19 @@ describe("buildChunks", () => {
       "# Examples",
       "",
       "## Setup",
-      "second setup"
+      "second setup",
     ].join("\n");
 
     const chunks = buildChunks({
       filepath: "guides/examples.md",
       markdown,
-      strategy: { chunk_by: "h2" }
+      strategy: { chunk_by: "h2" },
     });
 
     expect(chunks.map((chunk) => chunk.chunk_id)).toEqual([
       "guides/examples.md#_preamble",
       "guides/examples.md#examples/setup",
-      "guides/examples.md#examples-2/setup"
+      "guides/examples.md#examples-2/setup",
     ]);
   });
 
@@ -76,7 +76,7 @@ describe("buildChunks", () => {
     const chunks = buildChunks({
       filepath: "guides/code.md",
       markdown,
-      strategy: { chunk_by: "h2" }
+      strategy: { chunk_by: "h2" },
     });
 
     expect(chunks[0]?.content_text).toContain("client.users.list()");
@@ -87,12 +87,12 @@ describe("buildChunks", () => {
     const chunks = buildChunks({
       filepath: "guides/min-merge.md",
       markdown,
-      strategy: { chunk_by: "h2", min_chunk_size: 100 }
+      strategy: { chunk_by: "h2", min_chunk_size: 100 },
     });
 
     expect(chunks.map((chunk) => chunk.chunk_id)).toEqual([
       "guides/min-merge.md#one",
-      "guides/min-merge.md#two"
+      "guides/min-merge.md#two",
     ]);
   });
 
@@ -101,13 +101,13 @@ describe("buildChunks", () => {
       "## One",
       "This paragraph is intentionally long enough to force a split.",
       "",
-      "tiny"
+      "tiny",
     ].join("\n");
 
     const chunks = buildChunks({
       filepath: "guides/min-merge-parts.md",
       markdown,
-      strategy: { chunk_by: "h2", max_chunk_size: 70, min_chunk_size: 20 }
+      strategy: { chunk_by: "h2", max_chunk_size: 70, min_chunk_size: 20 },
     });
 
     expect(chunks).toHaveLength(1);
@@ -130,13 +130,13 @@ describe("buildChunks", () => {
         bigBody(50),
         "",
         "### API Keys",
-        bigBody(50)
+        bigBody(50),
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/auth.md",
         markdown,
-        strategy: { chunk_by: "h2", max_chunk_size: 100 }
+        strategy: { chunk_by: "h2", max_chunk_size: 100 },
       });
 
       const ids = chunks.map((c) => c.chunk_id);
@@ -166,13 +166,13 @@ describe("buildChunks", () => {
         bigBody(50),
         "",
         "#### Retries",
-        bigBody(50)
+        bigBody(50),
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/config.md",
         markdown,
-        strategy: { chunk_by: "h2", max_chunk_size: 100 }
+        strategy: { chunk_by: "h2", max_chunk_size: 100 },
       });
 
       const ids = chunks.map((c) => c.chunk_id);
@@ -191,13 +191,13 @@ describe("buildChunks", () => {
         "## Huge Section",
         "Paragraph one. " + bigBody(80),
         "",
-        "Paragraph two. " + bigBody(80)
+        "Paragraph two. " + bigBody(80),
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/huge.md",
         markdown,
-        strategy: { chunk_by: "h2", max_chunk_size: 100 }
+        strategy: { chunk_by: "h2", max_chunk_size: 100 },
       });
 
       // Should produce multiple parts since there are no sub-headings
@@ -214,13 +214,13 @@ describe("buildChunks", () => {
         bigBody(DEFAULT_MAX_CHUNK_SIZE + 1000),
         "",
         "## Small",
-        "tiny"
+        "tiny",
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/giant.md",
         markdown,
-        strategy: { chunk_by: "h2" }
+        strategy: { chunk_by: "h2" },
       });
 
       // The giant section should be split even without explicit max_chunk_size
@@ -237,13 +237,13 @@ describe("buildChunks", () => {
         bigBody(80),
         "",
         "### Child Two",
-        bigBody(80)
+        bigBody(80),
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/preamble-refine.md",
         markdown,
-        strategy: { chunk_by: "h2", max_chunk_size: 100 }
+        strategy: { chunk_by: "h2", max_chunk_size: 100 },
       });
 
       // Preamble content should be preserved in a chunk with the parent heading
@@ -265,13 +265,13 @@ describe("buildChunks", () => {
         bigBody(80),
         "",
         "### Example",
-        bigBody(80)
+        bigBody(80),
       ].join("\n");
 
       const chunks = buildChunks({
         filepath: "docs/dedup.md",
         markdown,
-        strategy: { chunk_by: "h2", max_chunk_size: 100 }
+        strategy: { chunk_by: "h2", max_chunk_size: 100 },
       });
 
       const ids = chunks.map((c) => c.chunk_id);

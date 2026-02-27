@@ -66,7 +66,15 @@ function getClients(serverUrl: string, serverName: string, token?: string): Clie
   ];
 }
 
-export function InstallMethods({ serverUrl, serverName = "speakeasy-docs", token }: { serverUrl: string; serverName?: string; token?: string }) {
+export function InstallMethods({
+  serverUrl,
+  serverName = "speakeasy-docs",
+  token,
+}: {
+  serverUrl: string;
+  serverName?: string;
+  token?: string;
+}) {
   const clients = getClients(serverUrl, serverName, token);
   const [selected, setSelected] = useState<string | null>(null);
   const active = clients.find((c) => c.id === selected);
@@ -82,9 +90,7 @@ export function InstallMethods({ serverUrl, serverName = "speakeasy-docs", token
               key={client.id}
               className="pg-client-btn"
               data-active={selected === client.id}
-              onClick={() =>
-                setSelected(selected === client.id ? null : client.id)
-              }
+              onClick={() => setSelected(selected === client.id ? null : client.id)}
             >
               {Icon ? <Icon /> : <span className="pg-client-icon">{client.name[0]}</span>}
               {client.name}

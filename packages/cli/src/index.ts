@@ -7,7 +7,9 @@ import fg from "fast-glob";
 import { Command } from "commander";
 
 const require = createRequire(import.meta.url);
-const { version: CLI_VERSION } = require("../package.json") as { version: string };
+const { version: CLI_VERSION } = require("../package.json") as {
+  version: string;
+};
 import {
   buildLanceDbIndex,
   buildChunks,
@@ -28,7 +30,7 @@ import {
   type ManifestTaxonomyFieldConfig,
   type IndexBuildStep,
   type Manifest,
-  type PreviousIndexReader
+  type PreviousIndexReader,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
 import { resolveCorpusLabel, resolveSourceCommit } from "./git.js";
@@ -38,7 +40,9 @@ const program = new Command();
 const isTTY = process.stderr.isTTY ?? false;
 let progressLineCount = 0;
 
-function writeProgress(msg: string) { writeProgressBlock([msg]); }
+function writeProgress(msg: string) {
+  writeProgressBlock([msg]);
+}
 
 function writeProgressBlock(lines: string[]) {
   if (!isTTY) return;
@@ -171,21 +175,23 @@ program
         ...(manifestContext
           ? {
               manifest: manifestContext.manifest,
-              manifestBaseDir: manifestContext.manifestBaseDir
+              manifestBaseDir: manifestContext.manifestBaseDir,
             }
-          : {})
+          : {}),
       });
 
       if (!manifestContext) {
         warnings += 1;
-        console.warn(`warn: no manifest found for ${relative}; using default strategy '${resolved.strategy.chunk_by}'`);
+        console.warn(
+          `warn: no manifest found for ${relative}; using default strategy '${resolved.strategy.chunk_by}'`,
+        );
       }
 
       buildChunks({
         filepath: relative,
         markdown,
         strategy: resolved.strategy,
-        metadata: resolved.metadata
+        metadata: resolved.metadata,
       });
     }
 
@@ -213,46 +219,92 @@ program
   .option("--cache-dir <path>", "Directory for .embedding-cache/ (defaults to --out path)")
   .option("--tool-description-search <value>", "Custom description for the search_docs MCP tool")
   .option("--tool-description-get-doc <value>", "Custom description for the get_doc MCP tool")
-  .action(async (options: {
-    docsDir: string;
-    out: string;
-    description: string;
-    embeddingProvider: string;
-    embeddingModel?: string;
-    embeddingDimensions?: number;
-    embeddingApiKey?: string;
-    embeddingBaseUrl?: string;
-    embeddingBatchSize?: number;
-    embeddingConcurrency?: number;
-    embeddingMaxRetries?: number;
-    rebuildCache?: boolean;
-    cacheDir?: string;
-    toolDescriptionSearch?: string;
-    toolDescriptionGetDoc?: string;
-  }) => {
-    const docsDir = path.resolve(options.docsDir);
-    const outDir = path.resolve(options.out);
-    const files = await listMarkdownFiles(docsDir);
-    const manifestCache = new Map<string, Manifest>();
-    const lanceDbPath = path.join(outDir, ".lancedb");
-    const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
-    const lanceDbOldPath = path.join(outDir, ".lancedb.old");
+  .action(
+    async (options: {
+      docsDir: string;
+      out: string;
+      description: string;
+      embeddingProvider: string;
+      embeddingModel?: string;
+      embeddingDimensions?: number;
+      embeddingApiKey?: string;
+      embeddingBaseUrl?: string;
+      embeddingBatchSize?: number;
+      embeddingConcurrency?: number;
+      embeddingMaxRetries?: number;
+      rebuildCache?: boolean;
+      cacheDir?: string;
+      toolDescriptionSearch?: string;
+      toolDescriptionGetDoc?: string;
+    }) => {
+      const docsDir = path.resolve(options.docsDir);
+      const outDir = path.resolve(options.out);
+      const files = await listMarkdownFiles(docsDir);
+      const manifestCache = new Map<string, Manifest>();
+      const lanceDbPath = path.join(outDir, ".lancedb");
+      const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
+      const lanceDbOldPath = path.join(outDir, ".lancedb.old");
 
-    // Clean up stale tmp/old dirs from interrupted builds
-    await rm(lanceDbTmpPath, { recursive: true, force: true });
-    await rm(lanceDbOldPath, { recursive: true, force: true });
+      // Clean up stale tmp/old dirs from interrupted builds
+      await rm(lanceDbTmpPath, { recursive: true, force: true });
+      await rm(lanceDbOldPath, { recursive: true, force: true });
 
-    // Load previous index for chunk caching (old .lancedb/ stays readable during build)
-    let previousIndex: PreviousIndexReader | null = options.rebuildCache
-      ? null
-      : await loadChunksFromPreviousIndex(lanceDbPath);
+      // Load previous index for chunk caching (old .lancedb/ stays readable during build)
+      let previousIndex: PreviousIndexReader | null = options.rebuildCache
+        ? null
+        : await loadChunksFromPreviousIndex(lanceDbPath);
 
-    // Canary validation: re-chunk the first 10 fingerprint-matching files to
-    // detect chunking logic changes without maintaining a version number.
-    if (previousIndex) {
-      let validated = 0;
-      for (const file of files) {
-        if (validated >= 10) break;
+      // Canary validation: re-chunk the first 10 fingerprint-matching files to
+      // detect chunking logic changes without maintaining a version number.
+      if (previousIndex) {
+        let validated = 0;
+        for (const file of files) {
+          if (validated >= 10) break;
+          const markdown = await readFile(file, "utf8");
+          const relative = toPosix(path.relative(docsDir, file));
+          const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
+          const resolved = resolveFileConfig({
+            relativeFilePath: relative,
+            markdown,
+            ...(manifestContext
+              ? {
+                  manifest: manifestContext.manifest,
+                  manifestBaseDir: manifestContext.manifestBaseDir,
+                }
+              : {}),
+          });
+
+          const fingerprint = computeChunkFingerprint(
+            markdown,
+            resolved.strategy,
+            resolved.metadata,
+          );
+          if (previousIndex.fingerprints.get(relative) !== fingerprint) continue;
+
+          const freshChunks = buildChunks({
+            filepath: relative,
+            markdown,
+            strategy: resolved.strategy,
+            metadata: resolved.metadata,
+          });
+          const cachedChunks = await previousIndex.getChunks(relative);
+
+          if (JSON.stringify(freshChunks) !== JSON.stringify(cachedChunks)) {
+            console.warn(`warn: chunk cache canary mismatch for ${relative}; discarding cache`);
+            previousIndex.close();
+            previousIndex = null;
+            break;
+          }
+          validated++;
+        }
+      }
+
+      const chunks: Chunk[] = [];
+      const newFileFingerprints: Record<string, string> = {};
+      let chunkCacheHits = 0;
+      for (let fi = 0; fi < files.length; fi++) {
+        writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
+        const file = files[fi]!;
         const markdown = await readFile(file, "utf8");
         const relative = toPosix(path.relative(docsDir, file));
         const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
@@ -262,267 +314,243 @@ program
           ...(manifestContext
             ? {
                 manifest: manifestContext.manifest,
-                manifestBaseDir: manifestContext.manifestBaseDir
+                manifestBaseDir: manifestContext.manifestBaseDir,
               }
-            : {})
+            : {}),
         });
 
         const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);
-        if (previousIndex.fingerprints.get(relative) !== fingerprint) continue;
+        newFileFingerprints[relative] = fingerprint;
 
-        const freshChunks = buildChunks({
+        if (previousIndex?.fingerprints.get(relative) === fingerprint) {
+          const cachedChunks = await previousIndex.getChunks(relative);
+          chunks.push(...cachedChunks);
+          chunkCacheHits++;
+          continue;
+        }
+
+        const fileChunks = buildChunks({
           filepath: relative,
           markdown,
           strategy: resolved.strategy,
-          metadata: resolved.metadata
+          metadata: resolved.metadata,
         });
-        const cachedChunks = await previousIndex.getChunks(relative);
-
-        if (JSON.stringify(freshChunks) !== JSON.stringify(cachedChunks)) {
-          console.warn(`warn: chunk cache canary mismatch for ${relative}; discarding cache`);
-          previousIndex.close();
-          previousIndex = null;
-          break;
-        }
-        validated++;
+        chunks.push(...fileChunks);
       }
-    }
-
-    const chunks: Chunk[] = [];
-    const newFileFingerprints: Record<string, string> = {};
-    let chunkCacheHits = 0;
-    for (let fi = 0; fi < files.length; fi++) {
-      writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
-      const file = files[fi]!;
-      const markdown = await readFile(file, "utf8");
-      const relative = toPosix(path.relative(docsDir, file));
-      const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
-      const resolved = resolveFileConfig({
-        relativeFilePath: relative,
-        markdown,
-        ...(manifestContext
-          ? {
-              manifest: manifestContext.manifest,
-              manifestBaseDir: manifestContext.manifestBaseDir
-            }
-          : {})
-      });
-
-      const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);
-      newFileFingerprints[relative] = fingerprint;
-
-      if (previousIndex?.fingerprints.get(relative) === fingerprint) {
-        const cachedChunks = await previousIndex.getChunks(relative);
-        chunks.push(...cachedChunks);
-        chunkCacheHits++;
-        continue;
-      }
-
-      const fileChunks = buildChunks({
-        filepath: relative,
-        markdown,
-        strategy: resolved.strategy,
-        metadata: resolved.metadata
-      });
-      chunks.push(...fileChunks);
-    }
-    clearProgress();
-    const cacheSuffix = chunkCacheHits > 0 ? ` (${chunkCacheHits} cached)` : "";
-    console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks${cacheSuffix}`);
-
-    const taxonomyConfig = mergeTaxonomyConfigs(manifestCache.values());
-
-    const onBatchProgress = (event: BatchProgressEvent) => {
-      writeBatchProgress(event);
-    };
-    const providerInput: {
-      provider: "none" | "hash" | "openai";
-      model?: string;
-      dimensions?: number;
-      apiKey?: string;
-      baseUrl?: string;
-      batchSize?: number;
-      batchApiThreshold?: number;
-      batchName?: string;
-      concurrency?: number;
-      maxRetries?: number;
-      onBatchProgress?: (event: BatchProgressEvent) => void;
-    } = {
-      provider: normalizeProvider(options.embeddingProvider),
-      batchApiThreshold: 2500,
-      batchName: `docs-mcp:${await resolveCorpusLabel(docsDir)}`,
-      onBatchProgress,
-    };
-    if (options.embeddingModel !== undefined) {
-      providerInput.model = options.embeddingModel;
-    }
-    if (options.embeddingDimensions !== undefined) {
-      providerInput.dimensions = options.embeddingDimensions;
-    }
-    if (options.embeddingBaseUrl !== undefined) {
-      providerInput.baseUrl = options.embeddingBaseUrl;
-    }
-    if (options.embeddingBatchSize !== undefined) {
-      providerInput.batchSize = options.embeddingBatchSize;
-    }
-    if (options.embeddingConcurrency !== undefined) {
-      providerInput.concurrency = options.embeddingConcurrency;
-    }
-    if (options.embeddingMaxRetries !== undefined) {
-      providerInput.maxRetries = options.embeddingMaxRetries;
-    }
-    const apiKey = options.embeddingApiKey ?? process.env.OPENAI_API_KEY;
-    if (apiKey !== undefined) {
-      providerInput.apiKey = apiKey;
-    }
-
-    const embeddingProvider = createEmbeddingProvider(providerInput);
-
-    await mkdir(outDir, { recursive: true });
-    const cacheBaseDir = path.resolve(options.cacheDir ?? outDir);
-
-    let vectorsByChunkId: Map<string, number[]> | undefined;
-
-    if (embeddingProvider.name !== "none") {
-      const config = {
-        provider: embeddingProvider.name,
-        model: embeddingProvider.model,
-        dimensions: embeddingProvider.dimensions,
-        configFingerprint: embeddingProvider.configFingerprint,
-      };
-
-      // Load cache (skip when --rebuild-cache)
-      const cache = options.rebuildCache ? null : await loadCache(cacheBaseDir, config);
-
-      const embedStart = Date.now();
-      const onProgress = (event: EmbedProgressEvent) => {
-        writeProgress(`Embedding [${event.completed}/${event.total}] (${event.cached} cached)...`);
-      };
-      const result = await embedChunksIncremental(
-        chunks,
-        { ...config, embed: (texts) => embeddingProvider.embed(texts) },
-        cache,
-        {
-          ...(embeddingProvider.batchSize !== undefined ? { batchSize: embeddingProvider.batchSize } : {}),
-          ...(embeddingProvider.batchApiThreshold !== undefined ? { batchApiThreshold: embeddingProvider.batchApiThreshold } : {}),
-          onProgress,
-        },
-      );
       clearProgress();
-      const embedMs = ((Date.now() - embedStart) / 1000).toFixed(1);
+      const cacheSuffix = chunkCacheHits > 0 ? ` (${chunkCacheHits} cached)` : "";
+      console.warn(
+        `Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks${cacheSuffix}`,
+      );
 
-      vectorsByChunkId = result.vectorsByChunkId;
+      const taxonomyConfig = mergeTaxonomyConfigs(manifestCache.values());
 
-      // Emit stats to stderr on every run
-      const { stats } = result;
-      const hitRate = stats.total > 0
-        ? ((stats.hits / stats.total) * 100).toFixed(1)
-        : "0.0";
-      console.warn(`embedding cache: ${stats.hits} hits, ${stats.misses} misses (${hitRate}% hit rate)`);
-      if (stats.misses > 0) {
-        console.warn(`embedded ${stats.misses} chunks via ${embeddingProvider.name} in ${embedMs}s`);
+      const onBatchProgress = (event: BatchProgressEvent) => {
+        writeBatchProgress(event);
+      };
+      const providerInput: {
+        provider: "none" | "hash" | "openai";
+        model?: string;
+        dimensions?: number;
+        apiKey?: string;
+        baseUrl?: string;
+        batchSize?: number;
+        batchApiThreshold?: number;
+        batchName?: string;
+        concurrency?: number;
+        maxRetries?: number;
+        onBatchProgress?: (event: BatchProgressEvent) => void;
+      } = {
+        provider: normalizeProvider(options.embeddingProvider),
+        batchApiThreshold: 2500,
+        batchName: `docs-mcp:${await resolveCorpusLabel(docsDir)}`,
+        onBatchProgress,
+      };
+      if (options.embeddingModel !== undefined) {
+        providerInput.model = options.embeddingModel;
+      }
+      if (options.embeddingDimensions !== undefined) {
+        providerInput.dimensions = options.embeddingDimensions;
+      }
+      if (options.embeddingBaseUrl !== undefined) {
+        providerInput.baseUrl = options.embeddingBaseUrl;
+      }
+      if (options.embeddingBatchSize !== undefined) {
+        providerInput.batchSize = options.embeddingBatchSize;
+      }
+      if (options.embeddingConcurrency !== undefined) {
+        providerInput.concurrency = options.embeddingConcurrency;
+      }
+      if (options.embeddingMaxRetries !== undefined) {
+        providerInput.maxRetries = options.embeddingMaxRetries;
+      }
+      const apiKey = options.embeddingApiKey ?? process.env.OPENAI_API_KEY;
+      if (apiKey !== undefined) {
+        providerInput.apiKey = apiKey;
       }
 
-      // Save cache (always — even with --rebuild-cache to warm future builds).
-      // Non-critical: a failed cache write shouldn't abort the build since the
-      // index output is already computed.
+      const embeddingProvider = createEmbeddingProvider(providerInput);
+
+      await mkdir(outDir, { recursive: true });
+      const cacheBaseDir = path.resolve(options.cacheDir ?? outDir);
+
+      let vectorsByChunkId: Map<string, number[]> | undefined;
+
+      if (embeddingProvider.name !== "none") {
+        const config = {
+          provider: embeddingProvider.name,
+          model: embeddingProvider.model,
+          dimensions: embeddingProvider.dimensions,
+          configFingerprint: embeddingProvider.configFingerprint,
+        };
+
+        // Load cache (skip when --rebuild-cache)
+        const cache = options.rebuildCache ? null : await loadCache(cacheBaseDir, config);
+
+        const embedStart = Date.now();
+        const onProgress = (event: EmbedProgressEvent) => {
+          writeProgress(
+            `Embedding [${event.completed}/${event.total}] (${event.cached} cached)...`,
+          );
+        };
+        const result = await embedChunksIncremental(
+          chunks,
+          { ...config, embed: (texts) => embeddingProvider.embed(texts) },
+          cache,
+          {
+            ...(embeddingProvider.batchSize !== undefined
+              ? { batchSize: embeddingProvider.batchSize }
+              : {}),
+            ...(embeddingProvider.batchApiThreshold !== undefined
+              ? { batchApiThreshold: embeddingProvider.batchApiThreshold }
+              : {}),
+            onProgress,
+          },
+        );
+        clearProgress();
+        const embedMs = ((Date.now() - embedStart) / 1000).toFixed(1);
+
+        vectorsByChunkId = result.vectorsByChunkId;
+
+        // Emit stats to stderr on every run
+        const { stats } = result;
+        const hitRate = stats.total > 0 ? ((stats.hits / stats.total) * 100).toFixed(1) : "0.0";
+        console.warn(
+          `embedding cache: ${stats.hits} hits, ${stats.misses} misses (${hitRate}% hit rate)`,
+        );
+        if (stats.misses > 0) {
+          console.warn(
+            `embedded ${stats.misses} chunks via ${embeddingProvider.name} in ${embedMs}s`,
+          );
+        }
+
+        // Save cache (always — even with --rebuild-cache to warm future builds).
+        // Non-critical: a failed cache write shouldn't abort the build since the
+        // index output is already computed.
+        try {
+          await saveCache(cacheBaseDir, result.updatedCache, config);
+        } catch (err) {
+          console.warn(
+            `warn: failed to write embedding cache: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }
+
+      const embeddingMetadata: EmbeddingMetadata | null =
+        embeddingProvider.name === "none"
+          ? null
+          : {
+              provider: embeddingProvider.name,
+              model: embeddingProvider.model,
+              dimensions: embeddingProvider.dimensions,
+            };
+
+      const toolDescriptions: Record<string, string> = {};
+      if (options.toolDescriptionSearch) {
+        toolDescriptions.search_docs = options.toolDescriptionSearch;
+      }
+      if (options.toolDescriptionGetDoc) {
+        toolDescriptions.get_doc = options.toolDescriptionGetDoc;
+      }
+
+      const sourceCommit = await resolveSourceCommit(docsDir);
+      const metadata = buildMetadata(
+        chunks,
+        files,
+        options.description,
+        embeddingMetadata,
+        sourceCommit,
+        taxonomyConfig,
+        Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined,
+      );
+      const metadataKeys = Object.keys(metadata.taxonomy);
+
+      // Warn about taxonomy config keys that don't match any chunk metadata
+      for (const key of Object.keys(taxonomyConfig)) {
+        if (!metadata.taxonomy[key]) {
+          console.warn(
+            `warn: taxonomy config key '${key}' does not match any chunk metadata — this configuration has no effect`,
+          );
+        }
+      }
+
+      // Close previous index before writing the new one
+      previousIndex?.close();
+
+      const indexStepLabels: Record<IndexBuildStep, string> = {
+        "writing-table": "Building search index: writing table...",
+        "indexing-fts": "Building search index: full-text index...",
+        "indexing-scalar": "Building search index: scalar indices...",
+        "indexing-vector": "Building search index: vector index...",
+      };
+      const buildInput: {
+        dbPath: string;
+        chunks: Chunk[];
+        metadataKeys: string[];
+        vectorsByChunkId?: Map<string, number[]>;
+        fileFingerprints?: Record<string, string>;
+        onProgress?: (step: IndexBuildStep) => void;
+      } = {
+        dbPath: lanceDbTmpPath,
+        chunks,
+        metadataKeys,
+        fileFingerprints: newFileFingerprints,
+        onProgress: (step) => writeProgress(indexStepLabels[step]),
+      };
+      if (vectorsByChunkId) {
+        buildInput.vectorsByChunkId = vectorsByChunkId;
+      }
+      await buildLanceDbIndex(buildInput);
+      clearProgress();
+
+      await writeFile(path.join(outDir, "chunks.json"), JSON.stringify(chunks, null, 2));
+      await writeFile(
+        path.join(outDir, "metadata.json"),
+        JSON.stringify(
+          {
+            ...metadata,
+            index: {
+              engine: "lancedb",
+              table: "chunks",
+              path: ".lancedb",
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      // Atomic swap: .lancedb.tmp → .lancedb
+      await rm(lanceDbOldPath, { recursive: true, force: true });
       try {
-        await saveCache(cacheBaseDir, result.updatedCache, config);
-      } catch (err) {
-        console.warn(`warn: failed to write embedding cache: ${err instanceof Error ? err.message : err}`);
-      }
-    }
+        await rename(lanceDbPath, lanceDbOldPath);
+      } catch {}
+      await rename(lanceDbTmpPath, lanceDbPath);
+      await rm(lanceDbOldPath, { recursive: true, force: true }).catch(() => {});
 
-    const embeddingMetadata: EmbeddingMetadata | null =
-      embeddingProvider.name === "none"
-        ? null
-        : {
-            provider: embeddingProvider.name,
-            model: embeddingProvider.model,
-            dimensions: embeddingProvider.dimensions
-          };
-
-    const toolDescriptions: Record<string, string> = {};
-    if (options.toolDescriptionSearch) {
-      toolDescriptions.search_docs = options.toolDescriptionSearch;
-    }
-    if (options.toolDescriptionGetDoc) {
-      toolDescriptions.get_doc = options.toolDescriptionGetDoc;
-    }
-
-    const sourceCommit = await resolveSourceCommit(docsDir);
-    const metadata = buildMetadata(
-      chunks,
-      files,
-      options.description,
-      embeddingMetadata,
-      sourceCommit,
-      taxonomyConfig,
-      Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined
-    );
-    const metadataKeys = Object.keys(metadata.taxonomy);
-
-    // Warn about taxonomy config keys that don't match any chunk metadata
-    for (const key of Object.keys(taxonomyConfig)) {
-      if (!metadata.taxonomy[key]) {
-        console.warn(`warn: taxonomy config key '${key}' does not match any chunk metadata — this configuration has no effect`);
-      }
-    }
-
-    // Close previous index before writing the new one
-    previousIndex?.close();
-
-    const indexStepLabels: Record<IndexBuildStep, string> = {
-      "writing-table": "Building search index: writing table...",
-      "indexing-fts": "Building search index: full-text index...",
-      "indexing-scalar": "Building search index: scalar indices...",
-      "indexing-vector": "Building search index: vector index...",
-    };
-    const buildInput: {
-      dbPath: string;
-      chunks: Chunk[];
-      metadataKeys: string[];
-      vectorsByChunkId?: Map<string, number[]>;
-      fileFingerprints?: Record<string, string>;
-      onProgress?: (step: IndexBuildStep) => void;
-    } = {
-      dbPath: lanceDbTmpPath,
-      chunks,
-      metadataKeys,
-      fileFingerprints: newFileFingerprints,
-      onProgress: (step) => writeProgress(indexStepLabels[step]),
-    };
-    if (vectorsByChunkId) {
-      buildInput.vectorsByChunkId = vectorsByChunkId;
-    }
-    await buildLanceDbIndex(buildInput);
-    clearProgress();
-
-    await writeFile(path.join(outDir, "chunks.json"), JSON.stringify(chunks, null, 2));
-    await writeFile(
-      path.join(outDir, "metadata.json"),
-      JSON.stringify(
-        {
-          ...metadata,
-          index: {
-            engine: "lancedb",
-            table: "chunks",
-            path: ".lancedb"
-          }
-        },
-        null,
-        2
-      )
-    );
-
-    // Atomic swap: .lancedb.tmp → .lancedb
-    await rm(lanceDbOldPath, { recursive: true, force: true });
-    try { await rename(lanceDbPath, lanceDbOldPath); } catch {}
-    await rename(lanceDbTmpPath, lanceDbPath);
-    await rm(lanceDbOldPath, { recursive: true, force: true }).catch(() => {});
-
-    console.log(`wrote ${chunks.length} chunks and .lancedb index to ${outDir}`);
-  });
+      console.log(`wrote ${chunks.length} chunks and .lancedb index to ${outDir}`);
+    },
+  );
 
 program
   .command("fix")
@@ -544,16 +572,16 @@ program
         const markdown = await readFile(file, "utf8");
         return {
           path: relative,
-          markdown
+          markdown,
         };
-      })
+      }),
     );
     const baseline: Manifest = buildHeuristicManifest(manifestInput);
 
     await writeFile(manifestPath, `${JSON.stringify(baseline, null, 2)}\n`);
     const overrideCount = baseline.overrides?.length ?? 0;
     console.log(
-      `created ${manifestPath} (default=${baseline.strategy?.chunk_by ?? "h2"}, overrides=${overrideCount})`
+      `created ${manifestPath} (default=${baseline.strategy?.chunk_by ?? "h2"}, overrides=${overrideCount})`,
     );
   });
 
@@ -562,7 +590,7 @@ void program.parseAsync(process.argv);
 async function loadNearestManifest(
   filePath: string,
   docsDir: string,
-  cache: Map<string, Manifest>
+  cache: Map<string, Manifest>,
 ): Promise<{ manifest: Manifest; manifestBaseDir: string } | undefined> {
   let currentDir = path.dirname(filePath);
   const stopDir = path.resolve(docsDir);
@@ -578,7 +606,7 @@ async function loadNearestManifest(
       const relativeDir = toPosix(path.relative(stopDir, currentDir));
       return {
         manifest,
-        manifestBaseDir: relativeDir || "."
+        manifestBaseDir: relativeDir || ".",
       };
     }
 
@@ -602,7 +630,7 @@ async function listMarkdownFiles(docsDir: string): Promise<string[]> {
     cwd: docsDir,
     absolute: true,
     onlyFiles: true,
-    dot: false
+    dot: false,
   });
   files.sort((a, b) => a.localeCompare(b));
   return files;
@@ -615,7 +643,7 @@ function buildMetadata(
   embedding: EmbeddingMetadata | null,
   sourceCommit: string | null,
   taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>,
-  toolDescriptions?: Record<string, string>
+  toolDescriptions?: Record<string, string>,
 ): {
   metadata_version: string;
   corpus_description: string;
@@ -638,13 +666,16 @@ function buildMetadata(
     }
   }
 
-  const taxonomy: Record<string, { description: string; values: string[]; vector_collapse?: boolean }> = {};
+  const taxonomy: Record<
+    string,
+    { description: string; values: string[]; vector_collapse?: boolean }
+  > = {};
   for (const [key, values] of taxonomyValues.entries()) {
     const config = taxonomyConfig[key];
     taxonomy[key] = {
       description: `Filter results by ${key}.`,
       values: [...values].sort((a, b) => a.localeCompare(b)),
-      ...(config?.vector_collapse ? { vector_collapse: true } : {})
+      ...(config?.vector_collapse ? { vector_collapse: true } : {}),
     };
   }
 
@@ -656,10 +687,10 @@ function buildMetadata(
       total_chunks: chunks.length,
       total_files: files.length,
       indexed_at: new Date().toISOString(),
-      source_commit: sourceCommit
+      source_commit: sourceCommit,
     },
     embedding,
-    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {})
+    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
   };
 }
 
@@ -677,9 +708,7 @@ function normalizeProvider(value: string): "none" | "hash" | "openai" {
     return normalized;
   }
 
-  throw new Error(
-    `unsupported embedding provider '${value}'. Expected one of: none, hash, openai`
-  );
+  throw new Error(`unsupported embedding provider '${value}'. Expected one of: none, hash, openai`);
 }
 
 async function exists(targetPath: string): Promise<boolean> {

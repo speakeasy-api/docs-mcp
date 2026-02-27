@@ -7,8 +7,8 @@ describe("computeRoundsToRightDoc", () => {
       computeRoundsToRightDoc({
         found: true,
         roundsExecuted: 2,
-        maxRounds: 3
-      })
+        maxRounds: 3,
+      }),
     ).toBe(2);
   });
 
@@ -17,8 +17,8 @@ describe("computeRoundsToRightDoc", () => {
       computeRoundsToRightDoc({
         found: false,
         roundsExecuted: 3,
-        maxRounds: 3
-      })
+        maxRounds: 3,
+      }),
     ).toBe(4);
   });
 });

@@ -24,7 +24,7 @@ export interface DeltaInput {
  */
 export function generateDeltaMarkdown(
   current: DeltaInput | EvalSummary,
-  baseline: DeltaInput | EvalSummary
+  baseline: DeltaInput | EvalSummary,
 ): string {
   const currentInput = normalizeDeltaInput(current);
   const baselineInput = normalizeDeltaInput(baseline);
@@ -38,27 +38,25 @@ export function generateDeltaMarkdown(
     metricRow(
       "Avg Rounds to Right Doc",
       baselineSummary.avgRoundsToRightDoc,
-      currentSummary.avgRoundsToRightDoc
+      currentSummary.avgRoundsToRightDoc,
     ),
     metricRow("Facet Precision", baselineSummary.facetPrecision, currentSummary.facetPrecision),
     metricRow("Search p50 (ms)", baselineSummary.searchP50Ms, currentSummary.searchP50Ms),
     metricRow("Search p95 (ms)", baselineSummary.searchP95Ms, currentSummary.searchP95Ms),
     metricRow("Get Doc p50 (ms)", baselineSummary.getDocP50Ms, currentSummary.getDocP50Ms),
     metricRow("Build Time (ms)", baselineSummary.buildTimeMs, currentSummary.buildTimeMs),
-    metricRow("Peak RSS (MB)", baselineSummary.peakRssMb, currentSummary.peakRssMb)
+    metricRow("Peak RSS (MB)", baselineSummary.peakRssMb, currentSummary.peakRssMb),
   ];
 
   const lines = [
     "| Metric | Baseline | Current | Delta |",
     "| --- | ---: | ---: | ---: |",
-    ...rows
+    ...rows,
   ];
 
   // Regression / improvement tracking requires case-level data on both sides
   if (currentInput.cases.length > 0 && baselineInput.cases.length > 0) {
-    const baselineCaseMap = new Map(
-      baselineInput.cases.map((c) => [c.name, c])
-    );
+    const baselineCaseMap = new Map(baselineInput.cases.map((c) => [c.name, c]));
 
     const regressions = currentInput.cases.filter((c) => {
       const bc = baselineCaseMap.get(c.name);
@@ -80,9 +78,7 @@ export function generateDeltaMarkdown(
         const bc = baselineCaseMap.get(r.name)!;
         const baselineRank = rankLabel(bc);
         const currentRank = rankLabel(r);
-        lines.push(
-          `- **${r.name}**: was rank ${baselineRank}, now rank ${currentRank}`
-        );
+        lines.push(`- **${r.name}**: was rank ${baselineRank}, now rank ${currentRank}`);
       }
     }
 
@@ -92,9 +88,7 @@ export function generateDeltaMarkdown(
       lines.push("");
       for (const imp of improvements) {
         const currentRank = rankLabel(imp);
-        lines.push(
-          `- **${imp.name}**: now found at rank ${currentRank}`
-        );
+        lines.push(`- **${imp.name}**: now found at rank ${currentRank}`);
       }
     }
   }
@@ -111,7 +105,7 @@ export function toDeltaCases(cases: RankedCase[]): DeltaCaseData[] {
     name: c.name ?? `case-${i}`,
     passed: c.rankedChunkIds.slice(0, 5).includes(c.expectedChunkId),
     expectedChunkId: c.expectedChunkId,
-    rankedChunkIds: c.rankedChunkIds
+    rankedChunkIds: c.rankedChunkIds,
   }));
 }
 
@@ -143,7 +137,7 @@ function normalizeSummary(summary: EvalSummary): EvalSummary {
     searchP95Ms: coerceNumber(summary.searchP95Ms),
     getDocP50Ms: coerceNumber(summary.getDocP50Ms),
     buildTimeMs: coerceNumber(summary.buildTimeMs),
-    peakRssMb: coerceNumber(summary.peakRssMb)
+    peakRssMb: coerceNumber(summary.peakRssMb),
   };
 }
 

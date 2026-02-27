@@ -19,16 +19,16 @@ export async function ensureRepo(spec: DocsRepoSpec): Promise<string> {
   const ref = spec.ref ?? "main";
   const docsPath = spec.docsPath ?? ".";
 
-  const cacheKey = createHash("sha256")
-    .update(`${spec.url}\0${ref}`)
-    .digest("hex")
-    .slice(0, 16);
+  const cacheKey = createHash("sha256").update(`${spec.url}\0${ref}`).digest("hex").slice(0, 16);
 
   const repoDir = path.join(REPOS_CACHE_DIR, cacheKey);
   const marker = path.join(repoDir, ".clone-complete");
 
   // Check for completed clone
-  const complete = await stat(marker).then(() => true, () => false);
+  const complete = await stat(marker).then(
+    () => true,
+    () => false,
+  );
   if (!complete) {
     // Clean up partial clone if it exists
     await rm(repoDir, { recursive: true, force: true });
@@ -57,7 +57,7 @@ function gitClone(url: string, ref: string, dir: string): Promise<void> {
     const child = spawn(
       "git",
       ["clone", "--depth", "1", "--branch", ref, "--single-branch", url, dir],
-      { stdio: ["ignore", "inherit", "inherit"] }
+      { stdio: ["ignore", "inherit", "inherit"] },
     );
 
     child.on("error", reject);
@@ -66,7 +66,11 @@ function gitClone(url: string, ref: string, dir: string): Promise<void> {
         resolve();
         return;
       }
-      reject(new Error(`git clone failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`));
+      reject(
+        new Error(
+          `git clone failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`,
+        ),
+      );
     });
   });
 }

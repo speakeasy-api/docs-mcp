@@ -1,4 +1,8 @@
 # Environment setup: copy mise.local.toml.example → mise.local.toml and fill in API keys.
+[tools]
+hk = "1.36.0"
+node = "24.13.1"
+pkl = "0.30.2"
 
 [tasks."index-fixtures"]
 description = "Build test fixture index from tests/fixtures/docs"

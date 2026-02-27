@@ -3,53 +3,152 @@
     "name": "List PushPress members",
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists members (customers) from the PushPress API. Install all dependencies first with npm. The PUSHPRESS_API_KEY environment variable is already set — use process.env.PUSHPRESS_API_KEY for authentication. Do not run the script.",
     "description": "PushPress TypeScript SDK — API references for members, checkins, webhooks, and classes",
-    "docsSpec": { "url": "https://github.com/pushpress/pushpress-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "docsSpec": {
+      "url": "https://github.com/pushpress/pushpress-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
-      { "type": "script", "command": "grep -q 'pushpress' package.json", "name": "pushpress-in-deps" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'member\\|customer\\|name\\|email'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "pushpress",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "grep -q 'pushpress' package.json",
+        "name": "pushpress-in-deps"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      },
+      {
+        "type": "script",
+        "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'member\\|customer\\|name\\|email'",
+        "name": "runs-successfully",
+        "when_env": "PUSHPRESS_API_KEY",
+        "soft": true
+      }
     ]
   },
   "get-checkins": {
     "name": "Get PushPress checkins",
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that retrieves recent checkins from the PushPress API. Install all dependencies first with npm. The PUSHPRESS_API_KEY environment variable is already set — use process.env.PUSHPRESS_API_KEY for authentication. Do not run the script.",
-    "docsSpec": { "url": "https://github.com/pushpress/pushpress-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "docsSpec": {
+      "url": "https://github.com/pushpress/pushpress-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
-      { "type": "file_matches", "path": "solution.ts", "pattern": "checkin", "flags": "i" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'checkin\\|check'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "pushpress",
+        "flags": "i"
+      },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "checkin",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      },
+      {
+        "type": "script",
+        "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'checkin\\|check'",
+        "name": "runs-successfully",
+        "when_env": "PUSHPRESS_API_KEY",
+        "soft": true
+      }
     ]
   },
   "create-webhook": {
     "name": "Create PushPress webhook",
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that registers a webhook to listen for events. Install all dependencies first with npm. The PUSHPRESS_API_KEY environment variable is already set — use process.env.PUSHPRESS_API_KEY for authentication. Do not run the script.",
-    "docsSpec": { "url": "https://github.com/pushpress/pushpress-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "docsSpec": {
+      "url": "https://github.com/pushpress/pushpress-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
     "category": "advanced",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
-      { "type": "file_matches", "path": "solution.ts", "pattern": "webhook|event", "flags": "i" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'webhook\\|event\\|created'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "pushpress",
+        "flags": "i"
+      },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "webhook|event",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      },
+      {
+        "type": "script",
+        "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'webhook\\|event\\|created'",
+        "name": "runs-successfully",
+        "when_env": "PUSHPRESS_API_KEY",
+        "soft": true
+      }
     ]
   },
   "list-classes": {
     "name": "List PushPress classes",
     "prompt": "Using the PushPress TypeScript SDK (`@pushpress/pushpress`), write a script in solution.ts that lists available classes or scheduled sessions. Install all dependencies first with npm. The PUSHPRESS_API_KEY environment variable is already set — use process.env.PUSHPRESS_API_KEY for authentication. Do not run the script.",
-    "docsSpec": { "url": "https://github.com/pushpress/pushpress-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "docsSpec": {
+      "url": "https://github.com/pushpress/pushpress-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "pushpress", "flags": "i" },
-      { "type": "file_matches", "path": "solution.ts", "pattern": "class|schedule|session", "flags": "i" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
-      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'class\\|schedule\\|session'", "name": "runs-successfully", "when_env": "PUSHPRESS_API_KEY", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "pushpress",
+        "flags": "i"
+      },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "class|schedule|session",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      },
+      {
+        "type": "script",
+        "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'class\\|schedule\\|session'",
+        "name": "runs-successfully",
+        "when_env": "PUSHPRESS_API_KEY",
+        "soft": true
+      }
     ]
   }
 }

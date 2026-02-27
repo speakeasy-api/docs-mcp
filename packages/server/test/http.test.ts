@@ -16,7 +16,7 @@ const chunks: Chunk[] = [
     content_text: "TypeScript retry",
     breadcrumb: "guides/ts.md > Retry",
     chunk_index: 0,
-    metadata: { language: "typescript", scope: "sdk-specific" }
+    metadata: { language: "typescript", scope: "sdk-specific" },
   },
   {
     chunk_id: "guides/global.md#retry",
@@ -27,8 +27,8 @@ const chunks: Chunk[] = [
     content_text: "Global retry",
     breadcrumb: "guides/global.md > Retry",
     chunk_index: 0,
-    metadata: { scope: "global-guide" }
-  }
+    metadata: { scope: "global-guide" },
+  },
 ];
 
 const metadata = normalizeMetadata({
@@ -37,14 +37,18 @@ const metadata = normalizeMetadata({
   taxonomy: {
     language: {
       description: "Filter by language.",
-      values: ["python", "typescript"]
+      values: ["python", "typescript"],
     },
     scope: {
-      values: ["global-guide", "sdk-specific"]
-    }
+      values: ["global-guide", "sdk-specific"],
+    },
   },
-  stats: { total_chunks: 2, total_files: 2, indexed_at: "2026-01-01T00:00:00Z" },
-  embedding: null
+  stats: {
+    total_chunks: 2,
+    total_files: 2,
+    indexed_at: "2026-01-01T00:00:00Z",
+  },
+  embedding: null,
 });
 
 // Use a random high port to avoid conflicts
@@ -92,7 +96,11 @@ describe("MCP HTTP transport compliance", () => {
     expect(names).toContain("get_doc");
 
     const searchTool = tools.find((t) => t.name === "search_docs");
-    const props = (searchTool?.inputSchema as Record<string, unknown> | undefined)?.properties as Record<string, unknown> ?? {};
+    const props =
+      ((searchTool?.inputSchema as Record<string, unknown> | undefined)?.properties as Record<
+        string,
+        unknown
+      >) ?? {};
     expect(props).toHaveProperty("query");
     expect(props).toHaveProperty("language");
     expect(props).toHaveProperty("scope");
@@ -105,7 +113,10 @@ describe("MCP HTTP transport compliance", () => {
     const client = new Client({ name: "test-client", version: "0.1.0" });
     await client.connect(transport);
 
-    const result = await client.callTool({ name: "search_docs", arguments: { query: "retry" } });
+    const result = await client.callTool({
+      name: "search_docs",
+      arguments: { query: "retry" },
+    });
     expect(result.isError).not.toBe(true);
     expect(result.content).toHaveLength(1);
 
@@ -122,7 +133,7 @@ describe("MCP HTTP transport compliance", () => {
 
     const result = await client.callTool({
       name: "get_doc",
-      arguments: { chunk_id: "guides/ts.md#retry" }
+      arguments: { chunk_id: "guides/ts.md#retry" },
     });
     expect(result.isError).not.toBe(true);
     const text = (result.content as Array<{ text: string }>)[0].text;
@@ -136,7 +147,10 @@ describe("MCP HTTP transport compliance", () => {
     const client = new Client({ name: "test-client", version: "0.1.0" });
     await client.connect(transport);
 
-    const result = await client.callTool({ name: "nonexistent", arguments: {} });
+    const result = await client.callTool({
+      name: "nonexistent",
+      arguments: {},
+    });
     expect(result.isError).toBe(true);
 
     await client.close();
@@ -151,7 +165,7 @@ describe("MCP HTTP transport compliance", () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: ""
+      body: "",
     });
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -162,7 +176,7 @@ describe("MCP HTTP transport compliance", () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "not json"
+      body: "not json",
     });
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -191,8 +205,15 @@ describe("MCP HTTP transport with toolPrefix", () => {
   let prefixedBaseUrl: string;
 
   beforeAll(async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata, toolPrefix: "acme" });
-    const handle = await startHttpServer(app, { name: "acme-docs-server", port: 0 });
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      toolPrefix: "acme",
+    });
+    const handle = await startHttpServer(app, {
+      name: "acme-docs-server",
+      port: 0,
+    });
     prefixedHttpServer = handle.httpServer;
     const addr = prefixedHttpServer.address();
     const port = typeof addr === "object" && addr ? addr.port : handle.port;
@@ -236,7 +257,10 @@ describe("MCP HTTP transport with toolPrefix", () => {
     const client = new Client({ name: "test-client", version: "0.1.0" });
     await client.connect(transport);
 
-    const result = await client.callTool({ name: "acme_search_docs", arguments: { query: "retry" } });
+    const result = await client.callTool({
+      name: "acme_search_docs",
+      arguments: { query: "retry" },
+    });
     expect(result.isError).not.toBe(true);
     const payload = JSON.parse((result.content as Array<{ text: string }>)[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
@@ -251,7 +275,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
 
     const result = await client.callTool({
       name: "acme_get_doc",
-      arguments: { chunk_id: "guides/ts.md#retry" }
+      arguments: { chunk_id: "guides/ts.md#retry" },
     });
     expect(result.isError).not.toBe(true);
     const text = (result.content as Array<{ text: string }>)[0].text;

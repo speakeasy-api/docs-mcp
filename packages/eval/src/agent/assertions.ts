@@ -11,7 +11,7 @@ const SCRIPT_TIMEOUT_MS = 30_000;
 export async function evaluateAssertions(
   finalAnswer: string,
   assertions: AgentAssertion[],
-  workspaceDir: string
+  workspaceDir: string,
 ): Promise<AssertionResult[]> {
   const results: AssertionResult[] = [];
 
@@ -37,7 +37,7 @@ export async function evaluateAssertions(
           results.push({
             assertion,
             passed: true,
-            message: `Script "${assertion.name}" skipped (${assertion.when_env} not set)`
+            message: `Script "${assertion.name}" skipped (${assertion.when_env} not set)`,
           });
         } else {
           results.push(await evaluateScript(assertion, workspaceDir));
@@ -49,29 +49,38 @@ export async function evaluateAssertions(
   return results;
 }
 
-function evaluateContains(assertion: AgentAssertion & { type: "contains" }, text: string): AssertionResult {
+function evaluateContains(
+  assertion: AgentAssertion & { type: "contains" },
+  text: string,
+): AssertionResult {
   const passed = text.includes(assertion.value);
   return {
     assertion,
     passed,
     message: passed
       ? `Output contains "${assertion.value}"`
-      : `Output does not contain "${assertion.value}"`
+      : `Output does not contain "${assertion.value}"`,
   };
 }
 
-function evaluateNotContains(assertion: AgentAssertion & { type: "not_contains" }, text: string): AssertionResult {
+function evaluateNotContains(
+  assertion: AgentAssertion & { type: "not_contains" },
+  text: string,
+): AssertionResult {
   const passed = !text.includes(assertion.value);
   return {
     assertion,
     passed,
     message: passed
       ? `Output does not contain "${assertion.value}"`
-      : `Output unexpectedly contains "${assertion.value}"`
+      : `Output unexpectedly contains "${assertion.value}"`,
   };
 }
 
-function evaluateMatches(assertion: AgentAssertion & { type: "matches" }, text: string): AssertionResult {
+function evaluateMatches(
+  assertion: AgentAssertion & { type: "matches" },
+  text: string,
+): AssertionResult {
   const re = new RegExp(assertion.pattern, assertion.flags);
   const passed = re.test(text);
   return {
@@ -79,13 +88,13 @@ function evaluateMatches(assertion: AgentAssertion & { type: "matches" }, text: 
     passed,
     message: passed
       ? `Output matches /${assertion.pattern}/${assertion.flags ?? ""}`
-      : `Output does not match /${assertion.pattern}/${assertion.flags ?? ""}`
+      : `Output does not match /${assertion.pattern}/${assertion.flags ?? ""}`,
   };
 }
 
 async function evaluateFileContains(
   assertion: AgentAssertion & { type: "file_contains" },
-  workspaceDir: string
+  workspaceDir: string,
 ): Promise<AssertionResult> {
   const fullPath = join(workspaceDir, assertion.path);
   try {
@@ -96,23 +105,24 @@ async function evaluateFileContains(
       passed,
       message: passed
         ? `File "${assertion.path}" contains "${assertion.value}"`
-        : `File "${assertion.path}" does not contain "${assertion.value}"`
+        : `File "${assertion.path}" does not contain "${assertion.value}"`,
     };
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return {
       assertion,
       passed: false,
-      message: code === "ENOENT"
-        ? `File "${assertion.path}" not found in ${workspaceDir}`
-        : `File "${assertion.path}" unreadable: ${code ?? err}`
+      message:
+        code === "ENOENT"
+          ? `File "${assertion.path}" not found in ${workspaceDir}`
+          : `File "${assertion.path}" unreadable: ${code ?? err}`,
     };
   }
 }
 
 async function evaluateFileMatches(
   assertion: AgentAssertion & { type: "file_matches" },
-  workspaceDir: string
+  workspaceDir: string,
 ): Promise<AssertionResult> {
   const fullPath = join(workspaceDir, assertion.path);
   try {
@@ -124,45 +134,55 @@ async function evaluateFileMatches(
       passed,
       message: passed
         ? `File "${assertion.path}" matches /${assertion.pattern}/${assertion.flags ?? ""}`
-        : `File "${assertion.path}" does not match /${assertion.pattern}/${assertion.flags ?? ""}`
+        : `File "${assertion.path}" does not match /${assertion.pattern}/${assertion.flags ?? ""}`,
     };
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return {
       assertion,
       passed: false,
-      message: code === "ENOENT"
-        ? `File "${assertion.path}" not found in ${workspaceDir}`
-        : `File "${assertion.path}" unreadable: ${code ?? err}`
+      message:
+        code === "ENOENT"
+          ? `File "${assertion.path}" not found in ${workspaceDir}`
+          : `File "${assertion.path}" unreadable: ${code ?? err}`,
     };
   }
 }
 
 async function evaluateScript(
   assertion: AgentAssertion & { type: "script" },
-  workspaceDir: string
+  workspaceDir: string,
 ): Promise<AssertionResult> {
   try {
     const { stdout, stderr } = await execFileAsync("sh", ["-c", assertion.command], {
       cwd: workspaceDir,
       timeout: SCRIPT_TIMEOUT_MS,
       env: process.env as Record<string, string>,
-      maxBuffer: 10 * 1024 * 1024
+      maxBuffer: 10 * 1024 * 1024,
     });
     return {
       assertion,
       passed: true,
-      message: `Script "${assertion.name}" passed${stdout.trim() ? `: ${stdout.trim().slice(0, 200)}` : ""}${stderr.trim() ? ` (stderr: ${stderr.trim().slice(0, 200)})` : ""}`
+      message: `Script "${assertion.name}" passed${stdout.trim() ? `: ${stdout.trim().slice(0, 200)}` : ""}${stderr.trim() ? ` (stderr: ${stderr.trim().slice(0, 200)})` : ""}`,
     };
   } catch (err: unknown) {
-    const error = err as { code?: number; killed?: boolean; stdout?: string; stderr?: string; message?: string };
+    const error = err as {
+      code?: number;
+      killed?: boolean;
+      stdout?: string;
+      stderr?: string;
+      message?: string;
+    };
     const detail = error.killed
       ? "timed out"
-      : error.stderr?.trim()?.slice(0, 500) || error.stdout?.trim()?.slice(0, 500) || error.message || "unknown error";
+      : error.stderr?.trim()?.slice(0, 500) ||
+        error.stdout?.trim()?.slice(0, 500) ||
+        error.message ||
+        "unknown error";
     return {
       assertion,
       passed: false,
-      message: `Script "${assertion.name}" failed: ${detail}`
+      message: `Script "${assertion.name}" failed: ${detail}`,
     };
   }
 }

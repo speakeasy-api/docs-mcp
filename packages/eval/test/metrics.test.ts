@@ -1,22 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { generateDeltaMarkdown, runEvaluation, summarizeCases, toDeltaCases, type RankedCase } from "../src/index.js";
+import {
+  generateDeltaMarkdown,
+  runEvaluation,
+  summarizeCases,
+  toDeltaCases,
+  type RankedCase,
+} from "../src/index.js";
 
 const cases: RankedCase[] = [
   {
     expectedChunkId: "a",
     rankedChunkIds: ["a", "b", "c"],
-    roundsToRightDoc: 1
+    roundsToRightDoc: 1,
   },
   {
     expectedChunkId: "b",
     rankedChunkIds: ["c", "b", "a"],
-    roundsToRightDoc: 2
+    roundsToRightDoc: 2,
   },
   {
     expectedChunkId: "x",
     rankedChunkIds: ["a", "b", "c"],
-    roundsToRightDoc: 4
-  }
+    roundsToRightDoc: 4,
+  },
 ];
 
 describe("eval metrics", () => {
@@ -48,8 +54,8 @@ describe("eval metrics", () => {
       deterministic: true,
       model: {
         provider: "openai",
-        model: "text-embedding-3-large"
-      }
+        model: "text-embedding-3-large",
+      },
     });
 
     expect(run.metadata.deterministic).toBe(true);
@@ -61,7 +67,7 @@ describe("eval metrics", () => {
       searchLatenciesMs: [5, 10, 20, 40],
       getDocLatenciesMs: [2, 3, 9],
       buildTimeMs: 1234,
-      peakRssMb: 88.5
+      peakRssMb: 88.5,
     });
 
     expect(summary.searchP50Ms).toBe(10);
@@ -82,7 +88,7 @@ describe("eval metrics", () => {
         searchP95Ms: 30,
         getDocP50Ms: 8,
         buildTimeMs: 1300,
-        peakRssMb: 90
+        peakRssMb: 90,
       },
       {
         mrrAt5: 0.4,
@@ -93,8 +99,8 @@ describe("eval metrics", () => {
         searchP95Ms: 20,
         getDocP50Ms: 11,
         buildTimeMs: 1200,
-        peakRssMb: 95
-      }
+        peakRssMb: 95,
+      },
     );
 
     expect(markdown).toContain("| Metric | Baseline | Current | Delta |");
@@ -107,11 +113,11 @@ describe("eval metrics", () => {
   it("shows regressions and improvements when case data is provided", () => {
     const baselineCases: RankedCase[] = [
       { expectedChunkId: "a", rankedChunkIds: ["a", "b"], roundsToRightDoc: 1 },
-      { expectedChunkId: "b", rankedChunkIds: ["c", "d"], roundsToRightDoc: 3 }
+      { expectedChunkId: "b", rankedChunkIds: ["c", "d"], roundsToRightDoc: 3 },
     ];
     const currentCases: RankedCase[] = [
       { expectedChunkId: "a", rankedChunkIds: ["c", "d"], roundsToRightDoc: 3 },
-      { expectedChunkId: "b", rankedChunkIds: ["b", "c"], roundsToRightDoc: 1 }
+      { expectedChunkId: "b", rankedChunkIds: ["b", "c"], roundsToRightDoc: 1 },
     ];
 
     const baselineSummary = summarizeCases(baselineCases);
@@ -122,7 +128,7 @@ describe("eval metrics", () => {
 
     const markdown = generateDeltaMarkdown(
       { summary: currentSummary, cases: currentDeltaCases },
-      { summary: baselineSummary, cases: baselineDeltaCases }
+      { summary: baselineSummary, cases: baselineDeltaCases },
     );
 
     // case-0 ("a"): baseline passed (found at rank 1), current failed -> regression

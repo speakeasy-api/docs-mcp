@@ -2,10 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  computeChunkFingerprint,
-  loadChunksFromPreviousIndex,
-} from "../src/chunk-cache.js";
+import { computeChunkFingerprint, loadChunksFromPreviousIndex } from "../src/chunk-cache.js";
 import { buildLanceDbIndex } from "../src/lancedb.js";
 import type { Chunk, ChunkingStrategy } from "../src/types.js";
 
@@ -58,8 +55,12 @@ describe("computeChunkFingerprint", () => {
     const strategy: ChunkingStrategy = { chunk_by: "h2" };
     const markdown = "# Hello\n\nWorld";
 
-    const fp1 = computeChunkFingerprint(markdown, strategy, { language: "typescript" });
-    const fp2 = computeChunkFingerprint(markdown, strategy, { language: "python" });
+    const fp1 = computeChunkFingerprint(markdown, strategy, {
+      language: "typescript",
+    });
+    const fp2 = computeChunkFingerprint(markdown, strategy, {
+      language: "python",
+    });
     expect(fp1).not.toBe(fp2);
   });
 });
@@ -76,17 +77,13 @@ describe("loadChunksFromPreviousIndex", () => {
   });
 
   it("returns null for missing DB", async () => {
-    const result = await loadChunksFromPreviousIndex(
-      path.join(tmpDir, "nonexistent-db")
-    );
+    const result = await loadChunksFromPreviousIndex(path.join(tmpDir, "nonexistent-db"));
     expect(result).toBeNull();
   });
 
   it("returns null when file_fingerprint column is missing (old-format index)", async () => {
     // Build an index without fingerprints
-    const chunks: Chunk[] = [
-      makeChunk({ chunk_id: "a.md#intro", filepath: "a.md" }),
-    ];
+    const chunks: Chunk[] = [makeChunk({ chunk_id: "a.md#intro", filepath: "a.md" })];
 
     const dbPath = path.join(tmpDir, ".lancedb");
     await buildLanceDbIndex({ dbPath, chunks });

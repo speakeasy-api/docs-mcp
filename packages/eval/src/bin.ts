@@ -14,7 +14,11 @@ import { runAgentEval } from "./agent/runner.js";
 import type { AgentScenario } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
-import { runEvaluationAgainstServer, type EvalHarnessOutput, type EvalQueryCase } from "./runner.js";
+import {
+  runEvaluationAgainstServer,
+  type EvalHarnessOutput,
+  type EvalQueryCase,
+} from "./runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,72 +46,77 @@ program
   .option("--warmup-queries <number>", "Number of warmup search_docs calls", parseIntOption, 0)
   .option("--baseline <path>", "Optional baseline eval JSON for delta markdown")
   .option("--out <path>", "Optional output JSON path")
-  .action(async (options: {
-    cases: string;
-    serverCommand: string;
-    serverArg: string[];
-    serverCwd?: string;
-    buildCommand?: string;
-    buildArg: string[];
-    buildCwd?: string;
-    warmupQueries: number;
-    baseline?: string;
-    out?: string;
-  }) => {
-    const casesPath = path.resolve(options.cases);
-    const casesRaw = await readFile(casesPath, "utf8");
-    const cases = JSON.parse(casesRaw) as EvalQueryCase[];
+  .action(
+    async (options: {
+      cases: string;
+      serverCommand: string;
+      serverArg: string[];
+      serverCwd?: string;
+      buildCommand?: string;
+      buildArg: string[];
+      buildCwd?: string;
+      warmupQueries: number;
+      baseline?: string;
+      out?: string;
+    }) => {
+      const casesPath = path.resolve(options.cases);
+      const casesRaw = await readFile(casesPath, "utf8");
+      const cases = JSON.parse(casesRaw) as EvalQueryCase[];
 
-    const server = {
-      command: options.serverCommand,
-      args: options.serverArg,
-      ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {})
-    };
-    const build = options.buildCommand
-      ? {
-          command: options.buildCommand,
-          args: options.buildArg,
-          ...(options.buildCwd ? { cwd: path.resolve(options.buildCwd) } : {})
-        }
-      : undefined;
+      const server = {
+        command: options.serverCommand,
+        args: options.serverArg,
+        ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
+      };
+      const build = options.buildCommand
+        ? {
+            command: options.buildCommand,
+            args: options.buildArg,
+            ...(options.buildCwd ? { cwd: path.resolve(options.buildCwd) } : {}),
+          }
+        : undefined;
 
-    const result = await runEvaluationAgainstServer({
-      server,
-      ...(build ? { build } : {}),
-      cases,
-      warmupQueries: options.warmupQueries,
-      deterministic: true
-    });
+      const result = await runEvaluationAgainstServer({
+        server,
+        ...(build ? { build } : {}),
+        cases,
+        warmupQueries: options.warmupQueries,
+        deterministic: true,
+      });
 
-    let deltaMarkdown: string | undefined;
-    if (options.baseline) {
-      const baselinePath = path.resolve(options.baseline);
-      const baselineRaw = await readFile(baselinePath, "utf8");
-      const baseline = JSON.parse(baselineRaw) as EvalHarnessOutput;
-      deltaMarkdown = generateDeltaMarkdown(
-        { summary: result.summary, cases: toDeltaCases(result.rankedCases) },
-        { summary: baseline.summary, cases: toDeltaCases(baseline.rankedCases) }
-      );
-    }
+      let deltaMarkdown: string | undefined;
+      if (options.baseline) {
+        const baselinePath = path.resolve(options.baseline);
+        const baselineRaw = await readFile(baselinePath, "utf8");
+        const baseline = JSON.parse(baselineRaw) as EvalHarnessOutput;
+        deltaMarkdown = generateDeltaMarkdown(
+          { summary: result.summary, cases: toDeltaCases(result.rankedCases) },
+          {
+            summary: baseline.summary,
+            cases: toDeltaCases(baseline.rankedCases),
+          },
+        );
+      }
 
-    const payload = {
-      ...result,
-      deltaMarkdown
-    };
+      const payload = {
+        ...result,
+        deltaMarkdown,
+      };
 
-    const serialized = `${JSON.stringify(payload, null, 2)}\n`;
-    if (options.out) {
-      const outPath = path.resolve(options.out);
-      await writeFile(outPath, serialized);
-      console.log(`wrote eval result to ${outPath}`);
-    } else {
-      process.stdout.write(serialized);
-    }
+      const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+      if (options.out) {
+        const outPath = path.resolve(options.out);
+        await writeFile(outPath, serialized);
+        console.log(`wrote eval result to ${outPath}`);
+      } else {
+        process.stdout.write(serialized);
+      }
 
-    if (deltaMarkdown) {
-      process.stderr.write(`${deltaMarkdown}\n`);
-    }
-  });
+      if (deltaMarkdown) {
+        process.stderr.write(`${deltaMarkdown}\n`);
+      }
+    },
+  );
 
 program
   .command("benchmark")
@@ -117,217 +126,263 @@ program
   .requiredOption("--work-dir <path>", "Working directory for per-provider outputs")
   .requiredOption("--build-command <path>", "Path to CLI build script")
   .requiredOption("--server-command <path>", "Path to server script")
-  .option("--embeddings <list>", "Comma-separated embedding specs: none,hash,openai/text-embedding-3-large", "none,openai/text-embedding-3-large")
+  .option(
+    "--embeddings <list>",
+    "Comma-separated embedding specs: none,hash,openai/text-embedding-3-large",
+    "none,openai/text-embedding-3-large",
+  )
   .option("--warmup-queries <n>", "Warmup queries per provider", parseIntOption, 3)
   .option("--out <path>", "Output JSON path (else stdout)")
-  .action(async (options: {
-    cases: string;
-    docsDir: string;
-    workDir: string;
-    buildCommand: string;
-    serverCommand: string;
-    embeddings: string;
-    warmupQueries: number;
-    out?: string;
-  }) => {
-    const embeddings = options.embeddings.split(",").map((s) => parseEmbeddingSpec(s)).filter((s) => s.provider);
+  .action(
+    async (options: {
+      cases: string;
+      docsDir: string;
+      workDir: string;
+      buildCommand: string;
+      serverCommand: string;
+      embeddings: string;
+      warmupQueries: number;
+      out?: string;
+    }) => {
+      const embeddings = options.embeddings
+        .split(",")
+        .map((s) => parseEmbeddingSpec(s))
+        .filter((s) => s.provider);
 
-    const casesPath = path.resolve(options.cases);
-    const casesRaw = await readFile(casesPath, "utf8");
-    const cases = JSON.parse(casesRaw) as EvalQueryCase[];
+      const casesPath = path.resolve(options.cases);
+      const casesRaw = await readFile(casesPath, "utf8");
+      const cases = JSON.parse(casesRaw) as EvalQueryCase[];
 
-    const result = await runBenchmark({
-      docsDir: path.resolve(options.docsDir),
-      casesPath,
-      workDir: path.resolve(options.workDir),
-      buildCommand: path.resolve(options.buildCommand),
-      serverCommand: path.resolve(options.serverCommand),
-      embeddings,
-      warmupQueries: options.warmupQueries
-    }, cases);
+      const result = await runBenchmark(
+        {
+          docsDir: path.resolve(options.docsDir),
+          casesPath,
+          workDir: path.resolve(options.workDir),
+          buildCommand: path.resolve(options.buildCommand),
+          serverCommand: path.resolve(options.serverCommand),
+          embeddings,
+          warmupQueries: options.warmupQueries,
+        },
+        cases,
+      );
 
-    const markdown = generateBenchmarkMarkdown(result);
+      const markdown = generateBenchmarkMarkdown(result);
 
-    if (options.out) {
-      const serialized = `${JSON.stringify(result, null, 2)}\n`;
-      const outPath = path.resolve(options.out);
-      await writeFile(outPath, serialized);
-      console.error(`wrote benchmark result to ${outPath}`);
-    }
+      if (options.out) {
+        const serialized = `${JSON.stringify(result, null, 2)}\n`;
+        const outPath = path.resolve(options.out);
+        await writeFile(outPath, serialized);
+        console.error(`wrote benchmark result to ${outPath}`);
+      }
 
-    process.stdout.write(`\n${markdown}\n`);
-  });
+      process.stdout.write(`\n${markdown}\n`);
+    },
+  );
 
 program
   .command("agent-eval")
   .description("Run agent-based eval scenarios against a docs-mcp server")
-  .option("--suite <name>", "Named scenario suite (resolves to fixtures/agent-scenarios/<name>.json)")
+  .option(
+    "--suite <name>",
+    "Named scenario suite (resolves to fixtures/agent-scenarios/<name>.json)",
+  )
   .option("--scenarios <path>", "Path to JSON array of agent scenarios")
   .option("--prompt <text>", "Ad-hoc single scenario prompt (requires --docs-dir)")
   .option("--include <ids>", "Comma-separated scenario IDs to run (filters loaded scenarios)")
   .option("--docs-dir <path>", "Default docs directory for scenarios that don't specify their own")
-  .option("--server-command <value>", "Command to launch the MCP server (auto-resolved when using docsDir)")
+  .option(
+    "--server-command <value>",
+    "Command to launch the MCP server (auto-resolved when using docsDir)",
+  )
   .option("--server-arg <value>", "Server arg (repeatable)", collectValues, [] as string[])
   .option("--server-cwd <path>", "Working directory for server process")
-  .option("--server-env <key=value>", "Server environment variable (repeatable)", collectKeyValues, {} as Record<string, string>)
+  .option(
+    "--server-env <key=value>",
+    "Server environment variable (repeatable)",
+    collectKeyValues,
+    {} as Record<string, string>,
+  )
   .option("--workspace-dir <path>", "Base directory for agent workspaces")
   .option("--model <value>", "Claude model to use", "claude-sonnet-4-20250514")
   .option("--max-turns <number>", "Default max turns per scenario", parseIntOption, 15)
-  .option("--max-budget-usd <number>", "Default max budget per scenario in USD", parseFloatOption, 0.50)
+  .option(
+    "--max-budget-usd <number>",
+    "Default max budget per scenario in USD",
+    parseFloatOption,
+    0.5,
+  )
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
   .option("--debug", "Keep workspaces after run for inspection", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
   .option("--out <path>", "Output JSON path")
-  .action(async (options: {
-    suite?: string;
-    scenarios?: string;
-    prompt?: string;
-    include?: string;
-    docsDir?: string;
-    serverCommand?: string;
-    serverArg: string[];
-    serverCwd?: string;
-    serverEnv: Record<string, string>;
-    workspaceDir?: string;
-    model: string;
-    maxTurns: number;
-    maxBudgetUsd: number;
-    maxConcurrency: number;
-    systemPrompt?: string;
-    mcp: boolean;
-    debug: boolean;
-    save: boolean;
-    out?: string;
-  }) => {
-    // Validate mutually exclusive options
-    const sourceCount = [options.suite, options.scenarios, options.prompt].filter(Boolean).length;
-    if (sourceCount === 0) {
-      console.error("Error: one of --suite, --scenarios, or --prompt is required");
-      process.exit(1);
-    }
-    if (sourceCount > 1) {
-      console.error("Error: --suite, --scenarios, and --prompt are mutually exclusive");
-      process.exit(1);
-    }
-    if (options.prompt && !options.docsDir) {
-      console.error("Error: --prompt requires --docs-dir");
-      process.exit(1);
-    }
-
-    // Load scenarios
-    let { scenarios, scenariosFilePath } = await loadScenarios(options);
-
-    // Filter by --include
-    if (options.include) {
-      const includeIds = new Set(options.include.split(",").map((s) => s.trim()));
-      scenarios = scenarios.filter((s) => includeIds.has(s.id));
-      if (scenarios.length === 0) {
-        console.error(`Error: no scenarios matched --include "${options.include}"`);
+  .action(
+    async (options: {
+      suite?: string;
+      scenarios?: string;
+      prompt?: string;
+      include?: string;
+      docsDir?: string;
+      serverCommand?: string;
+      serverArg: string[];
+      serverCwd?: string;
+      serverEnv: Record<string, string>;
+      workspaceDir?: string;
+      model: string;
+      maxTurns: number;
+      maxBudgetUsd: number;
+      maxConcurrency: number;
+      systemPrompt?: string;
+      mcp: boolean;
+      debug: boolean;
+      save: boolean;
+      out?: string;
+    }) => {
+      // Validate mutually exclusive options
+      const sourceCount = [options.suite, options.scenarios, options.prompt].filter(Boolean).length;
+      if (sourceCount === 0) {
+        console.error("Error: one of --suite, --scenarios, or --prompt is required");
         process.exit(1);
       }
-    }
-
-    const noMcp = !options.mcp;
-
-    // Resolve docsDir → build indexes → set indexDir on each scenario (skip in no-mcp mode)
-    let server: { command: string; args: string[]; cwd?: string; env?: Record<string, string> } | undefined;
-
-    if (!noMcp) {
-      const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
-      const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
-      const indexDescriptions = new Map<string, string>(); // first description per docsDir
-
-      for (const scenario of scenarios) {
-        let resolvedDocsDir: string | undefined;
-        if (scenario.docsSpec) {
-          resolvedDocsDir = await ensureRepo(scenario.docsSpec);
-        } else if (scenario.docsDir) {
-          const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
-          resolvedDocsDir = path.resolve(base, scenario.docsDir);
-        } else if (defaultDocsDir) {
-          resolvedDocsDir = defaultDocsDir;
-        }
-
-        if (resolvedDocsDir) {
-          // Use scenario description for the corpus; first one wins per docsDir
-          const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
-          if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
-            indexDescriptions.set(resolvedDocsDir, scenario.description);
-          }
-
-          const cacheKey = `${resolvedDocsDir}\0${description ?? ""}\0${JSON.stringify(scenario.toolDescriptions ?? {})}`;
-          let indexDir = indexCache.get(cacheKey);
-          if (!indexDir) {
-            indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH, undefined, description, scenario.toolDescriptions);
-            indexCache.set(cacheKey, indexDir);
-          }
-          scenario.indexDir = indexDir;
-        }
+      if (sourceCount > 1) {
+        console.error("Error: --suite, --scenarios, and --prompt are mutually exclusive");
+        process.exit(1);
       }
-
-      // Server config: only needed when some scenarios don't have indexDir
-      const allHaveIndex = scenarios.every((s) => s.indexDir);
-      if (!allHaveIndex && !options.serverCommand) {
-        console.error("Error: --server-command is required when scenarios don't specify docsDir");
+      if (options.prompt && !options.docsDir) {
+        console.error("Error: --prompt requires --docs-dir");
         process.exit(1);
       }
 
-      server = options.serverCommand
-        ? {
-            command: options.serverCommand,
-            args: options.serverArg,
-            ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
-            ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {})
-          }
-        : undefined;
-    }
+      // Load scenarios
+      let { scenarios, scenariosFilePath } = await loadScenarios(options);
 
-    const baseSuiteName = options.suite
-      ?? (options.scenarios ? path.basename(options.scenarios, path.extname(options.scenarios)) : "ad-hoc");
-    const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
-
-    const observer = new ConsoleObserver({
-      model: options.model,
-      suite: suiteName,
-      debug: options.debug
-    });
-
-    const output = await runAgentEval({
-      scenarios,
-      ...(server ? { server } : {}),
-      ...(options.workspaceDir ? { workspaceDir: path.resolve(options.workspaceDir) } : {}),
-      model: options.model,
-      maxTurns: options.maxTurns,
-      maxBudgetUsd: options.maxBudgetUsd,
-      maxConcurrency: options.maxConcurrency,
-      ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
-      observer,
-      debug: options.debug,
-      noMcp
-    });
-
-    // Auto-persist + trend comparison
-    if (options.save !== false) {
-      const previous = await loadPreviousResult(suiteName);
-      const savedPath = await saveResult(output, suiteName);
-      process.stderr.write(`\nResults saved to ${savedPath}\n`);
-
-      if (previous) {
-        const trend = generateTrendSummary(output, previous);
-        process.stderr.write(`${trend}\n`);
+      // Filter by --include
+      if (options.include) {
+        const includeIds = new Set(options.include.split(",").map((s) => s.trim()));
+        scenarios = scenarios.filter((s) => includeIds.has(s.id));
+        if (scenarios.length === 0) {
+          console.error(`Error: no scenarios matched --include "${options.include}"`);
+          process.exit(1);
+        }
       }
-    }
 
-    // Write JSON only when explicitly requested via --out
-    if (options.out) {
-      const serialized = `${JSON.stringify(output, null, 2)}\n`;
-      const outPath = path.resolve(options.out);
-      await writeFile(outPath, serialized);
-      process.stderr.write(`Wrote agent eval result to ${outPath}\n`);
-    }
-  });
+      const noMcp = !options.mcp;
+
+      // Resolve docsDir → build indexes → set indexDir on each scenario (skip in no-mcp mode)
+      let server:
+        | {
+            command: string;
+            args: string[];
+            cwd?: string;
+            env?: Record<string, string>;
+          }
+        | undefined;
+
+      if (!noMcp) {
+        const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
+        const indexCache = new Map<string, string>(); // dedup builds for shared docsDirs
+        const indexDescriptions = new Map<string, string>(); // first description per docsDir
+
+        for (const scenario of scenarios) {
+          let resolvedDocsDir: string | undefined;
+          if (scenario.docsSpec) {
+            resolvedDocsDir = await ensureRepo(scenario.docsSpec);
+          } else if (scenario.docsDir) {
+            const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
+            resolvedDocsDir = path.resolve(base, scenario.docsDir);
+          } else if (defaultDocsDir) {
+            resolvedDocsDir = defaultDocsDir;
+          }
+
+          if (resolvedDocsDir) {
+            // Use scenario description for the corpus; first one wins per docsDir
+            const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
+            if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
+              indexDescriptions.set(resolvedDocsDir, scenario.description);
+            }
+
+            const cacheKey = `${resolvedDocsDir}\0${description ?? ""}\0${JSON.stringify(scenario.toolDescriptions ?? {})}`;
+            let indexDir = indexCache.get(cacheKey);
+            if (!indexDir) {
+              indexDir = await ensureIndex(
+                resolvedDocsDir,
+                CLI_BIN_PATH,
+                undefined,
+                description,
+                scenario.toolDescriptions,
+              );
+              indexCache.set(cacheKey, indexDir);
+            }
+            scenario.indexDir = indexDir;
+          }
+        }
+
+        // Server config: only needed when some scenarios don't have indexDir
+        const allHaveIndex = scenarios.every((s) => s.indexDir);
+        if (!allHaveIndex && !options.serverCommand) {
+          console.error("Error: --server-command is required when scenarios don't specify docsDir");
+          process.exit(1);
+        }
+
+        server = options.serverCommand
+          ? {
+              command: options.serverCommand,
+              args: options.serverArg,
+              ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
+              ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {}),
+            }
+          : undefined;
+      }
+
+      const baseSuiteName =
+        options.suite ??
+        (options.scenarios
+          ? path.basename(options.scenarios, path.extname(options.scenarios))
+          : "ad-hoc");
+      const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
+
+      const observer = new ConsoleObserver({
+        model: options.model,
+        suite: suiteName,
+        debug: options.debug,
+      });
+
+      const output = await runAgentEval({
+        scenarios,
+        ...(server ? { server } : {}),
+        ...(options.workspaceDir ? { workspaceDir: path.resolve(options.workspaceDir) } : {}),
+        model: options.model,
+        maxTurns: options.maxTurns,
+        maxBudgetUsd: options.maxBudgetUsd,
+        maxConcurrency: options.maxConcurrency,
+        ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
+        observer,
+        debug: options.debug,
+        noMcp,
+      });
+
+      // Auto-persist + trend comparison
+      if (options.save !== false) {
+        const previous = await loadPreviousResult(suiteName);
+        const savedPath = await saveResult(output, suiteName);
+        process.stderr.write(`\nResults saved to ${savedPath}\n`);
+
+        if (previous) {
+          const trend = generateTrendSummary(output, previous);
+          process.stderr.write(`${trend}\n`);
+        }
+      }
+
+      // Write JSON only when explicitly requested via --out
+      if (options.out) {
+        const serialized = `${JSON.stringify(output, null, 2)}\n`;
+        const outPath = path.resolve(options.out);
+        await writeFile(outPath, serialized);
+        process.stderr.write(`Wrote agent eval result to ${outPath}\n`);
+      }
+    },
+  );
 
 void program.parseAsync(process.argv);
 
@@ -349,13 +404,15 @@ async function loadScenarios(options: {
   }
   // --prompt mode
   return {
-    scenarios: [{
-      id: "ad-hoc",
-      name: "ad-hoc",
-      prompt: options.prompt!,
-      assertions: [],
-      docsDir: options.docsDir!
-    }]
+    scenarios: [
+      {
+        id: "ad-hoc",
+        name: "ad-hoc",
+        prompt: options.prompt!,
+        assertions: [],
+        docsDir: options.docsDir!,
+      },
+    ],
   };
 }
 
@@ -366,13 +423,13 @@ function parseScenarioFile(raw: string): AgentScenario[] {
   if (Array.isArray(parsed)) {
     return (parsed as AgentScenario[]).map((s) => ({
       ...s,
-      id: s.id ?? slugify(s.name)
+      id: s.id ?? slugify(s.name),
     }));
   }
 
   // K:V format — key is the scenario id
   return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>).map(
-    ([id, scenario]) => ({ ...scenario, id })
+    ([id, scenario]) => ({ ...scenario, id }),
   );
 }
 

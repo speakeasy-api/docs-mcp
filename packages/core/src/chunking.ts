@@ -32,7 +32,7 @@ interface HeadingBoundary {
 const CHUNK_LEVEL_MAP: Record<Exclude<ChunkingStrategy["chunk_by"], "file">, number> = {
   h1: 1,
   h2: 2,
-  h3: 3
+  h3: 3,
 };
 
 /**
@@ -64,10 +64,10 @@ export function buildChunks(input: BuildChunksInput): Chunk[] {
           slug: "",
           nodes: contentNodes,
           fullMarkdown: input.markdown,
-          part: 1
-        }
+          part: 1,
+        },
       ],
-      input.strategy
+      input.strategy,
     );
     return materializeChunks(input.filepath, segments, input.metadata ?? {});
   }
@@ -135,7 +135,7 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
       headingLevel: node.depth,
       ancestorTexts,
       ancestorSlugs,
-      slug
+      slug,
     });
   }
 
@@ -150,8 +150,8 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
         slug: "_preamble",
         nodes: contentChildren,
         fullMarkdown: markdown,
-        part: 1
-      }
+        part: 1,
+      },
     ];
   }
 
@@ -171,7 +171,7 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
         slug: "_preamble",
         nodes: preambleNodes,
         fullMarkdown: markdown,
-        part: 1
+        part: 1,
       });
     }
   }
@@ -197,7 +197,7 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
       slug: boundary.slug,
       nodes: sectionNodes,
       fullMarkdown: markdown,
-      part: 1
+      part: 1,
     });
   }
 
@@ -213,8 +213,8 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
           slug: "_preamble",
           nodes: contentChildren,
           fullMarkdown: markdown,
-          part: 1
-        }
+          part: 1,
+        },
       ];
 }
 
@@ -223,7 +223,7 @@ function splitByHeadingLevel(ast: Root, markdown: string, targetLevel: number): 
 function dedupeSlug(
   ancestorSlugs: string[],
   baseSlug: string,
-  slugCountsByParent: Map<string, Map<string, number>>
+  slugCountsByParent: Map<string, Map<string, number>>,
 ): string {
   const parentPath = ancestorSlugs.join("/") || "__root__";
   const counterBySlug = slugCountsByParent.get(parentPath) ?? new Map<string, number>();
@@ -276,11 +276,7 @@ function applySizeRules(segments: Segment[], strategy: ChunkingStrategy): Segmen
     const previous = merged[merged.length - 1];
     const segmentContentLength = rawMarkdown(segment.nodes, segment.fullMarkdown).length;
 
-    if (
-      previous &&
-      segmentContentLength < min &&
-      canMerge(previous, segment)
-    ) {
+    if (previous && segmentContentLength < min && canMerge(previous, segment)) {
       // Merge nodes together
       previous.nodes = [...previous.nodes, ...segment.nodes];
       continue;
@@ -303,7 +299,11 @@ function refineOversizedSegment(segment: Segment, max: number): Segment[] {
   }
 
   // Find sub-heading boundaries at nextLevel within this segment's nodes
-  const subBoundaries: Array<{ nodeIndex: number; heading: string; slug: string }> = [];
+  const subBoundaries: Array<{
+    nodeIndex: number;
+    heading: string;
+    slug: string;
+  }> = [];
   const slugCounts = new Map<string, number>();
 
   for (let i = 0; i < segment.nodes.length; i += 1) {
@@ -334,7 +334,7 @@ function refineOversizedSegment(segment: Segment, max: number): Segment[] {
       subSegments.push({
         ...segment,
         nodes: preambleNodes,
-        part: 1
+        part: 1,
       });
     }
   }
@@ -361,7 +361,7 @@ function refineOversizedSegment(segment: Segment, max: number): Segment[] {
       slug: boundary.slug,
       nodes: sectionNodes,
       fullMarkdown: segment.fullMarkdown,
-      part: 1
+      part: 1,
     });
   }
 
@@ -388,7 +388,7 @@ function splitByNodeSizeSegments(segment: Segment, max: number): Segment[] {
   return nodeGroups.map((groupNodes, partIndex) => ({
     ...segment,
     nodes: groupNodes,
-    part: partIndex + 1
+    part: partIndex + 1,
   }));
 }
 
@@ -400,7 +400,11 @@ function splitByNodeSizeSegments(segment: Segment, max: number): Segment[] {
  * Single nodes that exceed the limit on their own stay intact -- a large code
  * block is never bisected.
  */
-function splitByNodeSize(nodes: RootContent[], fullMarkdown: string, maxSize: number): RootContent[][] {
+function splitByNodeSize(
+  nodes: RootContent[],
+  fullMarkdown: string,
+  maxSize: number,
+): RootContent[][] {
   const groups: RootContent[][] = [];
   let current: RootContent[] = [];
   let currentSize = 0;
@@ -466,7 +470,7 @@ function ancestorSlugsMatch(a: string[], b: string[]): boolean {
 function materializeChunks(
   filepath: string,
   segments: Segment[],
-  metadata: Record<string, string>
+  metadata: Record<string, string>,
 ): Chunk[] {
   const chunks: Chunk[] = [];
 
@@ -493,7 +497,7 @@ function materializeChunks(
       content_text: contentText,
       breadcrumb: breadcrumbParts.join(" > "),
       chunk_index: index,
-      metadata: { ...metadata }
+      metadata: { ...metadata },
     });
   }
 
@@ -531,10 +535,7 @@ function rawMarkdown(nodes: RootContent[], fullContent: string): string {
   const last = nodes[nodes.length - 1]!;
 
   if (first.position?.start && last.position?.end) {
-    return fullContent.slice(
-      first.position.start.offset,
-      last.position.end.offset
-    );
+    return fullContent.slice(first.position.start.offset, last.position.end.offset);
   }
 
   // Fallback

@@ -28,13 +28,13 @@ pnpm test
 
 This is a Turborepo monorepo with the following packages:
 
-| Package | Description |
-|---------|-------------|
-| `packages/core` | Core indexing, chunking, and search engine |
-| `packages/server` | MCP server runtime (stdio and HTTP transports) |
-| `packages/cli` | CLI for manifest bootstrapping and index building |
-| `packages/eval` | Evaluation and benchmarking harness |
-| `packages/playground` | Interactive web playground |
+| Package               | Description                                       |
+| --------------------- | ------------------------------------------------- |
+| `packages/core`       | Core indexing, chunking, and search engine        |
+| `packages/server`     | MCP server runtime (stdio and HTTP transports)    |
+| `packages/cli`        | CLI for manifest bootstrapping and index building |
+| `packages/eval`       | Evaluation and benchmarking harness               |
+| `packages/playground` | Interactive web playground                        |
 
 ## Development Workflow
 
@@ -74,6 +74,7 @@ mise run inspect:http    # Open MCP Inspector
 ## Reporting Issues
 
 Open an issue on GitHub with:
+
 - A clear description of the problem or suggestion.
 - Steps to reproduce (for bugs).
 - Expected vs. actual behavior.

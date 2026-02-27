@@ -11,11 +11,7 @@ function authPlugin(): Plugin {
       if (!password) return;
 
       const COOKIE_NAME = "pg_auth";
-      const expectedHash = crypto
-        .createHash("sha256")
-        .update(password)
-        .digest("hex")
-        .slice(0, 32);
+      const expectedHash = crypto.createHash("sha256").update(password).digest("hex").slice(0, 32);
 
       const LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en"><head>
@@ -54,59 +50,48 @@ function authPlugin(): Plugin {
         return cookies;
       }
 
-      server.middlewares.use(
-        (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-          const url = new URL(
-            req.url || "/",
-            `http://${req.headers.host || "localhost"}`,
-          );
+      server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
-          if (url.pathname === "/login" && req.method === "POST") {
-            let body = "";
-            req.on("data", (chunk: Buffer) => (body += chunk.toString()));
-            req.on("end", () => {
-              const params = new URLSearchParams(body);
-              if (params.get("password") === password) {
-                res.writeHead(302, {
-                  Location: "/",
-                  "Set-Cookie": `${COOKIE_NAME}=${expectedHash}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
-                });
-                res.end();
-              } else {
-                res.writeHead(200, { "Content-Type": "text/html" });
-                res.end(
-                  LOGIN_HTML.replace(
-                    "<!--ERROR-->",
-                    '<p class="error">Wrong password</p>',
-                  ),
-                );
-              }
-            });
-            return;
-          }
+        if (url.pathname === "/login" && req.method === "POST") {
+          let body = "";
+          req.on("data", (chunk: Buffer) => (body += chunk.toString()));
+          req.on("end", () => {
+            const params = new URLSearchParams(body);
+            if (params.get("password") === password) {
+              res.writeHead(302, {
+                Location: "/",
+                "Set-Cookie": `${COOKIE_NAME}=${expectedHash}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
+              });
+              res.end();
+            } else {
+              res.writeHead(200, { "Content-Type": "text/html" });
+              res.end(LOGIN_HTML.replace("<!--ERROR-->", '<p class="error">Wrong password</p>'));
+            }
+          });
+          return;
+        }
 
-          const cookies = parseCookies(req.headers.cookie);
-          if (cookies[COOKIE_NAME] === expectedHash) return next();
+        const cookies = parseCookies(req.headers.cookie);
+        if (cookies[COOKIE_NAME] === expectedHash) return next();
 
-          const auth = req.headers.authorization;
-          if (auth?.startsWith("Bearer ") && auth.slice(7) === password)
-            return next();
+        const auth = req.headers.authorization;
+        if (auth?.startsWith("Bearer ") && auth.slice(7) === password) return next();
 
-          if (url.searchParams.get("token") === password) return next();
+        if (url.searchParams.get("token") === password) return next();
 
-          const accept = req.headers.accept || "";
-          if (accept.includes("text/html")) {
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(LOGIN_HTML);
-          } else {
-            res.writeHead(401, {
-              "Content-Type": "application/json",
-              "WWW-Authenticate": "Bearer",
-            });
-            res.end(JSON.stringify({ error: "Unauthorized" }));
-          }
-        },
-      );
+        const accept = req.headers.accept || "";
+        if (accept.includes("text/html")) {
+          res.writeHead(200, { "Content-Type": "text/html" });
+          res.end(LOGIN_HTML);
+        } else {
+          res.writeHead(401, {
+            "Content-Type": "application/json",
+            "WWW-Authenticate": "Bearer",
+          });
+          res.end(JSON.stringify({ error: "Unauthorized" }));
+        }
+      });
     },
   };
 }
@@ -142,9 +127,7 @@ function apiPlugin(): Plugin {
 
         async function getHandlers() {
           if (!handlersPromise) {
-            const { createElementsServerHandlers } = await import(
-              "@gram-ai/elements/server"
-            );
+            const { createElementsServerHandlers } = await import("@gram-ai/elements/server");
             handlersPromise = createElementsServerHandlers();
           }
           return handlersPromise;
@@ -166,16 +149,11 @@ function apiPlugin(): Plugin {
               );
             }
             getHandlers().then((handlers) => {
-              handlers.session(
-                req as any,
-                res as any,
-                {
-                  embedOrigin:
-                    process.env.EMBED_ORIGIN || "http://localhost:3000",
-                  userIdentifier: userId,
-                  expiresAfter: 3600,
-                },
-              );
+              handlers.session(req as any, res as any, {
+                embedOrigin: process.env.EMBED_ORIGIN || "http://localhost:3000",
+                userIdentifier: userId,
+                expiresAfter: 3600,
+              });
             });
             return;
           }

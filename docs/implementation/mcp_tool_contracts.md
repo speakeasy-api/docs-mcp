@@ -1,6 +1,7 @@
 # Contract: MCP Tools
 
 ## Purpose
+
 This document defines the exact JSON Schema contracts and response structures for the MCP tools exposed by `@speakeasy-api/docs-mcp-server`. It maps the architectural requirements (dynamic taxonomy, cursor pagination, and fallback hints) into concrete interfaces that the agent host will consume.
 
 ### 1. Tool: `search_docs`
@@ -8,9 +9,10 @@ This document defines the exact JSON Schema contracts and response structures fo
 **Purpose:** Performs a hybrid search (Full-Text + Vector) across the documentation corpus. It enforces strict taxonomy upfront to prevent the LLM from hallucinating invalid filters.
 
 **Tool Name:** `search_docs`
-**Tool Description:** `Search the ${corpus_description}. Use this to find relevant documentation, guides, or API references.` *(Note: `${corpus_description}` is dynamically injected from `metadata.json` at boot).*
+**Tool Description:** `Search the ${corpus_description}. Use this to find relevant documentation, guides, or API references.` _(Note: `${corpus_description}` is dynamically injected from `metadata.json` at boot)._
 
 **Input Schema:**
+
 ```json
 {
   "type": "object",
@@ -69,6 +71,7 @@ Returns a single `TextContent` block. The `text` field contains a JSON-serialize
 ```
 
 **Shape of the inner `SearchResult` JSON string:**
+
 ```typescript
 {
   hits: Array<{
@@ -80,10 +83,10 @@ Returns a single `TextContent` block. The `text` field contains a JSON-serialize
     filepath: string;      // The source markdown file
     metadata: Record<string, string>; // The taxonomy values for this chunk
   }>;
-  
+
   // Opaque base64 token for the next page. Null if no more results.
-  next_cursor: string | null; 
-  
+  next_cursor: string | null;
+
   // Structured fallback hint if hits.length === 0, guiding the agent.
   hint: {
     message: string;       // e.g., "0 results found for scope 'sdk-specific'."
@@ -102,6 +105,7 @@ Returns a single `TextContent` block. The `text` field contains a JSON-serialize
 **Tool Description:** `Retrieve the full content of a specific documentation chunk using its chunk_id. You can optionally request surrounding context within the same file.`
 
 **Input Schema:**
+
 ```json
 {
   "type": "object",
@@ -154,6 +158,7 @@ Errors are returned as freetext in the `text` field. The message should be human
 ```
 
 Error cases:
+
 - **Chunk not found:** The `chunk_id` does not match any indexed chunk.
 - **Invalid format:** The `chunk_id` does not match the expected `{filepath}` or `{filepath}#{heading-path}` pattern.
 

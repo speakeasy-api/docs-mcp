@@ -4,7 +4,7 @@ import type {
   AgentEvalOutput,
   AgentObservedMessage,
   AgentScenario,
-  AgentScenarioResult
+  AgentScenarioResult,
 } from "./types.js";
 
 const useColor = !process.env.NO_COLOR && (process.stderr.isTTY ?? false);
@@ -21,7 +21,7 @@ const c = {
   blue: useColor ? "\x1b[34m" : "",
   white: useColor ? "\x1b[37m" : "",
   bgGreen: useColor ? "\x1b[42m" : "",
-  bgRed: useColor ? "\x1b[41m" : ""
+  bgRed: useColor ? "\x1b[41m" : "",
 };
 
 // ── Tool color mapping (mirrors skills/evals observer.py) ──────────────
@@ -34,7 +34,7 @@ const TOOL_COLORS: Record<string, string> = {
   Glob: c.cyan,
   Grep: c.cyan,
   mcp__docs_mcp__search_docs: c.magenta,
-  mcp__docs_mcp__get_doc: c.magenta
+  mcp__docs_mcp__get_doc: c.magenta,
 };
 
 function toolColor(name: string): string {
@@ -47,7 +47,10 @@ function toolColor(name: string): string {
 
 function panel(content: string, title?: string, border = c.dim): string {
   const lines = content.split("\n");
-  const maxLen = Math.max(...lines.map(stripAnsi).map((l) => l.length), title ? stripAnsi(title).length + 4 : 0);
+  const maxLen = Math.max(
+    ...lines.map(stripAnsi).map((l) => l.length),
+    title ? stripAnsi(title).length + 4 : 0,
+  );
   const width = Math.min(maxLen + 2, 80);
 
   const top = title
@@ -107,7 +110,10 @@ function truncateAnsi(str: string, max: number): string {
 
 function indent(text: string, spaces: number): string {
   const pad = " ".repeat(spaces);
-  return text.split("\n").map((l) => pad + l).join("\n");
+  return text
+    .split("\n")
+    .map((l) => pad + l)
+    .join("\n");
 }
 
 function formatToolResult(raw: string): string {
@@ -116,7 +122,12 @@ function formatToolResult(raw: string): string {
 
     // Content block array: [{"type":"text","text":"..."}]
     // Extract the inner text and re-parse it
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.type === "text" && typeof parsed[0]?.text === "string") {
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed[0]?.type === "text" &&
+      typeof parsed[0]?.text === "string"
+    ) {
       const inner = parsed.map((b: { text?: string }) => b.text ?? "").join("\n");
       return formatToolResult(inner); // recurse on the extracted text
     }
@@ -131,7 +142,9 @@ function formatToolResult(raw: string): string {
       try {
         const unescaped = JSON.parse(`"${raw.replace(/"/g, '\\"')}"`);
         return formatToolResult(unescaped);
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
   }
   // Plain text — truncate long single-line results
@@ -174,7 +187,7 @@ export class ConsoleObserver implements AgentEvalObserver {
       ...(this.opts.suite ? [`Suite: ${this.opts.suite}`] : []),
       `Model: ${this.opts.model ?? "default"}`,
       `Scenarios: ${total}`,
-      ...(this.opts.debug ? [`${c.yellow}Debug mode: streaming agent events${c.reset}`] : [])
+      ...(this.opts.debug ? [`${c.yellow}Debug mode: streaming agent events${c.reset}`] : []),
     ];
 
     write("\n" + panel(lines.join("\n"), `${c.cyan}docs-mcp eval${c.reset}`) + "\n");
@@ -183,7 +196,9 @@ export class ConsoleObserver implements AgentEvalObserver {
   onScenarioStart(scenario: AgentScenario, index: number, total: number): void {
     this.showHeader(total);
 
-    write(`\n${c.bold}${c.cyan}━━━ Scenario ${index + 1}/${total}: ${c.reset}${c.dim}[${scenario.id}]${c.reset} ${c.bold}${c.cyan}${scenario.name} ━━━${c.reset}\n`);
+    write(
+      `\n${c.bold}${c.cyan}━━━ Scenario ${index + 1}/${total}: ${c.reset}${c.dim}[${scenario.id}]${c.reset} ${c.bold}${c.cyan}${scenario.name} ━━━${c.reset}\n`,
+    );
     if (scenario.category) {
       write(`${c.dim}Category: ${scenario.category}${c.reset}\n`);
     }
@@ -244,26 +259,20 @@ export class ConsoleObserver implements AgentEvalObserver {
     const status = result.passed
       ? `${c.bold}${c.green}PASSED${c.reset}`
       : `${c.bold}${c.red}FAILED${c.reset}`;
-    const mcp = result.activated
-      ? `${c.green}MCP ✓${c.reset}`
-      : `${c.yellow}MCP ✗${c.reset}`;
+    const mcp = result.activated ? `${c.green}MCP ✓${c.reset}` : `${c.yellow}MCP ✗${c.reset}`;
 
     const parts = [
       `${status} ${c.bold}${result.name}${c.reset}`,
       mcp,
       `${c.dim}$${result.totalCostUsd.toFixed(2)}${c.reset}`,
       `${c.dim}${result.numTurns} turns${c.reset}`,
-      `${c.dim}${(result.durationMs / 1000).toFixed(1)}s${c.reset}`
+      `${c.dim}${(result.durationMs / 1000).toFixed(1)}s${c.reset}`,
     ];
     write(`\n${parts.join(` ${c.dim}|${c.reset} `)}\n`);
 
     // Assertion details
     for (const ar of result.assertionResults) {
-      const icon = ar.passed
-        ? `${c.green}✓`
-        : ar.assertion.soft
-          ? `${c.yellow}⚠`
-          : `${c.red}✗`;
+      const icon = ar.passed ? `${c.green}✓` : ar.assertion.soft ? `${c.yellow}⚠` : `${c.red}✗`;
       write(`  ${icon} ${ar.message}${c.reset}\n`);
     }
 
@@ -279,7 +288,10 @@ export class ConsoleObserver implements AgentEvalObserver {
         const lines = file.content.split("\n");
         const truncated = lines.length > MAX_SNIPPET_LINES;
         const displayLines = truncated
-          ? [...lines.slice(0, MAX_SNIPPET_LINES), `... (${lines.length - MAX_SNIPPET_LINES} more lines)`]
+          ? [
+              ...lines.slice(0, MAX_SNIPPET_LINES),
+              `... (${lines.length - MAX_SNIPPET_LINES} more lines)`,
+            ]
           : lines;
         const header = file.path + (truncated ? " (excerpt)" : "");
         const highlighted = highlightCode(displayLines.join("\n"), file.lang);
@@ -302,23 +314,20 @@ export class ConsoleObserver implements AgentEvalObserver {
     write(`${c.dim}${sep}${c.reset}\n`);
 
     for (const r of results) {
-      const result = r.passed
-        ? `${c.green}✓ PASS${c.reset}`
-        : `${c.red}✗ FAIL${c.reset}`;
-      const mcp = r.activated
-        ? `${c.green}✓${c.reset}`
-        : `${c.yellow}✗${c.reset}`;
+      const result = r.passed ? `${c.green}✓ PASS${c.reset}` : `${c.red}✗ FAIL${c.reset}`;
+      const mcp = r.activated ? `${c.green}✓${c.reset}` : `${c.yellow}✗${c.reset}`;
       const turns = String(r.numTurns);
       const cost = `$${r.totalCostUsd.toFixed(4)}`;
       const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 
       write(
-        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, 8)}  ${dur}\n`
+        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, 8)}  ${dur}\n`,
       );
     }
 
     // ── Summary panel ───────────────────────────────────────────────
-    const activationColor = s.activationRate >= 0.8 ? c.green : s.activationRate >= 0.5 ? c.yellow : c.red;
+    const activationColor =
+      s.activationRate >= 0.8 ? c.green : s.activationRate >= 0.5 ? c.yellow : c.red;
     const passColor = s.passRate >= 0.8 ? c.green : s.passRate >= 0.5 ? c.yellow : c.red;
 
     const summaryLines = [
@@ -329,7 +338,7 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${padRight("Avg cost", 16)}$${s.avgCostUsd.toFixed(4)} ${c.dim}(total $${s.totalCostUsd.toFixed(4)})${c.reset}`,
       `${padRight("Avg duration", 16)}${(s.avgDurationMs / 1000).toFixed(1)}s ${c.dim}(median ${(s.medianDurationMs / 1000).toFixed(1)}s)${c.reset}`,
       `${padRight("Avg tokens", 16)}${s.avgInputTokens.toFixed(0)}in / ${s.avgOutputTokens.toFixed(0)}out${formatCacheTokens(s.avgCacheReadInputTokens, s.avgCacheCreationInputTokens)}`,
-      formatMcpCallsLine(s)
+      formatMcpCallsLine(s),
     ].filter(Boolean);
 
     write("\n" + panel(summaryLines.join("\n"), `${c.cyan}Summary${c.reset}`) + "\n");
@@ -377,9 +386,10 @@ const MAX_SNIPPET_LINES = 20;
 function highlightCode(code: string, lang?: string): string {
   if (!useColor) return code;
   try {
-    const options = lang && supportsLanguage(lang)
-      ? { language: lang, ignoreIllegals: true }
-      : { ignoreIllegals: true };
+    const options =
+      lang && supportsLanguage(lang)
+        ? { language: lang, ignoreIllegals: true }
+        : { ignoreIllegals: true };
     return highlight(code, options);
   } catch {
     return code;

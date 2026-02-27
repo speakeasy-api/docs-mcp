@@ -8,7 +8,7 @@ export async function resolveSourceCommit(targetDir: string): Promise<string | n
   try {
     const { stdout } = await execFileAsync("git", ["-C", targetDir, "rev-parse", "HEAD"], {
       timeout: 5_000,
-      windowsHide: true
+      windowsHide: true,
     });
     const commit = stdout.trim().toLowerCase();
     return /^[a-f0-9]{40}$/.test(commit) ? commit : null;
@@ -26,17 +26,25 @@ export async function resolveCorpusLabel(docsDir: string): Promise<string> {
     const opts = { timeout: 5_000, windowsHide: true } as const;
 
     const { stdout: rootOut } = await execFileAsync(
-      "git", ["-C", docsDir, "rev-parse", "--show-toplevel"], opts
+      "git",
+      ["-C", docsDir, "rev-parse", "--show-toplevel"],
+      opts,
     );
     const repoRoot = rootOut.trim();
 
     let repoName: string;
     try {
       const { stdout: remoteOut } = await execFileAsync(
-        "git", ["-C", docsDir, "remote", "get-url", "origin"], opts
+        "git",
+        ["-C", docsDir, "remote", "get-url", "origin"],
+        opts,
       );
       const url = remoteOut.trim();
-      repoName = url.replace(/\.git$/, "").split(/[/:]/).pop() ?? path.basename(repoRoot);
+      repoName =
+        url
+          .replace(/\.git$/, "")
+          .split(/[/:]/)
+          .pop() ?? path.basename(repoRoot);
     } catch {
       repoName = path.basename(repoRoot);
     }

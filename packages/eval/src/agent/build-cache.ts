@@ -16,7 +16,7 @@ export async function ensureIndex(
   cliBinPath: string,
   cacheDir?: string,
   description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string }
+  toolDescriptions?: { search_docs?: string; get_doc?: string },
 ): Promise<string> {
   const resolvedCacheDir = cacheDir ?? path.resolve(DEFAULT_CACHE_DIR);
   const cacheKey = await computeCacheKey(docsDir, description, toolDescriptions);
@@ -42,7 +42,7 @@ export async function ensureIndex(
 async function computeCacheKey(
   docsDir: string,
   description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string }
+  toolDescriptions?: { search_docs?: string; get_doc?: string },
 ): Promise<string> {
   const hash = createHash("sha256");
 
@@ -106,7 +106,7 @@ function runBuild(
   docsDir: string,
   outDir: string,
   description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string }
+  toolDescriptions?: { search_docs?: string; get_doc?: string },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [cliBinPath, "build", "--docs-dir", docsDir, "--out", outDir];
@@ -121,7 +121,7 @@ function runBuild(
     }
     const child = spawn("node", args, {
       env: process.env as Record<string, string>,
-      stdio: ["ignore", "inherit", "inherit"]
+      stdio: ["ignore", "inherit", "inherit"],
     });
 
     child.on("error", reject);
@@ -130,7 +130,11 @@ function runBuild(
         resolve();
         return;
       }
-      reject(new Error(`Index build failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`));
+      reject(
+        new Error(
+          `Index build failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`,
+        ),
+      );
     });
   });
 }

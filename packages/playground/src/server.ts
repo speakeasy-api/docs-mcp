@@ -44,11 +44,7 @@ const LOGIN_HTML = `<!DOCTYPE html>
 </body></html>`;
 
 function createAuthMiddleware(password: string) {
-  const expectedHash = crypto
-    .createHash("sha256")
-    .update(password)
-    .digest("hex")
-    .slice(0, 32);
+  const expectedHash = crypto.createHash("sha256").update(password).digest("hex").slice(0, 32);
 
   function parseCookies(header?: string): Record<string, string> {
     const cookies: Record<string, string> = {};
@@ -61,10 +57,7 @@ function createAuthMiddleware(password: string) {
   }
 
   return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    const url = new URL(
-      req.url || "/",
-      `http://${req.headers.host || "localhost"}`,
-    );
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
     // Handle POST /login
     if (url.pathname === "/login" && req.method === "POST") {
@@ -80,12 +73,7 @@ function createAuthMiddleware(password: string) {
           res.end();
         } else {
           res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(
-            LOGIN_HTML.replace(
-              "<!--ERROR-->",
-              '<p class="error">Wrong password</p>',
-            ),
-          );
+          res.end(LOGIN_HTML.replace("<!--ERROR-->", '<p class="error">Wrong password</p>'));
         }
       });
       return;
@@ -145,9 +133,7 @@ app.get("/api/config", (_req, res) => {
 });
 
 if (chatEnabled) {
-  const { createElementsServerHandlers } = await import(
-    "@gram-ai/elements/server"
-  );
+  const { createElementsServerHandlers } = await import("@gram-ai/elements/server");
   const handlers = createElementsServerHandlers();
   const USER_ID_COOKIE = "pg_uid";
 

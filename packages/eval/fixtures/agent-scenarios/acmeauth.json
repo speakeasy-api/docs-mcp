@@ -10,7 +10,12 @@
     "assertions": [
       { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" },
       { "type": "file_contains", "path": "solution.ts", "value": "apiKey" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "py-init": {
@@ -20,9 +25,18 @@
     "category": "sdk-usage",
     "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
     "assertions": [
-      { "type": "file_matches", "path": "solution.py", "pattern": "acmeauth|AcmeAuth" },
+      {
+        "type": "file_matches",
+        "path": "solution.py",
+        "pattern": "acmeauth|AcmeAuth"
+      },
       { "type": "file_contains", "path": "solution.py", "value": "api_key" },
-      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true }
+      {
+        "type": "script",
+        "command": "uvx pyright solution.py",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "ts-rate-limit": {
@@ -33,9 +47,22 @@
     "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_contains", "path": "solution.ts", "value": "RateLimitError" },
-      { "type": "file_matches", "path": "solution.ts", "pattern": "retryAfter|retry_after" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+      {
+        "type": "file_contains",
+        "path": "solution.ts",
+        "value": "RateLimitError"
+      },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "retryAfter|retry_after"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "ts-webhooks": {
@@ -46,9 +73,23 @@
     "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "verifyWebhookSignature|verify_webhook", "flags": "i" },
-      { "type": "file_contains", "path": "solution.ts", "value": "x-acmeauth-signature" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "verifyWebhookSignature|verify_webhook",
+        "flags": "i"
+      },
+      {
+        "type": "file_contains",
+        "path": "solution.ts",
+        "value": "x-acmeauth-signature"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "ts-pagination": {
@@ -59,9 +100,24 @@
     "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "file_matches", "path": "solution.ts", "pattern": "list|paginate", "flags": "i" },
-      { "type": "file_matches", "path": "solution.ts", "pattern": "for.*await|cursor|next", "flags": "i" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "list|paginate",
+        "flags": "i"
+      },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "for.*await|cursor|next",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "py-async": {
@@ -71,9 +127,18 @@
     "category": "sdk-usage",
     "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
     "assertions": [
-      { "type": "file_contains", "path": "solution.py", "value": "AsyncAcmeAuth" },
+      {
+        "type": "file_contains",
+        "path": "solution.py",
+        "value": "AsyncAcmeAuth"
+      },
       { "type": "file_contains", "path": "solution.py", "value": "await" },
-      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true }
+      {
+        "type": "script",
+        "command": "uvx pyright solution.py",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "ts-oauth": {
@@ -85,9 +150,22 @@
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "accessToken" },
-      { "type": "file_contains", "path": "solution.ts", "value": "accessToken" },
-      { "type": "matches", "pattern": "authorization.code|PKCE|refresh.token", "flags": "i" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+      {
+        "type": "file_contains",
+        "path": "solution.ts",
+        "value": "accessToken"
+      },
+      {
+        "type": "matches",
+        "pattern": "authorization.code|PKCE|refresh.token",
+        "flags": "i"
+      },
+      {
+        "type": "script",
+        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
     ]
   },
   "rate-limit-guide": {
@@ -99,7 +177,11 @@
     "assertions": [
       { "type": "matches", "pattern": "60|600|6000", "flags": "" },
       { "type": "contains", "value": "429" },
-      { "type": "matches", "pattern": "cache|batch|circuit.breaker", "flags": "i" }
+      {
+        "type": "matches",
+        "pattern": "cache|batch|circuit.breaker",
+        "flags": "i"
+      }
     ]
   },
   "webhook-guide": {
@@ -111,7 +193,11 @@
     "assertions": [
       { "type": "contains", "value": "user.created" },
       { "type": "contains", "value": "session.revoked" },
-      { "type": "matches", "pattern": "5.*failed|5.*attempts|24.hours", "flags": "i" }
+      {
+        "type": "matches",
+        "pattern": "5.*failed|5.*attempts|24.hours",
+        "flags": "i"
+      }
     ]
   },
   "jwt-verification": {

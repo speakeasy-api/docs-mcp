@@ -17,81 +17,109 @@ afterEach(async () => {
 
 describe("evaluateAssertions", () => {
   it("contains: passes when text includes value", async () => {
-    const results = await evaluateAssertions("hello world", [
-      { type: "contains", value: "hello" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "hello world",
+      [{ type: "contains", value: "hello" }],
+      workspaceDir,
+    );
     expect(results).toHaveLength(1);
     expect(results[0]?.passed).toBe(true);
   });
 
   it("contains: fails when text does not include value", async () => {
-    const results = await evaluateAssertions("hello world", [
-      { type: "contains", value: "goodbye" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "hello world",
+      [{ type: "contains", value: "goodbye" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(false);
   });
 
   it("not_contains: passes when text does not include value", async () => {
-    const results = await evaluateAssertions("hello world", [
-      { type: "not_contains", value: "goodbye" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "hello world",
+      [{ type: "not_contains", value: "goodbye" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(true);
   });
 
   it("not_contains: fails when text includes value", async () => {
-    const results = await evaluateAssertions("hello world", [
-      { type: "not_contains", value: "hello" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "hello world",
+      [{ type: "not_contains", value: "hello" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(false);
   });
 
   it("matches: passes with matching regex", async () => {
-    const results = await evaluateAssertions("Error code: 404", [
-      { type: "matches", pattern: "\\d{3}" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "Error code: 404",
+      [{ type: "matches", pattern: "\\d{3}" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(true);
   });
 
   it("matches: supports flags", async () => {
-    const results = await evaluateAssertions("Hello World", [
-      { type: "matches", pattern: "hello", flags: "i" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "Hello World",
+      [{ type: "matches", pattern: "hello", flags: "i" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(true);
   });
 
   it("matches: fails when pattern does not match", async () => {
-    const results = await evaluateAssertions("hello", [
-      { type: "matches", pattern: "^\\d+$" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "hello",
+      [{ type: "matches", pattern: "^\\d+$" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(false);
   });
 
   it("script: passes when command exits 0", async () => {
-    const results = await evaluateAssertions("", [
-      { type: "script", command: "exit 0", name: "trivial" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "",
+      [{ type: "script", command: "exit 0", name: "trivial" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(true);
   });
 
   it("script: fails when command exits non-zero", async () => {
-    const results = await evaluateAssertions("", [
-      { type: "script", command: "exit 1", name: "failing" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "",
+      [{ type: "script", command: "exit 1", name: "failing" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(false);
   });
 
   it("script: runs in workspace directory", async () => {
     await writeFile(path.join(workspaceDir, "marker.txt"), "found");
-    const results = await evaluateAssertions("", [
-      { type: "script", command: "test -f marker.txt", name: "cwd-check" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "",
+      [{ type: "script", command: "test -f marker.txt", name: "cwd-check" }],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(true);
   });
 
   it("script: captures stderr in failure message", async () => {
-    const results = await evaluateAssertions("", [
-      { type: "script", command: "echo 'bad stuff' >&2; exit 1", name: "stderr-capture" }
-    ], workspaceDir);
+    const results = await evaluateAssertions(
+      "",
+      [
+        {
+          type: "script",
+          command: "echo 'bad stuff' >&2; exit 1",
+          name: "stderr-capture",
+        },
+      ],
+      workspaceDir,
+    );
     expect(results[0]?.passed).toBe(false);
     expect(results[0]?.message).toContain("bad stuff");
   });
@@ -100,7 +128,7 @@ describe("evaluateAssertions", () => {
     const assertions: AgentAssertion[] = [
       { type: "contains", value: "dub" },
       { type: "not_contains", value: "error" },
-      { type: "script", command: "exit 0", name: "ok" }
+      { type: "script", command: "exit 0", name: "ok" },
     ];
     const results = await evaluateAssertions("using dub sdk", assertions, workspaceDir);
     expect(results).toHaveLength(3);
