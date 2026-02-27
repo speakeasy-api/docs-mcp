@@ -176,7 +176,7 @@ Structured as a Turborepo with four packages:
 | `@speakeasy-api/docs-mcp-cli` | CLI for validation, manifest bootstrap (`fix`), and deterministic indexing (`build`) |
 | `@speakeasy-api/docs-mcp-core` | Core retrieval primitives, AST parsing, chunking, and LanceDB queries |
 | `@speakeasy-api/docs-mcp-server` | Lean runtime MCP server surface |
-| `@speakeasy-api/docs-mcp-eval` | Standalone evaluation and benchmarking harness |
+| `@speakeasy-api/docs-mcp-eval` | Standalone evaluation harness — search-quality benchmarks and end-to-end agent evaluation |
 
 ```text
                 +---------------------------+
@@ -378,7 +378,10 @@ Open `http://localhost:3001`. Requires a running HTTP server (step 3 with `--tra
 
 ## Evaluation
 
-Docs MCP includes a standalone evaluation harness for measuring search quality with transparent, repeatable benchmarks. See the [Evaluation Framework](docs/eval.md) for how to build an eval suite, run benchmarks across embedding providers, and interpret results.
+Docs MCP includes a standalone evaluation harness with two modes:
+
+- **Search-quality eval** (`run`) — drives the MCP server directly via stdio JSON-RPC, measuring retrieval metrics (MRR, NDCG, precision, latency). See [docs/eval.md](docs/eval.md).
+- **Agent eval** (`agent-eval`) — spawns a Claude agent with docs-mcp tools, runs it against a prompt, and evaluates assertions on the output. Validates the full stack end-to-end. See [docs/agent-eval.md](docs/agent-eval.md).
 
 ## License
 
