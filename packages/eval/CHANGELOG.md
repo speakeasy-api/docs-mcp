@@ -1,5 +1,15 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.5.0
+
+### Minor Changes
+
+- 0678460: Add multi-provider agent eval support with OpenAI Codex as a second provider. Introduces `AgentProvider` interface, `--provider` CLI flag, MCP pre-flight verification, and cost/token tracking for Codex. Removes hardcoded system prompts from acmeauth fixtures and adds package.json dependency assertions.
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

@@ -1,5 +1,7 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.5.0
+
 ## 0.4.2
 
 ### Patch Changes

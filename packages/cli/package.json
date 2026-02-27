@@ -1,6 +1,6 @@
 {
   "name": "@speakeasy-api/docs-mcp-cli",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "CLI toolchain for validating, indexing, and bootstrapping docs-mcp documentation corpora",
   "license": "AGPL-3.0-only",
   "type": "module",
