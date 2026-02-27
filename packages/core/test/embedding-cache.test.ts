@@ -105,8 +105,22 @@ describe("loadCache / saveCache", () => {
     const config = makeConfig();
     const cache = {
       entries: new Map([
-        ["fp1", { fingerprint: "fp1", chunk_id: "a.md#sec", vector: [1, 2, 3, 4, 5, 6, 7, 8] }],
-        ["fp2", { fingerprint: "fp2", chunk_id: "b.md#sec", vector: [8, 7, 6, 5, 4, 3, 2, 1] }],
+        [
+          "fp1",
+          {
+            fingerprint: "fp1",
+            chunk_id: "a.md#sec",
+            vector: [1, 2, 3, 4, 5, 6, 7, 8],
+          },
+        ],
+        [
+          "fp2",
+          {
+            fingerprint: "fp2",
+            chunk_id: "b.md#sec",
+            vector: [8, 7, 6, 5, 4, 3, 2, 1],
+          },
+        ],
       ]),
     };
 
@@ -132,7 +146,14 @@ describe("loadCache / saveCache", () => {
 
     const cache = {
       entries: new Map([
-        ["fp1", { fingerprint: "fp1", chunk_id: "a.md#sec", vector: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        [
+          "fp1",
+          {
+            fingerprint: "fp1",
+            chunk_id: "a.md#sec",
+            vector: [1, 2, 3, 4, 5, 6, 7, 8],
+          },
+        ],
       ]),
     };
 
@@ -142,9 +163,7 @@ describe("loadCache / saveCache", () => {
     const loaded = await loadCache(tmpDir, config2);
 
     expect(loaded).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("config_fingerprint mismatch")
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("config_fingerprint mismatch"));
 
     warnSpy.mockRestore();
   });
@@ -159,9 +178,7 @@ describe("loadCache / saveCache", () => {
     const loaded = await loadCache(tmpDir, config);
 
     expect(loaded).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("corrupt cache-meta.json")
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("corrupt cache-meta.json"));
 
     warnSpy.mockRestore();
   });
@@ -176,16 +193,14 @@ describe("loadCache / saveCache", () => {
         cache_version: "1",
         format_version: "999",
         config_fingerprint: config.configFingerprint,
-      })
+      }),
     );
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const loaded = await loadCache(tmpDir, config);
 
     expect(loaded).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("format_version mismatch")
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("format_version mismatch"));
 
     warnSpy.mockRestore();
   });
@@ -212,12 +227,26 @@ describe("loadCache / saveCache", () => {
     const config = makeConfig();
     const cache1 = {
       entries: new Map([
-        ["fp1", { fingerprint: "fp1", chunk_id: "a.md#sec", vector: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        [
+          "fp1",
+          {
+            fingerprint: "fp1",
+            chunk_id: "a.md#sec",
+            vector: [1, 2, 3, 4, 5, 6, 7, 8],
+          },
+        ],
       ]),
     };
     const cache2 = {
       entries: new Map([
-        ["fp2", { fingerprint: "fp2", chunk_id: "b.md#sec", vector: [8, 7, 6, 5, 4, 3, 2, 1] }],
+        [
+          "fp2",
+          {
+            fingerprint: "fp2",
+            chunk_id: "b.md#sec",
+            vector: [8, 7, 6, 5, 4, 3, 2, 1],
+          },
+        ],
       ]),
     };
 
@@ -260,7 +289,13 @@ describe("embedChunksIncremental", () => {
 
     const result = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
 
@@ -270,22 +305,34 @@ describe("embedChunksIncremental", () => {
     expect(result.vectorsByChunkId.size).toBe(2);
     expect(result.updatedCache.entries.size).toBe(2);
     expect(embedSpy).toHaveBeenCalledTimes(1);
-    expect(embedSpy).toHaveBeenCalledWith(
-      chunks.map((c) => toEmbeddingInput(c))
-    );
+    expect(embedSpy).toHaveBeenCalledWith(chunks.map((c) => toEmbeddingInput(c)));
   });
 
   it("reuses cached vectors for unchanged chunks", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a.md > s1" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world", breadcrumb: "b.md > s2" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a.md > s1",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world",
+        breadcrumb: "b.md > s2",
+      }),
     ];
 
     // First pass: cold cache
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
     expect(result1.stats.misses).toBe(2);
@@ -294,7 +341,13 @@ describe("embedChunksIncremental", () => {
     const embedSpy = vi.spyOn(provider, "embed");
     const result2 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       result1.updatedCache,
     );
 
@@ -317,27 +370,55 @@ describe("embedChunksIncremental", () => {
   it("re-embeds only changed chunks", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a.md > s1" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world", breadcrumb: "b.md > s2" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a.md > s1",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world",
+        breadcrumb: "b.md > s2",
+      }),
     ];
 
     // First pass: cold cache
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
 
     // Modify one chunk's content
     const modifiedChunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a.md > s1" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world updated", breadcrumb: "b.md > s2" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a.md > s1",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world updated",
+        breadcrumb: "b.md > s2",
+      }),
     ];
 
     const embedSpy = vi.spyOn(provider, "embed");
     const result2 = await embedChunksIncremental(
       modifiedChunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       result1.updatedCache,
     );
 
@@ -345,21 +426,33 @@ describe("embedChunksIncremental", () => {
     expect(result2.stats.hits).toBe(1);
     expect(result2.stats.misses).toBe(1);
     // Only the modified chunk's text should be sent
-    expect(embedSpy).toHaveBeenCalledWith([
-      toEmbeddingInput(modifiedChunks[1]!),
-    ]);
+    expect(embedSpy).toHaveBeenCalledWith([toEmbeddingInput(modifiedChunks[1]!)]);
   });
 
   it("prunes deleted chunks from the updated cache", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a.md > s1" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world", breadcrumb: "b.md > s2" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a.md > s1",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world",
+        breadcrumb: "b.md > s2",
+      }),
     ];
 
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
     expect(result1.updatedCache.entries.size).toBe(2);
@@ -367,7 +460,13 @@ describe("embedChunksIncremental", () => {
     // Second build with only one chunk
     const result2 = await embedChunksIncremental(
       [chunks[0]!],
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       result1.updatedCache,
     );
     // Updated cache should only contain the surviving chunk
@@ -381,21 +480,49 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
   it("calls onProgress once per batch with correct counts", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "alpha", breadcrumb: "a" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "bravo", breadcrumb: "b" }),
-      makeChunk({ chunk_id: "c.md#s3", content_text: "charlie", breadcrumb: "c" }),
-      makeChunk({ chunk_id: "d.md#s4", content_text: "delta", breadcrumb: "d" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "alpha",
+        breadcrumb: "a",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "bravo",
+        breadcrumb: "b",
+      }),
+      makeChunk({
+        chunk_id: "c.md#s3",
+        content_text: "charlie",
+        breadcrumb: "c",
+      }),
+      makeChunk({
+        chunk_id: "d.md#s4",
+        content_text: "delta",
+        breadcrumb: "d",
+      }),
       makeChunk({ chunk_id: "e.md#s5", content_text: "echo", breadcrumb: "e" }),
     ];
 
     const events: Array<{ completed: number; total: number; cached: number }> = [];
     const result = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
       {
         batchSize: 2,
-        onProgress: (event) => { events.push({ completed: event.completed, total: event.total, cached: event.cached }); },
+        onProgress: (event) => {
+          events.push({
+            completed: event.completed,
+            total: event.total,
+            cached: event.cached,
+          });
+        },
       },
     );
 
@@ -412,14 +539,32 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const embedSpy = vi.spyOn(provider, "embed");
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "alpha", breadcrumb: "a" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "bravo", breadcrumb: "b" }),
-      makeChunk({ chunk_id: "c.md#s3", content_text: "charlie", breadcrumb: "c" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "alpha",
+        breadcrumb: "a",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "bravo",
+        breadcrumb: "b",
+      }),
+      makeChunk({
+        chunk_id: "c.md#s3",
+        content_text: "charlie",
+        breadcrumb: "c",
+      }),
     ];
 
     await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
       { batchSize: 2 },
     );
@@ -431,13 +576,23 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
   it("does not call onProgress when all chunks are cached", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a",
+      }),
     ];
 
     // First pass: cold cache
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
 
@@ -445,11 +600,19 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
     const events: unknown[] = [];
     const result2 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       result1.updatedCache,
       {
         batchSize: 1,
-        onProgress: (event) => { events.push(event); },
+        onProgress: (event) => {
+          events.push(event);
+        },
       },
     );
 
@@ -461,31 +624,65 @@ describe("embedChunksIncremental with batchSize and onProgress", () => {
   it("reports correct cached count when mixing hits and misses", async () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const chunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world", breadcrumb: "b" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world",
+        breadcrumb: "b",
+      }),
     ];
 
     // First pass: cold cache
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
 
     // Second pass: modify one chunk
     const modifiedChunks = [
-      makeChunk({ chunk_id: "a.md#s1", content_text: "hello", breadcrumb: "a" }),
-      makeChunk({ chunk_id: "b.md#s2", content_text: "world updated", breadcrumb: "b" }),
+      makeChunk({
+        chunk_id: "a.md#s1",
+        content_text: "hello",
+        breadcrumb: "a",
+      }),
+      makeChunk({
+        chunk_id: "b.md#s2",
+        content_text: "world updated",
+        breadcrumb: "b",
+      }),
     ];
 
     const events: Array<{ completed: number; total: number; cached: number }> = [];
     await embedChunksIncremental(
       modifiedChunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       result1.updatedCache,
       {
         batchSize: 10,
-        onProgress: (event) => { events.push({ completed: event.completed, total: event.total, cached: event.cached }); },
+        onProgress: (event) => {
+          events.push({
+            completed: event.completed,
+            total: event.total,
+            cached: event.cached,
+          });
+        },
       },
     );
 
@@ -500,12 +697,22 @@ describe("embedChunksIncremental with batchApiThreshold", () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const embedSpy = vi.spyOn(provider, "embed");
     const chunks = Array.from({ length: 5 }, (_, i) =>
-      makeChunk({ chunk_id: `f${i}.md#s`, content_text: `text-${i}`, breadcrumb: `f${i}` })
+      makeChunk({
+        chunk_id: `f${i}.md#s`,
+        content_text: `text-${i}`,
+        breadcrumb: `f${i}`,
+      }),
     );
 
     const result = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
       { batchSize: 2, batchApiThreshold: 5 },
     );
@@ -520,12 +727,22 @@ describe("embedChunksIncremental with batchApiThreshold", () => {
     const provider = new HashEmbeddingProvider({ dimensions: 8 });
     const embedSpy = vi.spyOn(provider, "embed");
     const chunks = Array.from({ length: 3 }, (_, i) =>
-      makeChunk({ chunk_id: `f${i}.md#s`, content_text: `text-${i}`, breadcrumb: `f${i}` })
+      makeChunk({
+        chunk_id: `f${i}.md#s`,
+        content_text: `text-${i}`,
+        breadcrumb: `f${i}`,
+      }),
     );
 
     const result = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
       { batchSize: 2, batchApiThreshold: 5 },
     );
@@ -557,15 +774,33 @@ describe("end-to-end: save → load → incremental", () => {
     };
 
     const chunks = [
-      makeChunk({ chunk_id: "a.md#intro", content_text: "Introduction text", breadcrumb: "a.md > Intro" }),
-      makeChunk({ chunk_id: "a.md#setup", content_text: "Setup instructions", breadcrumb: "a.md > Setup" }),
-      makeChunk({ chunk_id: "b.md#api", content_text: "API reference", breadcrumb: "b.md > API" }),
+      makeChunk({
+        chunk_id: "a.md#intro",
+        content_text: "Introduction text",
+        breadcrumb: "a.md > Intro",
+      }),
+      makeChunk({
+        chunk_id: "a.md#setup",
+        content_text: "Setup instructions",
+        breadcrumb: "a.md > Setup",
+      }),
+      makeChunk({
+        chunk_id: "b.md#api",
+        content_text: "API reference",
+        breadcrumb: "b.md > API",
+      }),
     ];
 
     // First build: cold
     const result1 = await embedChunksIncremental(
       chunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       null,
     );
     expect(result1.stats.misses).toBe(3);
@@ -576,14 +811,32 @@ describe("end-to-end: save → load → incremental", () => {
     expect(loaded).not.toBeNull();
 
     const modifiedChunks = [
-      makeChunk({ chunk_id: "a.md#intro", content_text: "Introduction text", breadcrumb: "a.md > Intro" }),
-      makeChunk({ chunk_id: "a.md#setup", content_text: "Updated setup instructions", breadcrumb: "a.md > Setup" }),
-      makeChunk({ chunk_id: "b.md#api", content_text: "API reference", breadcrumb: "b.md > API" }),
+      makeChunk({
+        chunk_id: "a.md#intro",
+        content_text: "Introduction text",
+        breadcrumb: "a.md > Intro",
+      }),
+      makeChunk({
+        chunk_id: "a.md#setup",
+        content_text: "Updated setup instructions",
+        breadcrumb: "a.md > Setup",
+      }),
+      makeChunk({
+        chunk_id: "b.md#api",
+        content_text: "API reference",
+        breadcrumb: "b.md > API",
+      }),
     ];
 
     const result2 = await embedChunksIncremental(
       modifiedChunks,
-      { provider: provider.name, model: provider.model, dimensions: provider.dimensions, configFingerprint: provider.configFingerprint, embed: (texts: string[]) => provider.embed(texts) },
+      {
+        provider: provider.name,
+        model: provider.model,
+        dimensions: provider.dimensions,
+        configFingerprint: provider.configFingerprint,
+        embed: (texts: string[]) => provider.embed(texts),
+      },
       loaded,
     );
 

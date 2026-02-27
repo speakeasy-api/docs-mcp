@@ -122,9 +122,7 @@ describe("normalizeMetadata", () => {
 
   it("rejects empty corpus_description", () => {
     const input = validMetadata({ corpus_description: "   " });
-    expect(() => normalizeMetadata(input)).toThrow(
-      /corpus_description must be a non-empty string/,
-    );
+    expect(() => normalizeMetadata(input)).toThrow(/corpus_description must be a non-empty string/);
   });
 
   it("rejects missing corpus_description", () => {

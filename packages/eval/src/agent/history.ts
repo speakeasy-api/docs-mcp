@@ -13,7 +13,7 @@ const DEFAULT_RESULTS_DIR = path.resolve(__dirname, "..", "..", ".eval-results")
 export async function saveResult(
   output: AgentEvalOutput,
   suiteName: string,
-  resultsDir?: string
+  resultsDir?: string,
 ): Promise<string> {
   const dir = path.join(resultsDir ?? DEFAULT_RESULTS_DIR, sanitizeSuiteName(suiteName));
   await mkdir(dir, { recursive: true });
@@ -32,7 +32,7 @@ export async function saveResult(
  */
 export async function loadPreviousResult(
   suiteName: string,
-  resultsDir?: string
+  resultsDir?: string,
 ): Promise<AgentEvalOutput | null> {
   const dir = path.join(resultsDir ?? DEFAULT_RESULTS_DIR, sanitizeSuiteName(suiteName));
 
@@ -55,10 +55,7 @@ export async function loadPreviousResult(
 /**
  * Generate a trend comparison summary between two eval runs.
  */
-export function generateTrendSummary(
-  current: AgentEvalOutput,
-  previous: AgentEvalOutput
-): string {
+export function generateTrendSummary(current: AgentEvalOutput, previous: AgentEvalOutput): string {
   const prev = previous.summary;
   const curr = current.summary;
   const prevDate = previous.metadata.startedAt;
@@ -66,94 +63,112 @@ export function generateTrendSummary(
   const lines: string[] = [];
   lines.push(`\n\u2501\u2501\u2501 Trend vs Previous Run (${prevDate}) \u2501\u2501\u2501`);
   lines.push("  Metric          Previous  Current   Delta");
-  lines.push("  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500");
+  lines.push(
+    "  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+  );
 
   // Pass rate — higher is better
-  lines.push(formatTrendRow(
-    "Pass rate",
-    `${(prev.passRate * 100).toFixed(1)}%`,
-    `${(curr.passRate * 100).toFixed(1)}%`,
-    (curr.passRate - prev.passRate) * 100,
-    "%",
-    "higher"
-  ));
+  lines.push(
+    formatTrendRow(
+      "Pass rate",
+      `${(prev.passRate * 100).toFixed(1)}%`,
+      `${(curr.passRate * 100).toFixed(1)}%`,
+      (curr.passRate - prev.passRate) * 100,
+      "%",
+      "higher",
+    ),
+  );
 
   // Activation — higher is better
-  lines.push(formatTrendRow(
-    "Activation",
-    `${(prev.activationRate * 100).toFixed(1)}%`,
-    `${(curr.activationRate * 100).toFixed(1)}%`,
-    (curr.activationRate - prev.activationRate) * 100,
-    "%",
-    "higher"
-  ));
+  lines.push(
+    formatTrendRow(
+      "Activation",
+      `${(prev.activationRate * 100).toFixed(1)}%`,
+      `${(curr.activationRate * 100).toFixed(1)}%`,
+      (curr.activationRate - prev.activationRate) * 100,
+      "%",
+      "higher",
+    ),
+  );
 
   // Avg turns — lower is better
-  lines.push(formatTrendRow(
-    "Avg turns",
-    prev.avgTurns.toFixed(1),
-    curr.avgTurns.toFixed(1),
-    curr.avgTurns - prev.avgTurns,
-    "",
-    "lower"
-  ));
+  lines.push(
+    formatTrendRow(
+      "Avg turns",
+      prev.avgTurns.toFixed(1),
+      curr.avgTurns.toFixed(1),
+      curr.avgTurns - prev.avgTurns,
+      "",
+      "lower",
+    ),
+  );
 
   // Avg cost — lower is better
-  lines.push(formatTrendRow(
-    "Avg cost",
-    `$${prev.avgCostUsd.toFixed(4)}`,
-    `$${curr.avgCostUsd.toFixed(4)}`,
-    curr.avgCostUsd - prev.avgCostUsd,
-    "",
-    "lower",
-    true
-  ));
+  lines.push(
+    formatTrendRow(
+      "Avg cost",
+      `$${prev.avgCostUsd.toFixed(4)}`,
+      `$${curr.avgCostUsd.toFixed(4)}`,
+      curr.avgCostUsd - prev.avgCostUsd,
+      "",
+      "lower",
+      true,
+    ),
+  );
 
   // Total cost — lower is better
-  lines.push(formatTrendRow(
-    "Total cost",
-    `$${prev.totalCostUsd.toFixed(4)}`,
-    `$${curr.totalCostUsd.toFixed(4)}`,
-    curr.totalCostUsd - prev.totalCostUsd,
-    "",
-    "lower",
-    true
-  ));
+  lines.push(
+    formatTrendRow(
+      "Total cost",
+      `$${prev.totalCostUsd.toFixed(4)}`,
+      `$${curr.totalCostUsd.toFixed(4)}`,
+      curr.totalCostUsd - prev.totalCostUsd,
+      "",
+      "lower",
+      true,
+    ),
+  );
 
   // Avg MCP calls — informational (higher may be fine)
   const prevMcp = prev.avgMcpToolCalls ?? 0;
   const currMcp = curr.avgMcpToolCalls ?? 0;
-  lines.push(formatTrendRow(
-    "MCP calls",
-    prevMcp.toFixed(1),
-    currMcp.toFixed(1),
-    currMcp - prevMcp,
-    "",
-    "higher"
-  ));
+  lines.push(
+    formatTrendRow(
+      "MCP calls",
+      prevMcp.toFixed(1),
+      currMcp.toFixed(1),
+      currMcp - prevMcp,
+      "",
+      "higher",
+    ),
+  );
 
   // Cache tokens — informational
   const prevCacheRead = prev.avgCacheReadInputTokens ?? 0;
   const currCacheRead = curr.avgCacheReadInputTokens ?? 0;
-  lines.push(formatTrendRow(
-    "Cache read",
-    Math.round(prevCacheRead).toString(),
-    Math.round(currCacheRead).toString(),
-    currCacheRead - prevCacheRead,
-    "",
-    "higher"
-  ));
+  lines.push(
+    formatTrendRow(
+      "Cache read",
+      Math.round(prevCacheRead).toString(),
+      Math.round(currCacheRead).toString(),
+      currCacheRead - prevCacheRead,
+      "",
+      "higher",
+    ),
+  );
 
   const prevCacheCreate = prev.avgCacheCreationInputTokens ?? 0;
   const currCacheCreate = curr.avgCacheCreationInputTokens ?? 0;
-  lines.push(formatTrendRow(
-    "Cache create",
-    Math.round(prevCacheCreate).toString(),
-    Math.round(currCacheCreate).toString(),
-    currCacheCreate - prevCacheCreate,
-    "",
-    "lower"
-  ));
+  lines.push(
+    formatTrendRow(
+      "Cache create",
+      Math.round(prevCacheCreate).toString(),
+      Math.round(currCacheCreate).toString(),
+      currCacheCreate - prevCacheCreate,
+      "",
+      "lower",
+    ),
+  );
 
   // Per-scenario regressions and improvements
   const regressions: string[] = [];
@@ -193,7 +208,7 @@ function formatTrendRow(
   delta: number,
   suffix: string,
   betterDirection: "higher" | "lower",
-  isDollar?: boolean
+  isDollar?: boolean,
 ): string {
   const absDelta = Math.abs(delta);
   let deltaStr: string;

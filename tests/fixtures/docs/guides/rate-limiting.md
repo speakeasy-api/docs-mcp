@@ -10,10 +10,10 @@ AcmeAuth enforces rate limits to ensure fair usage and protect the platform from
 ## Default Limits
 
 | Plan       | Requests/minute | Burst limit |
-|------------|----------------|-------------|
-| Free       | 60             | 10          |
-| Pro        | 600            | 50          |
-| Enterprise | 6000           | 500         |
+| ---------- | --------------- | ----------- |
+| Free       | 60              | 10          |
+| Pro        | 600             | 50          |
+| Enterprise | 6000            | 500         |
 
 ## Rate Limit Headers
 

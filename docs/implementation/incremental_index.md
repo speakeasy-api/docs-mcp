@@ -37,11 +37,9 @@ const EMBEDDING_FORMAT_VERSION = "1";
 type EmbeddingFingerprint = string; // SHA-256 hex digest
 
 function computeFingerprint(chunk: Chunk, config: EmbeddingConfig): EmbeddingFingerprint {
-  const input = [
-    EMBEDDING_FORMAT_VERSION,
-    config.configFingerprint,
-    toEmbeddingInput(chunk),
-  ].join("\0");
+  const input = [EMBEDDING_FORMAT_VERSION, config.configFingerprint, toEmbeddingInput(chunk)].join(
+    "\0",
+  );
   return sha256hex(input);
 }
 ```
@@ -63,9 +61,9 @@ interface EmbeddingConfig {
 
 **What goes into `configFingerprint` per provider:**
 
-| Provider | Fields hashed |
-|---|---|
-| `hash` | `provider`, `model`, `dimensions` |
+| Provider | Fields hashed                                |
+| -------- | -------------------------------------------- |
+| `hash`   | `provider`, `model`, `dimensions`            |
 | `openai` | `provider`, `model`, `dimensions`, `baseUrl` |
 
 ### Why `chunk_id` Is Not Sufficient
@@ -80,11 +78,11 @@ The cache uses a **LanceDB table** stored in a dedicated directory (`.embedding-
 
 **Schema:**
 
-| Column | Type | Description |
-|---|---|---|
-| `fingerprint` | `string` | SHA-256 hex digest (primary key for lookups) |
-| `chunk_id` | `string` | Stored for diagnostics only |
-| `vector` | `FixedSizeList<Float32>[dims]` | The embedding vector |
+| Column        | Type                           | Description                                  |
+| ------------- | ------------------------------ | -------------------------------------------- |
+| `fingerprint` | `string`                       | SHA-256 hex digest (primary key for lookups) |
+| `chunk_id`    | `string`                       | Stored for diagnostics only                  |
+| `vector`      | `FixedSizeList<Float32>[dims]` | The embedding vector                         |
 
 **Cache metadata** is stored in a sibling file `.embedding-cache/cache-meta.json`:
 
@@ -176,14 +174,14 @@ wrote 1900 chunks and .lancedb index to ./index
 
 For a corpus of N total chunks where M chunks changed since last build:
 
-| Operation | Full Build | Incremental Build |
-|---|---|---|
-| Chunking (AST parse) | N | N |
-| Fingerprint computation | 0 | N (SHA-256, ~μs each) |
-| Embedding API calls | N | M |
-| LanceDB index table write | N | N |
-| Cache read (binary) | 0 | O(N) Arrow scan |
-| Cache write (binary) | 0 | O(N) Arrow write |
+| Operation                 | Full Build | Incremental Build     |
+| ------------------------- | ---------- | --------------------- |
+| Chunking (AST parse)      | N          | N                     |
+| Fingerprint computation   | 0          | N (SHA-256, ~μs each) |
+| Embedding API calls       | N          | M                     |
+| LanceDB index table write | N          | N                     |
+| Cache read (binary)       | 0          | O(N) Arrow scan       |
+| Cache write (binary)      | 0          | O(N) Arrow write      |
 
 The savings are entirely in embedding API calls: `(N - M) × cost_per_embedding`.
 

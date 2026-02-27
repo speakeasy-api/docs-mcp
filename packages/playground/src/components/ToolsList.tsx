@@ -93,8 +93,7 @@ function ToolsListInner({ tools }: { tools: ToolEntry[] | undefined }) {
       <h2 className="pg-heading">Available Tools</h2>
       {ftsOnly && (
         <p className="pg-warning">
-          Semantic search is unavailable — set OPENAI_API_KEY to enable semantic
-          search results.
+          Semantic search is unavailable — set OPENAI_API_KEY to enable semantic search results.
         </p>
       )}
       {loading && (
@@ -104,29 +103,20 @@ function ToolsListInner({ tools }: { tools: ToolEntry[] | undefined }) {
           ))}
         </div>
       )}
-      {!loading && tools.length === 0 && (
-        <p className="pg-muted">No tools available.</p>
-      )}
+      {!loading && tools.length === 0 && <p className="pg-muted">No tools available.</p>}
       <div className="pg-tools-grid">
         {(tools ?? []).map((tool) => (
           <div key={tool.name} className="pg-tool-card">
             <button
               className="pg-tool-header"
-              onClick={() =>
-                setExpanded(expanded === tool.name ? null : tool.name)
-              }
+              onClick={() => setExpanded(expanded === tool.name ? null : tool.name)}
               aria-expanded={expanded === tool.name}
             >
               <div>
                 <span className="pg-tool-name">{tool.name}</span>
-                {tool.description && (
-                  <p className="pg-tool-desc">{tool.description}</p>
-                )}
+                {tool.description && <p className="pg-tool-desc">{tool.description}</p>}
               </div>
-              <span
-                className="pg-tool-chevron"
-                data-expanded={expanded === tool.name}
-              >
+              <span className="pg-tool-chevron" data-expanded={expanded === tool.name}>
                 &#9654;
               </span>
             </button>

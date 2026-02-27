@@ -15,7 +15,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": [
-    "@speakeasy-api/tsconfig"
-  ]
+  "ignore": ["@speakeasy-api/tsconfig"]
 }

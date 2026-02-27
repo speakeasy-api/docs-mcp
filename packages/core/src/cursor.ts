@@ -21,19 +21,19 @@ export function decodeCursor(cursor: string): CursorPayload {
 
 export function encodeSearchCursor(
   payload: CursorPayload,
-  context: { query: string; filters: Record<string, string> }
+  context: { query: string; filters: Record<string, string> },
 ): string {
   const searchPayload: SearchCursorPayload = {
     ...payload,
     v: 1,
-    sig: computeSearchCursorSignature(context)
+    sig: computeSearchCursorSignature(context),
   };
   return encodePayload(searchPayload);
 }
 
 export function decodeSearchCursor(
   cursor: string,
-  context: { query: string; filters: Record<string, string> }
+  context: { query: string; filters: Record<string, string> },
 ): CursorPayload {
   const payload = decodePayload(cursor);
   if (!isSearchCursorPayload(payload)) {
@@ -47,7 +47,7 @@ export function decodeSearchCursor(
 
   return {
     offset: payload.offset,
-    limit: payload.limit
+    limit: payload.limit,
   };
 }
 
@@ -107,7 +107,7 @@ function computeSearchCursorSignature(input: {
 
   const serialized = JSON.stringify({
     query,
-    filters: normalizedFilters
+    filters: normalizedFilters,
   });
 
   return createHash("sha1").update(serialized, "utf8").digest("base64url");

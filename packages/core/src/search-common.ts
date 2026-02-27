@@ -58,7 +58,7 @@ export function dedupKey(
   heading: string,
   chunkId: string,
   getMetadataValue: (key: string) => string,
-  collapseKeys: string[]
+  collapseKeys: string[],
 ): string | null {
   if (collapseKeys.length === 0) return null;
 
@@ -87,7 +87,7 @@ export function dedupKey(
 export function matchesMetadataFilters(
   metadata: Record<string, string>,
   filters: Record<string, string>,
-  taxonomyKeys?: string[]
+  taxonomyKeys?: string[],
 ): boolean {
   const language = filters.language;
   const scope = filters.scope;

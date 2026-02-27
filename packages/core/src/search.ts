@@ -6,7 +6,7 @@ import {
   makeSnippet,
   matchesMetadataFilters,
   normalizeSearchText,
-  tokenizeSearchText
+  tokenizeSearchText,
 } from "./search-common.js";
 import type {
   Chunk,
@@ -17,7 +17,7 @@ import type {
   SearchHit,
   SearchHint,
   SearchRequest,
-  SearchResult
+  SearchResult,
 } from "./types.js";
 
 export class InMemorySearchEngine implements SearchEngine {
@@ -62,7 +62,10 @@ export class InMemorySearchEngine implements SearchEngine {
 
     const scored = this.chunks
       .filter((chunk) => matchesMetadataFilters(chunk.metadata, filters, taxonomyKeys))
-      .map((chunk) => ({ chunk, score: scoreChunk(chunk, query, proximityWeight) }))
+      .map((chunk) => ({
+        chunk,
+        score: scoreChunk(chunk, query, proximityWeight),
+      }))
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score || a.chunk.chunk_id.localeCompare(b.chunk.chunk_id));
 
@@ -73,29 +76,30 @@ export class InMemorySearchEngine implements SearchEngine {
     const hits = paged.map(({ chunk, score }) => toSearchHit(chunk, score, query));
 
     const nextOffset = offset + paged.length;
-    const nextCursor = nextOffset < deduped.length
-      ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
-      : null;
+    const nextCursor =
+      nextOffset < deduped.length
+        ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
+        : null;
 
     if (hits.length > 0) {
       return {
         hits,
         next_cursor: nextCursor,
-        hint: null
+        hint: null,
       };
     }
 
     return {
       hits,
       next_cursor: nextCursor,
-      hint: buildHint(this.chunks, query, filters)
+      hint: buildHint(this.chunks, query, filters),
     };
   }
 
   async getDoc(request: GetDocRequest): Promise<GetDocResult> {
     if (!isChunkIdFormat(request.chunk_id)) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`
+        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
       );
     }
 
@@ -103,7 +107,7 @@ export class InMemorySearchEngine implements SearchEngine {
     const target = this.byId.get(request.chunk_id);
     if (!target) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`
+        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`,
       );
     }
 
@@ -130,12 +134,12 @@ export class InMemorySearchEngine implements SearchEngine {
           : `Context: ${contextOffset > 0 ? `+${contextOffset}` : contextOffset}`;
 
       blocks.push(
-        `--- Chunk: ${chunk.chunk_id} (${positionLabel}) (${role}) ---\n${chunk.content}`
+        `--- Chunk: ${chunk.chunk_id} (${positionLabel}) (${role}) ---\n${chunk.content}`,
       );
     }
 
     return {
-      text: blocks.join("\n\n")
+      text: blocks.join("\n\n"),
     };
   }
 }
@@ -172,20 +176,16 @@ function toSearchHit(chunk: Chunk, score: number, query: string): SearchHit {
     snippet: makeSnippet(chunk.content_text, query),
     filepath: chunk.filepath,
     metadata: chunk.metadata,
-    score: Number(score.toFixed(6))
+    score: Number(score.toFixed(6)),
   };
 }
 
-function buildHint(
-  chunks: Chunk[],
-  query: string,
-  filters: Record<string, string>
-): SearchHint {
+function buildHint(chunks: Chunk[], query: string, filters: Record<string, string>): SearchHint {
   const queryMatches = chunks.filter((chunk) => scoreChunk(chunk, query, 0) > 0);
   if (queryMatches.length === 0) {
     return {
       message: "0 results found. No matches were found for this query in the indexed corpus.",
-      suggested_filters: {}
+      suggested_filters: {},
     };
   }
 
@@ -213,13 +213,13 @@ function buildHint(
     message: filterSummary
       ? `0 results found for query '${query}' with filters ${filterSummary}.`
       : `0 results found for query '${query}'.`,
-    suggested_filters: suggestions
+    suggested_filters: suggestions,
   };
 }
 
 function deduplicateChunks(
   entries: Array<{ chunk: Chunk; score: number }>,
-  collapseKeys: string[]
+  collapseKeys: string[],
 ): Array<{ chunk: Chunk; score: number }> {
   if (collapseKeys.length === 0) return entries;
 
@@ -230,7 +230,7 @@ function deduplicateChunks(
       entry.chunk.heading,
       entry.chunk.chunk_id,
       (k) => entry.chunk.metadata[k] ?? "",
-      collapseKeys
+      collapseKeys,
     );
     if (key === null) return true;
     if (seen.has(key)) return false;

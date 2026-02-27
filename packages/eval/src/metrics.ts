@@ -70,7 +70,7 @@ export function summarizeCases(
     getDocLatenciesMs?: number[];
     buildTimeMs?: number;
     peakRssMb?: number;
-  } = {}
+  } = {},
 ): EvalSummary {
   return {
     mrrAt5: round(computeMrrAtK(cases, 5)),
@@ -78,13 +78,13 @@ export function summarizeCases(
     avgRoundsToRightDoc: round(computeAvgRoundsToRightDoc(cases)),
     facetPrecision: round(
       cases.filter((c) => c.rankedChunkIds.slice(0, 5).includes(c.expectedChunkId)).length /
-        (cases.length || 1)
+        (cases.length || 1),
     ),
     searchP50Ms: round(percentile(timings.searchLatenciesMs ?? [], 0.5)),
     searchP95Ms: round(percentile(timings.searchLatenciesMs ?? [], 0.95)),
     getDocP50Ms: round(percentile(timings.getDocLatenciesMs ?? [], 0.5)),
     buildTimeMs: round(timings.buildTimeMs ?? 0),
-    peakRssMb: round(timings.peakRssMb ?? 0)
+    peakRssMb: round(timings.peakRssMb ?? 0),
   };
 }
 
@@ -115,10 +115,10 @@ export function computeCategoryBreakdown(cases: RankedCase[]): CategoryBreakdown
       caseCount: group.length,
       facetPrecision: round(
         group.filter((c) => c.rankedChunkIds.slice(0, 5).includes(c.expectedChunkId)).length /
-          (group.length || 1)
+          (group.length || 1),
       ),
       mrrAt5: round(computeMrrAtK(group, 5)),
-      ndcgAt5: round(computeNdcgAtK(group, 5))
+      ndcgAt5: round(computeNdcgAtK(group, 5)),
     });
   }
 

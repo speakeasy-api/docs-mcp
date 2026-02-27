@@ -46,7 +46,7 @@ async function resolveFixtureFile(relPath: string) {
     relativeFilePath: relPath,
     manifest,
     manifestBaseDir,
-    markdown
+    markdown,
   });
 
   return { markdown, config };
@@ -57,7 +57,7 @@ const ALL_FIXTURE_FILES = [
   "guides/rate-limiting.md",
   "guides/webhooks.md",
   "sdk/python/readme.md",
-  "sdk/typescript/readme.md"
+  "sdk/typescript/readme.md",
 ];
 
 async function buildAllChunks(): Promise<Chunk[]> {
@@ -68,7 +68,7 @@ async function buildAllChunks(): Promise<Chunk[]> {
       filepath: relPath,
       markdown,
       strategy: config.strategy,
-      metadata: config.metadata
+      metadata: config.metadata,
     });
     allChunks.push(...chunks);
   }
@@ -82,24 +82,18 @@ describe("integration: build → search → getDoc round-trip", () => {
     expect(allChunks.length).toBeGreaterThan(10);
 
     // Verify SDK files got sdk-specific scope from their per-directory manifest
-    const tsChunks = allChunks.filter(
-      (c) => c.filepath === "sdk/typescript/readme.md"
-    );
+    const tsChunks = allChunks.filter((c) => c.filepath === "sdk/typescript/readme.md");
     expect(tsChunks.length).toBeGreaterThan(0);
     expect(tsChunks[0]?.metadata.scope).toBe("sdk-specific");
     expect(tsChunks[0]?.metadata.language).toBe("typescript");
 
-    const pyChunks = allChunks.filter(
-      (c) => c.filepath === "sdk/python/readme.md"
-    );
+    const pyChunks = allChunks.filter((c) => c.filepath === "sdk/python/readme.md");
     expect(pyChunks.length).toBeGreaterThan(0);
     expect(pyChunks[0]?.metadata.scope).toBe("sdk-specific");
     expect(pyChunks[0]?.metadata.language).toBe("python");
 
     // Verify global guides got global-guide scope and no language
-    const authChunks = allChunks.filter(
-      (c) => c.filepath === "guides/authentication.md"
-    );
+    const authChunks = allChunks.filter((c) => c.filepath === "guides/authentication.md");
     expect(authChunks.length).toBeGreaterThan(0);
     expect(authChunks[0]?.metadata.scope).toBe("global-guide");
     expect(authChunks[0]?.metadata.language).toBeUndefined();
@@ -112,7 +106,7 @@ describe("integration: build → search → getDoc round-trip", () => {
     const buildResult = await buildLanceDbIndex({
       dbPath: dbDir,
       chunks: allChunks,
-      metadataKeys
+      metadataKeys,
     });
 
     expect(buildResult.tableName).toBe("chunks");
@@ -121,14 +115,14 @@ describe("integration: build → search → getDoc round-trip", () => {
     // 4. Open search engine
     const engine = await LanceDbSearchEngine.open({
       dbPath: dbDir,
-      metadataKeys
+      metadataKeys,
     });
 
     // 5. Search: unfiltered query
     const result1 = await engine.search({
       query: "authentication",
       limit: 5,
-      filters: {}
+      filters: {},
     });
 
     expect(result1.hits.length).toBeGreaterThan(0);
@@ -141,7 +135,7 @@ describe("integration: build → search → getDoc round-trip", () => {
       query: "authentication",
       limit: 10,
       filters: { language: "typescript" },
-      taxonomy_keys: metadataKeys
+      taxonomy_keys: metadataKeys,
     });
 
     expect(result2.hits.length).toBeGreaterThan(0);
@@ -164,7 +158,7 @@ describe("integration: build → search → getDoc round-trip", () => {
     const page1 = await engine.search({
       query: "authentication",
       limit: 2,
-      filters: {}
+      filters: {},
     });
 
     if (page1.next_cursor) {
@@ -172,7 +166,7 @@ describe("integration: build → search → getDoc round-trip", () => {
         query: "authentication",
         limit: 2,
         cursor: page1.next_cursor,
-        filters: {}
+        filters: {},
       });
       expect(page2.hits.length).toBeGreaterThan(0);
 
@@ -187,7 +181,7 @@ describe("integration: build → search → getDoc round-trip", () => {
     const result3 = await engine.search({
       query: "zzzznonexistent",
       limit: 5,
-      filters: {}
+      filters: {},
     });
     expect(result3.hits.length).toBe(0);
     expect(result3.hint).not.toBeNull();
@@ -202,7 +196,10 @@ describe("integration: build → search → getDoc round-trip", () => {
     const metadataKeys = ["scope", "language"];
     await buildLanceDbIndex({ dbPath: dbDir, chunks: allChunks, metadataKeys });
 
-    const engine = await LanceDbSearchEngine.open({ dbPath: dbDir, metadataKeys });
+    const engine = await LanceDbSearchEngine.open({
+      dbPath: dbDir,
+      metadataKeys,
+    });
 
     // Search for "SDK" filtered to python — should return python SDK hits
     // plus global-guide hits (auto-include), but NOT typescript SDK hits.
@@ -210,7 +207,7 @@ describe("integration: build → search → getDoc round-trip", () => {
       query: "SDK installation",
       limit: 20,
       filters: { language: "python" },
-      taxonomy_keys: metadataKeys
+      taxonomy_keys: metadataKeys,
     });
 
     expect(result.hits.length).toBeGreaterThan(0);
@@ -235,20 +232,20 @@ describe("integration: build → search → getDoc round-trip", () => {
     const engine = await LanceDbSearchEngine.open({
       dbPath: dbDir,
       metadataKeys,
-      collapseKeys
+      collapseKeys,
     });
 
     // Search for a heading shared across both SDKs (Installation, Authentication, etc.)
     const result = await engine.search({
       query: "installation",
       limit: 20,
-      filters: {}
+      filters: {},
     });
 
     // SDK "Installation" chunks exist in both python and typescript,
     // but should be collapsed to 1 with vector_collapse
     const sdkInstallHits = result.hits.filter(
-      (h) => h.metadata.scope === "sdk-specific" && h.heading === "Installation"
+      (h) => h.metadata.scope === "sdk-specific" && h.heading === "Installation",
     );
     expect(sdkInstallHits).toHaveLength(1);
 
@@ -270,14 +267,14 @@ describe("integration: build → search → getDoc round-trip", () => {
     const engine = await LanceDbSearchEngine.open({
       dbPath: dbDir,
       metadataKeys,
-      collapseKeys
+      collapseKeys,
     });
 
     const result = await engine.search({
       query: "installation",
       limit: 20,
       filters: { language: "typescript" },
-      taxonomy_keys: metadataKeys
+      taxonomy_keys: metadataKeys,
     });
 
     // With a language filter, dedup is a no-op — all typescript chunks survive
@@ -299,32 +296,34 @@ describe("integration: build → search → getDoc round-trip", () => {
         content_text: "Implement retry backoff to handle transient failures gracefully.",
         breadcrumb: "a.md > Retry Backoff",
         chunk_index: 0,
-        metadata: {}
+        metadata: {},
       },
       {
         chunk_id: "b.md#scattered",
         filepath: "b.md",
         heading: "Overview",
         heading_level: 2,
-        content: "This section discusses retry strategies. Backoff is covered elsewhere in the docs.",
-        content_text: "This section discusses retry strategies. Backoff is covered elsewhere in the docs.",
+        content:
+          "This section discusses retry strategies. Backoff is covered elsewhere in the docs.",
+        content_text:
+          "This section discusses retry strategies. Backoff is covered elsewhere in the docs.",
         breadcrumb: "b.md > Overview",
         chunk_index: 0,
-        metadata: {}
-      }
+        metadata: {},
+      },
     ];
 
     await buildLanceDbIndex({ dbPath: dbDir, chunks });
 
     const engine = await LanceDbSearchEngine.open({
       dbPath: dbDir,
-      metadataKeys: []
+      metadataKeys: [],
     });
 
     const result = await engine.search({
       query: "retry backoff",
       limit: 5,
-      filters: {}
+      filters: {},
     });
 
     expect(result.hits.length).toBe(2);

@@ -85,13 +85,13 @@ export function runEvaluation(input: EvalRunInput): EvalRunOutput {
     metadata: {
       deterministic: input.deterministic ?? true,
       provider: input.model?.provider ?? null,
-      model: input.model?.model ?? null
-    }
+      model: input.model?.model ?? null,
+    },
   };
 }
 
 export async function runEvaluationAgainstServer(
-  input: EvalHarnessInput
+  input: EvalHarnessInput,
 ): Promise<EvalHarnessOutput> {
   const buildTimeMs = input.build ? await runBuildStep(input.build) : 0;
 
@@ -101,7 +101,7 @@ export async function runEvaluationAgainstServer(
     cwd?: string;
     env?: Record<string, string>;
   } = {
-    command: input.server.command
+    command: input.server.command,
   };
 
   if (input.server.args !== undefined) {
@@ -119,11 +119,11 @@ export async function runEvaluationAgainstServer(
   const client = new Client(
     {
       name: "@speakeasy-api/docs-mcp-eval",
-      version: "0.1.0"
+      version: "0.1.0",
     },
     {
-      capabilities: {}
-    }
+      capabilities: {},
+    },
   );
 
   await client.connect(transport);
@@ -152,10 +152,10 @@ export async function runEvaluationAgainstServer(
         searchLatenciesMs,
         getDocLatenciesMs,
         buildTimeMs,
-        peakRssMb
+        peakRssMb,
       },
       ...(input.model ? { model: input.model } : {}),
-      ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {})
+      ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {}),
     });
 
     return {
@@ -165,8 +165,8 @@ export async function runEvaluationAgainstServer(
         searchLatenciesMs,
         getDocLatenciesMs,
         buildTimeMs,
-        peakRssMb
-      }
+        peakRssMb,
+      },
     };
   } finally {
     await rssSampler.stop();
@@ -176,7 +176,7 @@ export async function runEvaluationAgainstServer(
 
 async function executeCase(
   client: Client,
-  testCase: EvalQueryCase
+  testCase: EvalQueryCase,
 ): Promise<{
   rankedCase: RankedCase;
   searchLatenciesMs: number[];
@@ -197,7 +197,7 @@ async function executeCase(
     const args: Record<string, unknown> = {
       query: testCase.query,
       limit: testCase.limit ?? 5,
-      ...(testCase.filters ?? {})
+      ...(testCase.filters ?? {}),
     };
 
     if (cursor) {
@@ -207,7 +207,7 @@ async function executeCase(
     const searchStart = performance.now();
     const toolResult = await client.callTool({
       name: "search_docs",
-      arguments: args
+      arguments: args,
     });
     searchLatenciesMs.push(performance.now() - searchStart);
 
@@ -216,7 +216,9 @@ async function executeCase(
     }
 
     if (toolResult.isError) {
-      throw new Error(readTextContent(toolResult.content) || "search_docs returned an unknown error");
+      throw new Error(
+        readTextContent(toolResult.content) || "search_docs returned an unknown error",
+      );
     }
 
     const payload = parseSearchResultText(readTextContent(toolResult.content));
@@ -234,8 +236,8 @@ async function executeCase(
         name: "get_doc",
         arguments: {
           chunk_id: targetHit.chunk_id,
-          context: 0
-        }
+          context: 0,
+        },
       });
       getDocLatenciesMs.push(performance.now() - getDocStart);
 
@@ -243,7 +245,9 @@ async function executeCase(
         throw new Error("Unexpected compatibility tool result shape from server");
       }
       if (getDocResult.isError) {
-        throw new Error(readTextContent(getDocResult.content) || "get_doc returned an unknown error");
+        throw new Error(
+          readTextContent(getDocResult.content) || "get_doc returned an unknown error",
+        );
       }
 
       break;
@@ -258,7 +262,7 @@ async function executeCase(
   const roundsToRightDoc = computeRoundsToRightDoc({
     found: rankedChunkIds.includes(testCase.expectedChunkId),
     roundsExecuted: rounds,
-    maxRounds
+    maxRounds,
   });
 
   return {
@@ -267,10 +271,10 @@ async function executeCase(
       rankedChunkIds,
       roundsToRightDoc,
       ...(testCase.name !== undefined ? { name: testCase.name } : {}),
-      ...(testCase.category !== undefined ? { category: testCase.category } : {})
+      ...(testCase.category !== undefined ? { category: testCase.category } : {}),
     },
     searchLatenciesMs,
-    getDocLatenciesMs
+    getDocLatenciesMs,
   };
 }
 
@@ -285,7 +289,7 @@ export function computeRoundsToRightDoc(input: {
 async function warmupServer(
   client: Client,
   cases: EvalQueryCase[],
-  warmupQueries: number
+  warmupQueries: number,
 ): Promise<void> {
   if (warmupQueries <= 0 || cases.length === 0) {
     return;
@@ -300,13 +304,13 @@ async function warmupServer(
     const args: Record<string, unknown> = {
       query: testCase.query,
       limit: Math.min(5, testCase.limit ?? 5),
-      ...(testCase.filters ?? {})
+      ...(testCase.filters ?? {}),
     };
 
     try {
       await client.callTool({
         name: "search_docs",
-        arguments: args
+        arguments: args,
       });
     } catch {
       // Warmup is best-effort.
@@ -354,13 +358,12 @@ function parseSearchResultText(text: string): {
   }
 
   const nextCursorRaw = result.next_cursor;
-  const nextCursor = nextCursorRaw === null || typeof nextCursorRaw === "string"
-    ? nextCursorRaw
-    : null;
+  const nextCursor =
+    nextCursorRaw === null || typeof nextCursorRaw === "string" ? nextCursorRaw : null;
 
   return {
     hits,
-    next_cursor: nextCursor
+    next_cursor: nextCursor,
   };
 }
 
@@ -372,10 +375,10 @@ async function runBuildStep(config: EvalBuildConfig): Promise<number> {
       cwd: config.cwd,
       env: {
         ...process.env,
-        ...config.env
+        ...config.env,
       },
       stdio: "inherit",
-      shell: false
+      shell: false,
     });
 
     child.on("error", reject);
@@ -386,8 +389,8 @@ async function runBuildStep(config: EvalBuildConfig): Promise<number> {
       }
       reject(
         new Error(
-          `Build command failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`
-        )
+          `Build command failed with ${signal ? `signal ${signal}` : `exit code ${String(code)}`}`,
+        ),
       );
     });
   });
@@ -406,7 +409,7 @@ function createRssSampler(pid: number | null): {
       },
       async stop(): Promise<number> {
         return 0;
-      }
+      },
     };
   }
 
@@ -448,13 +451,13 @@ function createRssSampler(pid: number | null): {
       }
       await sample();
       return Number(peakRssMb.toFixed(6));
-    }
+    },
   };
 }
 
 async function readProcessRssMb(pid: number): Promise<number> {
   const { stdout } = await execFileAsync("ps", ["-o", "rss=", "-p", String(pid)], {
-    windowsHide: true
+    windowsHide: true,
   });
   const kb = Number.parseFloat(stdout.trim());
   if (!Number.isFinite(kb) || kb <= 0) {

@@ -7,15 +7,9 @@ describe("suggestChunkBy", () => {
   });
 
   it("prefers h2 when multiple h2 sections exist", () => {
-    const markdown = [
-      "# SDK",
-      "",
-      "## Installation",
-      "content",
-      "",
-      "## Usage",
-      "content"
-    ].join("\n");
+    const markdown = ["# SDK", "", "## Installation", "content", "", "## Usage", "content"].join(
+      "\n",
+    );
     expect(suggestChunkBy(markdown)).toBe("h2");
   });
 
@@ -28,7 +22,7 @@ describe("suggestChunkBy", () => {
       "### Three",
       "### Four",
       "### Five",
-      "### Six"
+      "### Six",
     ].join("\n");
     expect(suggestChunkBy(markdown)).toBe("h3");
   });
@@ -39,16 +33,16 @@ describe("buildHeuristicManifest", () => {
     const manifest = buildHeuristicManifest([
       {
         path: "docs/a.md",
-        markdown: "## Intro\n\n## Config"
+        markdown: "## Intro\n\n## Config",
       },
       {
         path: "docs/b.md",
-        markdown: "## Intro\n\n## Config"
+        markdown: "## Intro\n\n## Config",
       },
       {
         path: "docs/c.md",
-        markdown: "No headings"
-      }
+        markdown: "No headings",
+      },
     ]);
 
     expect(manifest.strategy?.chunk_by).toBe("h2");
@@ -56,9 +50,9 @@ describe("buildHeuristicManifest", () => {
       {
         pattern: "docs/c.md",
         strategy: {
-          chunk_by: "file"
-        }
-      }
+          chunk_by: "file",
+        },
+      },
     ]);
   });
 });

@@ -101,7 +101,7 @@ const DEFAULT_MAX_INPUT_CHARS = 24_000;
 const OPENAI_COST_PER_M_TOKENS: Record<string, number> = {
   "text-embedding-3-large": 0.13,
   "text-embedding-3-small": 0.02,
-  "text-embedding-ada-002": 0.10,
+  "text-embedding-ada-002": 0.1,
 };
 
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
@@ -162,7 +162,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     for (let i = 0; i < texts.length; i += this.batchSize) {
       batches.push({
         offset: i,
-        values: texts.slice(i, i + this.batchSize)
+        values: texts.slice(i, i + this.batchSize),
       });
     }
 
@@ -187,7 +187,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         const source = text.match(/^Context: (.+)\n/)?.[1] ?? "unknown";
         console.warn(
           `[docs-mcp] Embedding input truncated from ${text.length} to ${DEFAULT_MAX_INPUT_CHARS} characters (source: ${source}). ` +
-            `Consider lowering max_chunk_size in your chunking strategy to avoid content loss.`
+            `Consider lowering max_chunk_size in your chunking strategy to avoid content loss.`,
         );
         return text.slice(0, DEFAULT_MAX_INPUT_CHARS);
       }
@@ -199,13 +199,13 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`
+          Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           model: this.model,
           input: truncated,
-          dimensions: this.dimensions
-        })
+          dimensions: this.dimensions,
+        }),
       });
 
       if (response.ok) {
@@ -220,7 +220,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         const ordered = [...payload.data].sort((a, b) => a.index - b.index);
         if (ordered.length !== batch.length) {
           throw new Error(
-            `OpenAI embeddings response size mismatch: expected ${batch.length}, got ${ordered.length}`
+            `OpenAI embeddings response size mismatch: expected ${batch.length}, got ${ordered.length}`,
           );
         }
 
@@ -230,7 +230,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       const body = await response.text();
       if (!isRetryableStatus(response.status) || attempt >= this.maxRetries) {
         throw new Error(
-          `OpenAI embeddings request failed (${response.status}): ${body.slice(0, 500)}`
+          `OpenAI embeddings request failed (${response.status}): ${body.slice(0, 500)}`,
         );
       }
 
@@ -239,8 +239,8 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
         this.retryMaxDelayMs,
         Math.max(
           retryAfterMs,
-          this.retryBaseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 250)
-        )
+          this.retryBaseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 250),
+        ),
       );
 
       await sleep(backoffMs);
@@ -255,16 +255,18 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       if (text.length > DEFAULT_MAX_INPUT_CHARS) {
         text = text.slice(0, DEFAULT_MAX_INPUT_CHARS);
       }
-      lines.push(JSON.stringify({
-        custom_id: `req-${i}`,
-        method: "POST",
-        url: "/v1/embeddings",
-        body: {
-          model: this.model,
-          input: text,
-          dimensions: this.dimensions,
-        },
-      }));
+      lines.push(
+        JSON.stringify({
+          custom_id: `req-${i}`,
+          method: "POST",
+          url: "/v1/embeddings",
+          body: {
+            model: this.model,
+            input: text,
+            dimensions: this.dimensions,
+          },
+        }),
+      );
     }
     return lines.join("\n");
   }
@@ -346,11 +348,20 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       };
 
       for (const batch of payload.data) {
-        if (this.batchName && batch.metadata?.batch_name && batch.metadata.batch_name !== this.batchName) continue;
+        if (
+          this.batchName &&
+          batch.metadata?.batch_name &&
+          batch.metadata.batch_name !== this.batchName
+        )
+          continue;
         if (batch.metadata?.content_sha !== contentSha) continue;
 
         // Skip terminal failure states — we'll create a new batch
-        if (batch.status === "failed" || batch.status === "expired" || batch.status === "cancelled") {
+        if (
+          batch.status === "failed" ||
+          batch.status === "expired" ||
+          batch.status === "cancelled"
+        ) {
           continue;
         }
 
@@ -418,7 +429,12 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       }
 
       let etaSec: number | undefined;
-      if (firstProgressTime !== undefined && firstProgressCompleted !== undefined && counts && counts.completed > firstProgressCompleted) {
+      if (
+        firstProgressTime !== undefined &&
+        firstProgressCompleted !== undefined &&
+        counts &&
+        counts.completed > firstProgressCompleted
+      ) {
         const elapsedSinceFirst = (Date.now() - firstProgressTime) / 1000;
         const completedSinceFirst = counts.completed - firstProgressCompleted;
         const rate = completedSinceFirst / elapsedSinceFirst;
@@ -449,7 +465,10 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     }
   }
 
-  private async downloadBatchResults(outputFileId: string, expectedCount: number): Promise<number[][]> {
+  private async downloadBatchResults(
+    outputFileId: string,
+    expectedCount: number,
+  ): Promise<number[][]> {
     this.onBatchProgress?.({
       phase: "batch-downloading",
       message: "Downloading results...",
@@ -461,7 +480,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`OpenAI batch results download failed (${response.status}): ${body.slice(0, 500)}`);
+      throw new Error(
+        `OpenAI batch results download failed (${response.status}): ${body.slice(0, 500)}`,
+      );
     }
 
     const text = await response.text();
@@ -540,13 +561,9 @@ export function createEmbeddingProvider(input: {
   retryMaxDelayMs?: number;
   onBatchProgress?: (event: BatchProgressEvent) => void;
 }): EmbeddingProvider {
-  if (
-    input.provider !== "none" &&
-    input.provider !== "hash" &&
-    input.provider !== "openai"
-  ) {
+  if (input.provider !== "none" && input.provider !== "hash" && input.provider !== "openai") {
     throw new Error(
-      `unsupported embedding provider '${String(input.provider)}'. Expected one of: none, hash, openai`
+      `unsupported embedding provider '${String(input.provider)}'. Expected one of: none, hash, openai`,
     );
   }
 
@@ -568,7 +585,7 @@ export function createEmbeddingProvider(input: {
   const apiKey = input.apiKey?.trim();
   if (!apiKey) {
     throw new Error(
-      `${input.provider} embedding provider requires --embedding-api-key or OPENAI_API_KEY`
+      `${input.provider} embedding provider requires --embedding-api-key or OPENAI_API_KEY`,
     );
   }
 
@@ -639,7 +656,7 @@ function normalizeInt(
   value: number | undefined,
   fallback: number,
   min: number,
-  max: number
+  max: number,
 ): number {
   if (value === undefined || !Number.isFinite(value)) {
     return fallback;
@@ -685,7 +702,7 @@ function sleep(ms: number): Promise<void> {
 async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
-  worker: (item: T) => Promise<void>
+  worker: (item: T) => Promise<void>,
 ): Promise<void> {
   if (items.length === 0) {
     return;
@@ -708,6 +725,6 @@ async function runWithConcurrency<T>(
         }
         await worker(item);
       }
-    })
+    }),
   );
 }

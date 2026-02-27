@@ -9,7 +9,7 @@ function makeResult(overrides: Partial<AgentScenarioResult> = {}): AgentScenario
     passed: true,
     assertionResults: [],
     numTurns: 5,
-    totalCostUsd: 0.10,
+    totalCostUsd: 0.1,
     durationMs: 10000,
     durationApiMs: 8000,
     toolsCalled: { search_docs: 2, get_doc: 1 },
@@ -23,7 +23,7 @@ function makeResult(overrides: Partial<AgentScenarioResult> = {}): AgentScenario
     workspaceFiles: [],
     finalAnswer: "done",
     resultSubtype: "success",
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -39,7 +39,7 @@ describe("computeAgentEvalSummary", () => {
     const results = [
       makeResult({ activated: true, passed: true }),
       makeResult({ activated: true, passed: false }),
-      makeResult({ activated: false, passed: false })
+      makeResult({ activated: false, passed: false }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.totalScenarios).toBe(3);
@@ -51,7 +51,7 @@ describe("computeAgentEvalSummary", () => {
     const results = [
       makeResult({ numTurns: 3, totalCostUsd: 0.05, durationMs: 5000 }),
       makeResult({ numTurns: 7, totalCostUsd: 0.15, durationMs: 15000 }),
-      makeResult({ numTurns: 5, totalCostUsd: 0.10, durationMs: 10000 })
+      makeResult({ numTurns: 5, totalCostUsd: 0.1, durationMs: 10000 }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.avgTurns).toBe(5);
@@ -64,7 +64,7 @@ describe("computeAgentEvalSummary", () => {
   it("aggregates tool usage distribution", () => {
     const results = [
       makeResult({ toolsCalled: { search_docs: 3, Read: 1 } }),
-      makeResult({ toolsCalled: { search_docs: 2, Write: 1 } })
+      makeResult({ toolsCalled: { search_docs: 2, Write: 1 } }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.toolUsageDistribution.search_docs).toBe(5);
@@ -74,9 +74,24 @@ describe("computeAgentEvalSummary", () => {
 
   it("computes category breakdown", () => {
     const results = [
-      makeResult({ category: "sdk-usage", passed: true, activated: true, numTurns: 4 }),
-      makeResult({ category: "sdk-usage", passed: false, activated: true, numTurns: 6 }),
-      makeResult({ category: "error-handling", passed: true, activated: false, numTurns: 3 })
+      makeResult({
+        category: "sdk-usage",
+        passed: true,
+        activated: true,
+        numTurns: 4,
+      }),
+      makeResult({
+        category: "sdk-usage",
+        passed: false,
+        activated: true,
+        numTurns: 6,
+      }),
+      makeResult({
+        category: "error-handling",
+        passed: true,
+        activated: false,
+        numTurns: 3,
+      }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.categoryBreakdown).toHaveLength(2);
@@ -96,7 +111,7 @@ describe("computeAgentEvalSummary", () => {
   it("computes token averages", () => {
     const results = [
       makeResult({ inputTokens: 4000, outputTokens: 800 }),
-      makeResult({ inputTokens: 6000, outputTokens: 1200 })
+      makeResult({ inputTokens: 6000, outputTokens: 1200 }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.avgInputTokens).toBe(5000);
@@ -106,7 +121,7 @@ describe("computeAgentEvalSummary", () => {
   it("handles median with even number of results", () => {
     const results = [
       makeResult({ numTurns: 2, durationMs: 3000 }),
-      makeResult({ numTurns: 8, durationMs: 9000 })
+      makeResult({ numTurns: 8, durationMs: 9000 }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.medianTurns).toBe(5);
@@ -116,19 +131,23 @@ describe("computeAgentEvalSummary", () => {
   it("aggregates MCP tool usage distribution", () => {
     const results = [
       makeResult({
-        toolsCalled: { "mcp__docs-mcp__search_docs": 3, "mcp__docs-mcp__get_doc": 1, Read: 2 },
-        mcpToolCalls: 4
+        toolsCalled: {
+          "mcp__docs-mcp__search_docs": 3,
+          "mcp__docs-mcp__get_doc": 1,
+          Read: 2,
+        },
+        mcpToolCalls: 4,
       }),
       makeResult({
         toolsCalled: { "mcp__docs-mcp__search_docs": 1, Write: 1 },
-        mcpToolCalls: 1
-      })
+        mcpToolCalls: 1,
+      }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.avgMcpToolCalls).toBe(2.5);
     expect(summary.mcpToolUsageDistribution).toEqual({
       "mcp__docs-mcp__search_docs": 4,
-      "mcp__docs-mcp__get_doc": 1
+      "mcp__docs-mcp__get_doc": 1,
     });
     // Non-MCP tools should not appear in mcpToolUsageDistribution
     expect(summary.mcpToolUsageDistribution.Read).toBeUndefined();
@@ -136,8 +155,14 @@ describe("computeAgentEvalSummary", () => {
 
   it("computes cache token averages", () => {
     const results = [
-      makeResult({ cacheReadInputTokens: 10000, cacheCreationInputTokens: 400 }),
-      makeResult({ cacheReadInputTokens: 14000, cacheCreationInputTokens: 600 })
+      makeResult({
+        cacheReadInputTokens: 10000,
+        cacheCreationInputTokens: 400,
+      }),
+      makeResult({
+        cacheReadInputTokens: 14000,
+        cacheCreationInputTokens: 600,
+      }),
     ];
     const summary = computeAgentEvalSummary(results);
     expect(summary.avgCacheReadInputTokens).toBe(12000);

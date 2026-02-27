@@ -11,23 +11,23 @@ describe("manifest resolution", () => {
       overrides: [
         {
           pattern: "guides/**/*.md",
-          metadata: { scope: "sdk-specific" }
+          metadata: { scope: "sdk-specific" },
         },
         {
           pattern: "guides/advanced/*.md",
-          metadata: { scope: "global-guide" }
-        }
-      ]
+          metadata: { scope: "global-guide" },
+        },
+      ],
     });
 
     const resolved = resolveFileConfig({
       relativeFilePath: "guides/advanced/retries.md",
-      manifest
+      manifest,
     });
 
     expect(resolved.metadata).toEqual({
       language: "typescript",
-      scope: "global-guide"
+      scope: "global-guide",
     });
   });
 
@@ -35,7 +35,7 @@ describe("manifest resolution", () => {
     const manifest = parseManifest({
       version: "1",
       strategy: { chunk_by: "h2" },
-      metadata: { language: "typescript" }
+      metadata: { language: "typescript" },
     });
 
     const markdown = [
@@ -44,19 +44,19 @@ describe("manifest resolution", () => {
       "mcp_metadata:",
       "  scope: global-guide",
       "---",
-      "# Example"
+      "# Example",
     ].join("\n");
 
     const resolved = resolveFileConfig({
       relativeFilePath: "guides/example.md",
       manifest,
-      markdown
+      markdown,
     });
 
     expect(resolved.strategy.chunk_by).toBe("file");
     expect(resolved.metadata).toEqual({
       language: "typescript",
-      scope: "global-guide"
+      scope: "global-guide",
     });
   });
 
@@ -64,7 +64,7 @@ describe("manifest resolution", () => {
     const manifest = parseManifest({
       version: "1",
       strategy: { chunk_by: "h2" },
-      metadata: { language: "typescript", product: "sdk" }
+      metadata: { language: "typescript", product: "sdk" },
     });
 
     const markdown = [
@@ -75,19 +75,19 @@ describe("manifest resolution", () => {
       "mcp_metadata:",
       "  product: api",
       "---",
-      "# Example"
+      "# Example",
     ].join("\n");
 
     const resolved = resolveFileConfig({
       relativeFilePath: "guides/example.md",
       manifest,
-      markdown
+      markdown,
     });
 
     expect(resolved.metadata).toEqual({
       language: "typescript",
       scope: "global-guide",
-      product: "api"
+      product: "api",
     });
   });
 
@@ -98,20 +98,20 @@ describe("manifest resolution", () => {
       overrides: [
         {
           pattern: "auth.md",
-          metadata: { scope: "sdk-specific" }
-        }
-      ]
+          metadata: { scope: "sdk-specific" },
+        },
+      ],
     });
 
     const resolved = resolveFileConfig({
       relativeFilePath: "sdks/typescript/auth.md",
       manifestBaseDir: "sdks/typescript",
-      manifest
+      manifest,
     });
 
     expect(resolved.metadata).toEqual({
       language: "typescript",
-      scope: "sdk-specific"
+      scope: "sdk-specific",
     });
   });
 
@@ -120,12 +120,12 @@ describe("manifest resolution", () => {
       version: "1",
       metadata: { language: "typescript" },
       taxonomy: {
-        language: { vector_collapse: true }
-      }
+        language: { vector_collapse: true },
+      },
     });
 
     expect(manifest.taxonomy).toEqual({
-      language: { vector_collapse: true }
+      language: { vector_collapse: true },
     });
   });
 
@@ -133,8 +133,8 @@ describe("manifest resolution", () => {
     const manifest = parseManifest({
       version: "1",
       taxonomy: {
-        language: {}
-      }
+        language: {},
+      },
     });
 
     expect(manifest.taxonomy).toEqual({ language: { vector_collapse: false } });
@@ -145,7 +145,7 @@ describe("mergeTaxonomyConfigs", () => {
   it("returns empty when no manifests have taxonomy", () => {
     const manifests: Manifest[] = [
       { version: "1" },
-      { version: "1", metadata: { scope: "global-guide" } }
+      { version: "1", metadata: { scope: "global-guide" } },
     ];
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({});
@@ -157,12 +157,12 @@ describe("mergeTaxonomyConfigs", () => {
       {
         version: "1",
         metadata: { language: "python", scope: "sdk-specific" },
-        taxonomy: { language: { vector_collapse: true } }
-      }
+        taxonomy: { language: { vector_collapse: true } },
+      },
     ];
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({
-      language: { vector_collapse: true }
+      language: { vector_collapse: true },
     });
   });
 
@@ -171,13 +171,13 @@ describe("mergeTaxonomyConfigs", () => {
       {
         version: "1",
         metadata: { language: "python" },
-        taxonomy: { language: { vector_collapse: true } }
+        taxonomy: { language: { vector_collapse: true } },
       },
       {
         version: "1",
         metadata: { language: "typescript" },
-        taxonomy: { language: { vector_collapse: true } }
-      }
+        taxonomy: { language: { vector_collapse: true } },
+      },
     ];
 
     const merged = mergeTaxonomyConfigs(manifests);
@@ -190,14 +190,14 @@ describe("mergeTaxonomyConfigs", () => {
       {
         version: "1",
         metadata: { language: "python" },
-        taxonomy: { language: { vector_collapse: true } }
+        taxonomy: { language: { vector_collapse: true } },
       },
       { version: "1", metadata: { language: "go" } },
-      { version: "1", metadata: { language: "typescript" } }
+      { version: "1", metadata: { language: "typescript" } },
     ];
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({
-      language: { vector_collapse: true }
+      language: { vector_collapse: true },
     });
   });
 
@@ -205,17 +205,17 @@ describe("mergeTaxonomyConfigs", () => {
     const manifests: Manifest[] = [
       {
         version: "1",
-        taxonomy: { language: { vector_collapse: true } }
+        taxonomy: { language: { vector_collapse: true } },
       },
       {
         version: "1",
-        taxonomy: { platform: { vector_collapse: true } }
-      }
+        taxonomy: { platform: { vector_collapse: true } },
+      },
     ];
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({
       language: { vector_collapse: true },
-      platform: { vector_collapse: true }
+      platform: { vector_collapse: true },
     });
   });
 
@@ -223,12 +223,12 @@ describe("mergeTaxonomyConfigs", () => {
     const manifests: Manifest[] = [
       {
         version: "1",
-        taxonomy: { language: {} }
+        taxonomy: { language: {} },
       },
       {
         version: "1",
-        taxonomy: { language: { vector_collapse: false } }
-      }
+        taxonomy: { language: { vector_collapse: false } },
+      },
     ];
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({});

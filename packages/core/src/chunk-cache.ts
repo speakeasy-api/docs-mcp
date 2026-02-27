@@ -12,11 +12,9 @@ const DEFAULT_TABLE_NAME = "chunks";
 export function computeChunkFingerprint(
   markdown: string,
   strategy: ChunkingStrategy,
-  metadata: Record<string, string>
+  metadata: Record<string, string>,
 ): string {
-  return sha256hex(
-    [JSON.stringify(strategy), JSON.stringify(metadata), markdown].join("\0")
-  );
+  return sha256hex([JSON.stringify(strategy), JSON.stringify(metadata), markdown].join("\0"));
 }
 
 export interface PreviousIndexReader {
@@ -31,7 +29,7 @@ export interface PreviousIndexReader {
  */
 export async function loadChunksFromPreviousIndex(
   dbPath: string,
-  tableName?: string
+  tableName?: string,
 ): Promise<PreviousIndexReader | null> {
   const table = tableName ?? DEFAULT_TABLE_NAME;
 
@@ -52,11 +50,7 @@ export async function loadChunksFromPreviousIndex(
     const tbl = await db.openTable(table);
 
     // Probe for file_fingerprint column by fetching a single row
-    const probeRows = await tbl
-      .query()
-      .select(["filepath", "file_fingerprint"])
-      .limit(1)
-      .toArray();
+    const probeRows = await tbl.query().select(["filepath", "file_fingerprint"]).limit(1).toArray();
 
     if (probeRows.length === 0) {
       // Empty table — nothing to cache from
@@ -66,10 +60,7 @@ export async function loadChunksFromPreviousIndex(
     }
 
     const probeRow = probeRows[0]!;
-    if (
-      !("file_fingerprint" in probeRow) ||
-      typeof probeRow.file_fingerprint !== "string"
-    ) {
+    if (!("file_fingerprint" in probeRow) || typeof probeRow.file_fingerprint !== "string") {
       // Old-format index without fingerprints
       tbl.close();
       db.close();
@@ -77,10 +68,7 @@ export async function loadChunksFromPreviousIndex(
     }
 
     // Load all fingerprints (lightweight: only two string columns)
-    const fpRows = await tbl
-      .query()
-      .select(["filepath", "file_fingerprint"])
-      .toArray();
+    const fpRows = await tbl.query().select(["filepath", "file_fingerprint"]).toArray();
 
     const fingerprints = new Map<string, string>();
     for (const row of fpRows) {
@@ -95,10 +83,7 @@ export async function loadChunksFromPreviousIndex(
       fingerprints,
       async getChunks(filepath: string): Promise<Chunk[]> {
         const escaped = filepath.replace(/'/g, "''");
-        const rows = await tbl
-          .query()
-          .where(`filepath = '${escaped}'`)
-          .toArray();
+        const rows = await tbl.query().where(`filepath = '${escaped}'`).toArray();
 
         return rows
           .map((row) => row as ChunkRow)

@@ -9,13 +9,13 @@ export function buildHeuristicManifest(files: FixFileInput[]): Manifest {
   if (files.length === 0) {
     return {
       version: "1",
-      strategy: { chunk_by: "h2" }
+      strategy: { chunk_by: "h2" },
     };
   }
 
   const suggestions = files.map((file) => ({
     path: file.path,
-    chunkBy: suggestChunkBy(file.markdown)
+    chunkBy: suggestChunkBy(file.markdown),
   }));
   const defaultChunkBy = pickDefaultChunkBy(suggestions.map((entry) => entry.chunkBy));
   const overrides = suggestions
@@ -23,16 +23,16 @@ export function buildHeuristicManifest(files: FixFileInput[]): Manifest {
     .map((entry) => ({
       pattern: entry.path,
       strategy: {
-        chunk_by: entry.chunkBy
-      }
+        chunk_by: entry.chunkBy,
+      },
     }))
     .sort((a, b) => a.pattern.localeCompare(b.pattern));
 
   const manifest: Manifest = {
     version: "1",
     strategy: {
-      chunk_by: defaultChunkBy
-    }
+      chunk_by: defaultChunkBy,
+    },
   };
   if (overrides.length > 0) {
     manifest.overrides = overrides;
@@ -74,7 +74,7 @@ function pickDefaultChunkBy(values: ChunkingStrategy["chunk_by"][]): ChunkingStr
     ["h2", 0],
     ["h1", 0],
     ["h3", 0],
-    ["file", 0]
+    ["file", 0],
   ]);
 
   for (const value of values) {
@@ -94,7 +94,11 @@ function pickDefaultChunkBy(values: ChunkingStrategy["chunk_by"][]): ChunkingStr
   return best;
 }
 
-function countHeadings(markdown: string): { h1: number; h2: number; h3: number } {
+function countHeadings(markdown: string): {
+  h1: number;
+  h2: number;
+  h3: number;
+} {
   const counts = { h1: 0, h2: 0, h3: 0 };
   const lines = markdown.split(/\r?\n/g);
   for (const line of lines) {

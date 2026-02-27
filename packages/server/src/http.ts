@@ -7,12 +7,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
-  type ListToolsResult
+  type ListToolsResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { McpDocsServer } from "./server.js";
 
 const require = createRequire(import.meta.url);
-const { version: PKG_VERSION } = require("../package.json") as { version: string };
+const { version: PKG_VERSION } = require("../package.json") as {
+  version: string;
+};
 
 export interface StartHttpServerOptions {
   name?: string;
@@ -33,25 +35,25 @@ export interface HttpServerHandle {
  */
 function createPerRequestServer(
   app: McpDocsServer,
-  options: StartHttpServerOptions
+  options: StartHttpServerOptions,
 ): { server: Server; transport: StreamableHTTPServerTransport } {
   const server = new Server(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
-      version: options.version ?? PKG_VERSION
+      version: options.version ?? PKG_VERSION,
     },
     {
       capabilities: {
-        tools: {}
-      }
-    }
+        tools: {},
+      },
+    },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools = app.getTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"]
+      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"],
     }));
     return { tools } satisfies ListToolsResult;
   });
@@ -62,13 +64,15 @@ function createPerRequestServer(
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- exactOptionalPropertyTypes workaround
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined } as any);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  } as any);
   return { server, transport };
 }
 
 export async function startHttpServer(
   app: McpDocsServer,
-  options: StartHttpServerOptions = {}
+  options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const port = options.port ?? 20310;
 
@@ -83,8 +87,8 @@ export async function startHttpServer(
           JSON.stringify({
             jsonrpc: "2.0",
             error: { code: -32603, message: "Internal server error" },
-            id: null
-          })
+            id: null,
+          }),
         );
       } else if (!res.writableEnded) {
         res.end();
@@ -102,7 +106,7 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "*",
-  "Access-Control-Max-Age": "86400"
+  "Access-Control-Max-Age": "86400",
 };
 
 function setCorsHeaders(res: http.ServerResponse): void {
@@ -115,7 +119,7 @@ async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   app: McpDocsServer,
-  options: StartHttpServerOptions
+  options: StartHttpServerOptions,
 ): Promise<void> {
   // Only the pathname matters; the base URL is arbitrary.
   const url = new URL(req.url ?? "/", "http://localhost");
@@ -140,8 +144,8 @@ async function handleRequest(
       JSON.stringify({
         jsonrpc: "2.0",
         error: { code: -32000, message: "Method not allowed." },
-        id: null
-      })
+        id: null,
+      }),
     );
     return;
   }
@@ -157,8 +161,8 @@ async function handleRequest(
       JSON.stringify({
         jsonrpc: "2.0",
         error: { code: -32700, message: "Parse error" },
-        id: null
-      })
+        id: null,
+      }),
     );
     return;
   }
@@ -179,8 +183,8 @@ async function handleRequest(
         JSON.stringify({
           jsonrpc: "2.0",
           error: { code: -32603, message: "Internal server error" },
-          id: null
-        })
+          id: null,
+        }),
       );
     }
     transport.close();

@@ -46,7 +46,7 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     avgMcpToolCalls: round(avg(mcpCalls)),
     mcpToolUsageDistribution,
     toolUsageDistribution,
-    categoryBreakdown: computeCategoryBreakdown(results)
+    categoryBreakdown: computeCategoryBreakdown(results),
   };
 }
 
@@ -71,7 +71,7 @@ function computeCategoryBreakdown(results: AgentScenarioResult[]): AgentCategory
       activationRate: round(group.filter((r) => r.activated).length / n),
       passRate: round(group.filter((r) => r.passed).length / n),
       avgTurns: round(avg(group.map((r) => r.numTurns))),
-      avgCostUsd: round(avg(group.map((r) => r.totalCostUsd)))
+      avgCostUsd: round(avg(group.map((r) => r.totalCostUsd))),
     });
   }
 
@@ -96,7 +96,7 @@ function emptySummary(): AgentEvalSummary {
     avgMcpToolCalls: 0,
     mcpToolUsageDistribution: {},
     toolUsageDistribution: {},
-    categoryBreakdown: []
+    categoryBreakdown: [],
   };
 }
 

@@ -1,5 +1,10 @@
 import semver from "semver";
-import type { CorpusMetadata, EmbeddingMetadata, TaxonomyField, ToolDescriptions } from "./types.js";
+import type {
+  CorpusMetadata,
+  EmbeddingMetadata,
+  TaxonomyField,
+  ToolDescriptions,
+} from "./types.js";
 
 /**
  * Returns taxonomy keys that have `vector_collapse: true`, i.e. dimensions
@@ -15,7 +20,7 @@ const LIMITS = {
   maxKeys: 64,
   maxKeyLength: 64,
   maxValuesPerKey: 512,
-  maxValueLength: 128
+  maxValueLength: 128,
 } as const;
 
 export interface NormalizeMetadataOptions {
@@ -24,7 +29,7 @@ export interface NormalizeMetadataOptions {
 
 export function normalizeMetadata(
   input: unknown,
-  options: NormalizeMetadataOptions = {}
+  options: NormalizeMetadataOptions = {},
 ): CorpusMetadata {
   if (!input || typeof input !== "object") {
     throw new Error("metadata must be an object");
@@ -41,7 +46,7 @@ export function normalizeMetadata(
   const parsed = semver.parse(metadataVersion);
   if (!parsed || parsed.major !== supportedMajor) {
     throw new Error(
-      `Unsupported metadata_version major: expected ${supportedMajor}.x.x, got ${metadataVersion}`
+      `Unsupported metadata_version major: expected ${supportedMajor}.x.x, got ${metadataVersion}`,
     );
   }
 
@@ -58,7 +63,7 @@ export function normalizeMetadata(
     taxonomy,
     stats,
     embedding,
-    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {})
+    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
   };
 }
 
@@ -91,14 +96,15 @@ function normalizeTaxonomy(value: unknown): Record<string, TaxonomyField> {
 
     const field = rawField as Record<string, unknown>;
     const values = normalizeValues(field.values, key);
-    const description = field.description === undefined ? undefined : asTrimmedString(field.description);
+    const description =
+      field.description === undefined ? undefined : asTrimmedString(field.description);
 
     const vectorCollapse = field.vector_collapse === true ? true : undefined;
 
     normalized[key] = {
       ...(description ? { description } : {}),
       values,
-      ...(vectorCollapse ? { vector_collapse: true } : {})
+      ...(vectorCollapse ? { vector_collapse: true } : {}),
     };
   }
 
@@ -111,9 +117,7 @@ function normalizeValues(value: unknown, key: string): string[] {
   }
 
   if (value.length > LIMITS.maxValuesPerKey) {
-    throw new Error(
-      `taxonomy['${key}'].values exceeds max length ${LIMITS.maxValuesPerKey}`
-    );
+    throw new Error(`taxonomy['${key}'].values exceeds max length ${LIMITS.maxValuesPerKey}`);
   }
 
   const deduped = new Set<string>();
@@ -124,7 +128,7 @@ function normalizeValues(value: unknown, key: string): string[] {
     }
     if (normalized.length > LIMITS.maxValueLength) {
       throw new Error(
-        `taxonomy['${key}'].value '${normalized}' exceeds max length ${LIMITS.maxValueLength}`
+        `taxonomy['${key}'].value '${normalized}' exceeds max length ${LIMITS.maxValueLength}`,
       );
     }
     deduped.add(normalized);
@@ -159,7 +163,7 @@ function normalizeStats(value: unknown): CorpusMetadata["stats"] {
   const result: CorpusMetadata["stats"] = {
     total_chunks: totalChunks,
     total_files: totalFiles,
-    indexed_at: indexedAt
+    indexed_at: indexedAt,
   };
 
   if (sourceCommit !== undefined) {

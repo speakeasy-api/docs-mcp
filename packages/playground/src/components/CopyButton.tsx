@@ -28,15 +28,7 @@ export function CopyButton({ text }: { text: string }) {
         </svg>
       ) : (
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <rect
-            x="5"
-            y="5"
-            width="8"
-            height="8"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
+          <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
           <path
             d="M3 10V3.5A1.5 1.5 0 014.5 2H10"
             stroke="currentColor"

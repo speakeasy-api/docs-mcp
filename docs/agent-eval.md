@@ -31,20 +31,20 @@ docs-mcp-eval agent-eval --suite acmeauth --include ts-init
 
 ### Field Reference
 
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| *(object key)* | `string` | yes | — | Scenario ID — short, stable identifier used for `--include` and result matching |
-| `name` | `string` | yes | — | Human-readable scenario name, shown in output tables |
-| `prompt` | `string` | yes | — | The user prompt sent to the Claude agent |
-| `assertions` | `AgentAssertion[]` | yes | — | Array of assertions to evaluate against the agent's output |
-| `category` | `string` | no | — | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`) |
-| `maxTurns` | `number` | no | `15` | Max agent conversation turns for this scenario |
-| `maxBudgetUsd` | `number` | no | `0.50` | Max dollar spend for this scenario |
-| `systemPrompt` | `string` | no | — | System prompt given to the agent |
-| `setup` | `string` | no | — | Shell command run in the workspace directory before the agent starts |
-| `description` | `string` | no | — | Corpus description for the docs index; flows into MCP tool descriptions |
-| `docsSpec` | `DocsRepoSpec` | no | — | Git repo to clone and index docs from (takes precedence over `docsDir`) |
-| `docsDir` | `string` | no | — | Path to a local docs directory, resolved relative to the scenario file |
+| Field          | Type               | Required | Default | Description                                                                      |
+| -------------- | ------------------ | -------- | ------- | -------------------------------------------------------------------------------- |
+| _(object key)_ | `string`           | yes      | —       | Scenario ID — short, stable identifier used for `--include` and result matching  |
+| `name`         | `string`           | yes      | —       | Human-readable scenario name, shown in output tables                             |
+| `prompt`       | `string`           | yes      | —       | The user prompt sent to the Claude agent                                         |
+| `assertions`   | `AgentAssertion[]` | yes      | —       | Array of assertions to evaluate against the agent's output                       |
+| `category`     | `string`           | no       | —       | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`) |
+| `maxTurns`     | `number`           | no       | `15`    | Max agent conversation turns for this scenario                                   |
+| `maxBudgetUsd` | `number`           | no       | `0.50`  | Max dollar spend for this scenario                                               |
+| `systemPrompt` | `string`           | no       | —       | System prompt given to the agent                                                 |
+| `setup`        | `string`           | no       | —       | Shell command run in the workspace directory before the agent starts             |
+| `description`  | `string`           | no       | —       | Corpus description for the docs index; flows into MCP tool descriptions          |
+| `docsSpec`     | `DocsRepoSpec`     | no       | —       | Git repo to clone and index docs from (takes precedence over `docsDir`)          |
+| `docsDir`      | `string`           | no       | —       | Path to a local docs directory, resolved relative to the scenario file           |
 
 A scenario **passes** only if it has at least one hard assertion and all hard assertions pass. Soft assertions (`"soft": true`) are still evaluated and displayed in output, but their results do not affect pass/fail.
 
@@ -81,12 +81,12 @@ Clone a repository and index a subdirectory within it. Useful for evaluating aga
 }
 ```
 
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `url` | `string` | yes | — | Git clone URL |
-| `ref` | `string` | no | `"main"` | Branch, tag, or commit |
-| `docsPath` | `string` | no | `"."` | Subdirectory within the repo containing docs |
-| `docsConfig` | `object` | no | — | Inline `.docs-mcp.json` manifest (written into the docs directory if the repo lacks one) |
+| Field        | Type     | Required | Default  | Description                                                                              |
+| ------------ | -------- | -------- | -------- | ---------------------------------------------------------------------------------------- |
+| `url`        | `string` | yes      | —        | Git clone URL                                                                            |
+| `ref`        | `string` | no       | `"main"` | Branch, tag, or commit                                                                   |
+| `docsPath`   | `string` | no       | `"."`    | Subdirectory within the repo containing docs                                             |
+| `docsConfig` | `object` | no       | —        | Inline `.docs-mcp.json` manifest (written into the docs directory if the repo lacks one) |
 
 ### Auto-Build and Caching
 
@@ -100,9 +100,9 @@ Multiple scenarios sharing the same docs directory and description share a singl
 
 All assertion types support an optional `soft` flag:
 
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `soft` | `boolean` | no | `false` | When `true`, the assertion is evaluated and shown in output (as yellow `⚠` on failure) but does **not** count toward the scenario's pass/fail |
+| Field  | Type      | Required | Default | Description                                                                                                                                    |
+| ------ | --------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `soft` | `boolean` | no       | `false` | When `true`, the assertion is evaluated and shown in output (as yellow `⚠` on failure) but does **not** count toward the scenario's pass/fail |
 
 Soft assertions are useful for typecheck or compilation checks that provide signal without blocking the overall result.
 
@@ -127,13 +127,17 @@ Checks that the agent's final answer does **not** include the specified string.
 Tests the agent's final answer against a regular expression.
 
 ```json
-{ "type": "matches", "pattern": "authorization.code|PKCE|refresh.token", "flags": "i" }
+{
+  "type": "matches",
+  "pattern": "authorization.code|PKCE|refresh.token",
+  "flags": "i"
+}
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `pattern` | `string` | yes | Regular expression body |
-| `flags` | `string` | no | RegExp flags (e.g. `"i"` for case-insensitive) |
+| Field     | Type     | Required | Description                                    |
+| --------- | -------- | -------- | ---------------------------------------------- |
+| `pattern` | `string` | yes      | Regular expression body                        |
+| `flags`   | `string` | no       | RegExp flags (e.g. `"i"` for case-insensitive) |
 
 ### `file_contains`
 
@@ -143,24 +147,28 @@ Reads a file in the agent's workspace and checks if it contains the specified st
 { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" }
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `path` | `string` | yes | File path relative to the workspace directory |
-| `value` | `string` | yes | String to search for in the file content |
+| Field   | Type     | Required | Description                                   |
+| ------- | -------- | -------- | --------------------------------------------- |
+| `path`  | `string` | yes      | File path relative to the workspace directory |
+| `value` | `string` | yes      | String to search for in the file content      |
 
 ### `file_matches`
 
 Reads a file in the agent's workspace and tests its content against a regular expression. Fails with a clear message if the file doesn't exist.
 
 ```json
-{ "type": "file_matches", "path": "solution.ts", "pattern": "retryAfter|retry_after" }
+{
+  "type": "file_matches",
+  "path": "solution.ts",
+  "pattern": "retryAfter|retry_after"
+}
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `path` | `string` | yes | File path relative to the workspace directory |
-| `pattern` | `string` | yes | Regular expression body |
-| `flags` | `string` | no | RegExp flags (e.g. `"i"` for case-insensitive) |
+| Field     | Type     | Required | Description                                    |
+| --------- | -------- | -------- | ---------------------------------------------- |
+| `path`    | `string` | yes      | File path relative to the workspace directory  |
+| `pattern` | `string` | yes      | Regular expression body                        |
+| `flags`   | `string` | no       | RegExp flags (e.g. `"i"` for case-insensitive) |
 
 ### `script`
 
@@ -175,12 +183,12 @@ Runs a shell command in the agent's workspace directory. Passes if exit code is 
 }
 ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `command` | `string` | yes | Shell command to execute (via `sh -c`) |
-| `name` | `string` | yes | Human-readable label for the assertion |
-| `when_env` | `string` | no | Environment variable guard — if set but the variable is absent, the assertion is auto-passed (skipped) |
-| `soft` | `boolean` | no | When `true`, failure is shown as `⚠` but doesn't affect scenario pass/fail |
+| Field      | Type      | Required | Description                                                                                            |
+| ---------- | --------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `command`  | `string`  | yes      | Shell command to execute (via `sh -c`)                                                                 |
+| `name`     | `string`  | yes      | Human-readable label for the assertion                                                                 |
+| `when_env` | `string`  | no       | Environment variable guard — if set but the variable is absent, the assertion is auto-passed (skipped) |
+| `soft`     | `boolean` | no       | When `true`, failure is shown as `⚠` but doesn't affect scenario pass/fail                            |
 
 The `when_env` field is useful for assertions that require API keys to run (e.g. actually executing generated code against a live SDK). In CI without the key, the assertion is skipped rather than failed.
 
@@ -194,46 +202,46 @@ docs-mcp-eval agent-eval [options]
 
 ### Scenario source (mutually exclusive, one required)
 
-| Option | Description |
-|---|---|
-| `--suite <name>` | Named scenario suite bundled with the eval package (resolves to `fixtures/agent-scenarios/<name>.json`) |
-| `--scenarios <path>` | Path to a scenario JSON file (object keyed by ID, or legacy array) |
-| `--prompt <text>` | Ad-hoc single scenario prompt (requires `--docs-dir`). Creates a one-off scenario with empty assertions |
+| Option               | Description                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--suite <name>`     | Named scenario suite bundled with the eval package (resolves to `fixtures/agent-scenarios/<name>.json`) |
+| `--scenarios <path>` | Path to a scenario JSON file (object keyed by ID, or legacy array)                                      |
+| `--prompt <text>`    | Ad-hoc single scenario prompt (requires `--docs-dir`). Creates a one-off scenario with empty assertions |
 
 ### Filtering
 
-| Option | Description |
-|---|---|
+| Option            | Description                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
 | `--include <ids>` | Comma-separated scenario IDs to run (e.g. `--include ts-init,py-init`). Only matching scenarios are executed |
 
 ### Docs and server
 
-| Option | Default | Description |
-|---|---|---|
-| `--docs-dir <path>` | — | Default docs directory for scenarios that don't specify their own `docsDir`/`docsSpec` |
-| `--server-command <cmd>` | *(auto-resolved)* | Command to launch the MCP server |
-| `--server-arg <value>` | `[]` | Repeatable server arguments |
-| `--server-cwd <path>` | — | Working directory for the server process |
-| `--server-env <key=value>` | `{}` | Repeatable server environment variables |
+| Option                     | Default           | Description                                                                            |
+| -------------------------- | ----------------- | -------------------------------------------------------------------------------------- |
+| `--docs-dir <path>`        | —                 | Default docs directory for scenarios that don't specify their own `docsDir`/`docsSpec` |
+| `--server-command <cmd>`   | _(auto-resolved)_ | Command to launch the MCP server                                                       |
+| `--server-arg <value>`     | `[]`              | Repeatable server arguments                                                            |
+| `--server-cwd <path>`      | —                 | Working directory for the server process                                               |
+| `--server-env <key=value>` | `{}`              | Repeatable server environment variables                                                |
 
 ### Agent
 
-| Option | Default | Description |
-|---|---|---|
-| `--model <value>` | `claude-sonnet-4-20250514` | Claude model to use |
-| `--max-turns <n>` | `15` | Default max turns per scenario |
-| `--max-budget-usd <n>` | `0.50` | Default max budget per scenario (USD) |
-| `--max-concurrency <n>` | `1` | Max concurrent scenarios |
-| `--system-prompt <value>` | — | Custom system prompt for the agent |
-| `--workspace-dir <path>` | — | Base directory for agent workspaces |
+| Option                    | Default                    | Description                           |
+| ------------------------- | -------------------------- | ------------------------------------- |
+| `--model <value>`         | `claude-sonnet-4-20250514` | Claude model to use                   |
+| `--max-turns <n>`         | `15`                       | Default max turns per scenario        |
+| `--max-budget-usd <n>`    | `0.50`                     | Default max budget per scenario (USD) |
+| `--max-concurrency <n>`   | `1`                        | Max concurrent scenarios              |
+| `--system-prompt <value>` | —                          | Custom system prompt for the agent    |
+| `--workspace-dir <path>`  | —                          | Base directory for agent workspaces   |
 
 ### Output
 
-| Option | Default | Description |
-|---|---|---|
-| `--out <path>` | — | Output JSON path |
-| `--no-save` | — | Skip auto-saving results to `.eval-results/` |
-| `--debug` | `false` | Keep workspaces after run for inspection |
+| Option         | Default | Description                                  |
+| -------------- | ------- | -------------------------------------------- |
+| `--out <path>` | —       | Output JSON path                             |
+| `--no-save`    | —       | Skip auto-saving results to `.eval-results/` |
+| `--debug`      | `false` | Keep workspaces after run for inspection     |
 
 ## Using from Another Repo
 
@@ -264,9 +272,7 @@ Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs c
       "ref": "v2.0",
       "docsPath": "docs"
     },
-    "assertions": [
-      { "type": "contains", "value": "Client" }
-    ]
+    "assertions": [{ "type": "contains", "value": "Client" }]
   }
 }
 ```
@@ -328,11 +334,11 @@ Results are saved as JSON (auto-saved to `.eval-results/<suite>/` by default, or
   "summary": {
     "totalScenarios": 10,
     "activationRate": 1.0,
-    "passRate": 0.80,
+    "passRate": 0.8,
     "avgTurns": 8.2,
     "medianTurns": 7,
     "avgCostUsd": 0.18,
-    "totalCostUsd": 1.80,
+    "totalCostUsd": 1.8,
     "avgDurationMs": 45000,
     "medianDurationMs": 42000,
     "avgInputTokens": 12000,
@@ -355,14 +361,14 @@ Results are saved as JSON (auto-saved to `.eval-results/<suite>/` by default, or
 }
 ```
 
-| Metric | Description |
-|---|---|
-| `activationRate` | Fraction of scenarios where the agent called at least one docs-mcp tool (`search_docs` or `get_doc`) |
-| `passRate` | Fraction of scenarios where all assertions passed |
-| `avgTurns` / `medianTurns` | Agent conversation turns (lower = more efficient) |
-| `avgCostUsd` / `totalCostUsd` | API spend per scenario and total |
-| `toolUsageDistribution` | Total calls per tool across all scenarios |
-| `categoryBreakdown` | Per-category metrics (activation, pass rate, turns, cost) |
+| Metric                        | Description                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `activationRate`              | Fraction of scenarios where the agent called at least one docs-mcp tool (`search_docs` or `get_doc`) |
+| `passRate`                    | Fraction of scenarios where all assertions passed                                                    |
+| `avgTurns` / `medianTurns`    | Agent conversation turns (lower = more efficient)                                                    |
+| `avgCostUsd` / `totalCostUsd` | API spend per scenario and total                                                                     |
+| `toolUsageDistribution`       | Total calls per tool across all scenarios                                                            |
+| `categoryBreakdown`           | Per-category metrics (activation, pass rate, turns, cost)                                            |
 
 ### Per-Scenario Result
 
@@ -383,11 +389,11 @@ When previous results exist in `.eval-results/`, the CLI automatically compares 
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | **yes** | API key for the Claude agent (used by `@anthropic-ai/claude-agent-sdk`) |
-| `OPENAI_API_KEY` | no | For embedding-based index builds (when using OpenAI embeddings) |
-| SDK-specific keys (e.g. `DUB_API_KEY`) | no | For `script` assertions guarded by `when_env` — skipped if absent |
-| `NO_COLOR` | no | Disables ANSI color output |
+| Variable                               | Required | Description                                                             |
+| -------------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                    | **yes**  | API key for the Claude agent (used by `@anthropic-ai/claude-agent-sdk`) |
+| `OPENAI_API_KEY`                       | no       | For embedding-based index builds (when using OpenAI embeddings)         |
+| SDK-specific keys (e.g. `DUB_API_KEY`) | no       | For `script` assertions guarded by `when_env` — skipped if absent       |
+| `NO_COLOR`                             | no       | Disables ANSI color output                                              |
 
 When running from the monorepo via mise, copy `mise.local.toml.example` to `mise.local.toml` and fill in your API keys. The `.env` file in the eval package directory is also loaded automatically via `dotenv`.

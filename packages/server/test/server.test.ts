@@ -12,7 +12,7 @@ const chunks: Chunk[] = [
     content_text: "TypeScript retry",
     breadcrumb: "guides/ts.md > Retry",
     chunk_index: 0,
-    metadata: { language: "typescript", scope: "sdk-specific" }
+    metadata: { language: "typescript", scope: "sdk-specific" },
   },
   {
     chunk_id: "guides/global.md#retry",
@@ -23,8 +23,8 @@ const chunks: Chunk[] = [
     content_text: "Global retry",
     breadcrumb: "guides/global.md > Retry",
     chunk_index: 0,
-    metadata: { scope: "global-guide" }
-  }
+    metadata: { scope: "global-guide" },
+  },
 ];
 
 const metadata = normalizeMetadata({
@@ -33,25 +33,25 @@ const metadata = normalizeMetadata({
   taxonomy: {
     language: {
       description: "Filter results by programming language.",
-      values: ["python", "typescript"]
+      values: ["python", "typescript"],
     },
     scope: {
-      values: ["global-guide", "sdk-specific"]
-    }
+      values: ["global-guide", "sdk-specific"],
+    },
   },
   stats: {
     total_chunks: 2,
     total_files: 2,
-    indexed_at: "2026-02-22T00:00:00Z"
+    indexed_at: "2026-02-22T00:00:00Z",
   },
-  embedding: null
+  embedding: null,
 });
 
 describe("McpDocsServer", () => {
   it("builds dynamic schema with injected taxonomy enums", () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata
+      metadata,
     });
 
     const tools = server.getTools();
@@ -67,12 +67,12 @@ describe("McpDocsServer", () => {
   it("passes through auto-include behavior from core", async () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata
+      metadata,
     });
 
     const result = await server.callTool("search_docs", {
       query: "retry",
-      language: "typescript"
+      language: "typescript",
     });
 
     expect(result.isError).toBe(false);
@@ -84,12 +84,12 @@ describe("McpDocsServer", () => {
   it("returns structured errors for invalid cursor", async () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata
+      metadata,
     });
 
     const result = await server.callTool("search_docs", {
       query: "retry",
-      cursor: "bad-cursor"
+      cursor: "bad-cursor",
     });
 
     expect(result.isError).toBe(true);
@@ -99,12 +99,12 @@ describe("McpDocsServer", () => {
   it("rejects unknown fields in search_docs", async () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata
+      metadata,
     });
 
     const result = await server.callTool("search_docs", {
       query: "retry",
-      unsupported: "x"
+      unsupported: "x",
     });
 
     expect(result.isError).toBe(true);
@@ -114,19 +114,19 @@ describe("McpDocsServer", () => {
   it("enforces numeric bounds for limit and context", async () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata
+      metadata,
     });
 
     const badLimit = await server.callTool("search_docs", {
       query: "retry",
-      limit: 0
+      limit: 0,
     });
     expect(badLimit.isError).toBe(true);
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
 
     const badContext = await server.callTool("get_doc", {
       chunk_id: "guides/ts.md#retry",
-      context: 6
+      context: 6,
     });
     expect(badContext.isError).toBe(true);
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
@@ -138,7 +138,7 @@ describe("McpDocsServer with toolPrefix", () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
       metadata,
-      toolPrefix: "acme"
+      toolPrefix: "acme",
     });
 
     const tools = server.getTools();
@@ -153,12 +153,12 @@ describe("McpDocsServer with toolPrefix", () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
       metadata,
-      toolPrefix: "acme"
+      toolPrefix: "acme",
     });
 
     const result = await server.callTool("acme_search_docs", {
       query: "retry",
-      language: "typescript"
+      language: "typescript",
     });
 
     expect(result.isError).toBe(false);
@@ -170,7 +170,7 @@ describe("McpDocsServer with toolPrefix", () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
       metadata,
-      toolPrefix: "acme"
+      toolPrefix: "acme",
     });
 
     const result = await server.callTool("search_docs", { query: "retry" });

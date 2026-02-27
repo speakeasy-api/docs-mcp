@@ -3,7 +3,7 @@ import type {
   RrfWeights,
   SearchEngine,
   GetDocRequest,
-  SearchRequest
+  SearchRequest,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
 import type { CallToolResult, ToolDefinition } from "./types.js";
@@ -44,13 +44,13 @@ export class McpDocsServer {
       {
         name: this.searchToolName,
         description: this.metadata.tool_descriptions?.search_docs ?? defaultSearchDescription,
-        inputSchema: buildSearchDocsSchema(this.metadata)
+        inputSchema: buildSearchDocsSchema(this.metadata),
       },
       {
         name: this.getDocToolName,
         description: this.metadata.tool_descriptions?.get_doc ?? defaultGetDocDescription,
-        inputSchema: buildGetDocSchema()
-      }
+        inputSchema: buildGetDocSchema(),
+      },
     ];
   }
 
@@ -72,7 +72,7 @@ export class McpDocsServer {
       const result = await this.index.search(request);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        isError: false
+        isError: false,
       };
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : "search_docs failed");
@@ -85,7 +85,7 @@ export class McpDocsServer {
       const result = await this.index.getDoc(request);
       return {
         content: [{ type: "text", text: result.text }],
-        isError: false
+        isError: false,
       };
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : "get_doc failed");
@@ -96,7 +96,7 @@ export class McpDocsServer {
 function parseSearchRequest(
   args: unknown,
   metadata: CorpusMetadata,
-  rrfWeights?: RrfWeights
+  rrfWeights?: RrfWeights,
 ): SearchRequest {
   if (!args || typeof args !== "object") {
     throw new Error("search_docs input must be an object");
@@ -132,7 +132,7 @@ function parseSearchRequest(
     const allowed = metadata.taxonomy[key]?.values ?? [];
     if (!allowed.includes(normalized)) {
       throw new Error(
-        `Invalid taxonomy value for '${key}': '${normalized}'. Allowed values: ${allowed.join(", ")}`
+        `Invalid taxonomy value for '${key}': '${normalized}'. Allowed values: ${allowed.join(", ")}`,
       );
     }
 
@@ -143,7 +143,7 @@ function parseSearchRequest(
     query,
     limit,
     filters,
-    taxonomy_keys: taxonomyKeys
+    taxonomy_keys: taxonomyKeys,
   };
 
   if (cursor !== undefined) {
@@ -180,7 +180,7 @@ function parseGetDocRequest(args: unknown): GetDocRequest {
 
   return {
     chunk_id: chunkId,
-    context
+    context,
   };
 }
 
@@ -203,6 +203,6 @@ function assertAllowedKeys(input: Record<string, unknown>, allowedKeys: string[]
 function errorResult(message: string): CallToolResult {
   return {
     content: [{ type: "text", text: message }],
-    isError: true
+    isError: true,
   };
 }

@@ -4,15 +4,10 @@ import {
   MultiMatchQuery,
   PhraseQuery,
   type FullTextQuery,
-  type Table
+  type Table,
 } from "@lancedb/lancedb";
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor.js";
-import {
-  clampLimit,
-  dedupKey,
-  isChunkIdFormat,
-  makeSnippet
-} from "./search-common.js";
+import { clampLimit, dedupKey, isChunkIdFormat, makeSnippet } from "./search-common.js";
 import type {
   Chunk,
   DocsIndexOptions,
@@ -23,7 +18,7 @@ import type {
   SearchHint,
   SearchHit,
   SearchRequest,
-  SearchResult
+  SearchResult,
 } from "./types.js";
 
 const DEFAULT_TABLE_NAME = "chunks";
@@ -63,13 +58,13 @@ export interface LanceDbIndexBuildResult {
 }
 
 export async function buildLanceDbIndex(
-  options: BuildLanceDbIndexOptions
+  options: BuildLanceDbIndexOptions,
 ): Promise<LanceDbIndexBuildResult> {
   const tableName = options.tableName ?? DEFAULT_TABLE_NAME;
   const metadataKeys = options.metadataKeys ?? collectMetadataKeys(options.chunks);
 
   const rows = options.chunks.map((chunk) =>
-    serializeChunkRow(chunk, metadataKeys, options.vectorsByChunkId, options.fileFingerprints)
+    serializeChunkRow(chunk, metadataKeys, options.vectorsByChunkId, options.fileFingerprints),
   );
 
   if (rows.length === 0) {
@@ -87,18 +82,18 @@ export async function buildLanceDbIndex(
     onProgress?.("indexing-fts");
     await table.createIndex("content_text", {
       config: Index.fts({ withPosition: true }),
-      replace: true
+      replace: true,
     });
     await table.createIndex("heading", {
       config: Index.fts({ withPosition: true }),
-      replace: true
+      replace: true,
     });
 
     onProgress?.("indexing-scalar");
     await Promise.all([
       safeCreateScalarIndex(table, "chunk_id"),
       safeCreateScalarIndex(table, "filepath"),
-      safeCreateScalarIndex(table, "chunk_index")
+      safeCreateScalarIndex(table, "chunk_index"),
     ]);
 
     // Create IVF-PQ vector index when there are enough rows with vectors
@@ -122,7 +117,7 @@ export async function buildLanceDbIndex(
 
   return {
     tableName,
-    metadataKeys
+    metadataKeys,
   };
 }
 
@@ -145,7 +140,7 @@ export class LanceDbSearchEngine implements SearchEngine {
       queryEmbeddingProvider?: EmbeddingProvider;
       vectorWeight?: number;
       onWarning?: (message: string) => void;
-    } = {}
+    } = {},
   ) {
     this.table = table;
     this.metadataKeys = [...metadataKeys];
@@ -204,22 +199,31 @@ export class LanceDbSearchEngine implements SearchEngine {
 
     const [matchRows, phraseRows, vectorRows] = await Promise.all([
       this.runFtsQuery(
-        new MultiMatchQuery(query, ["heading", "content_text"], { boosts: [3, 1] }),
+        new MultiMatchQuery(query, ["heading", "content_text"], {
+          boosts: [3, 1],
+        }),
         whereClause,
-        fetchLimit
+        fetchLimit,
       ),
       this.runFtsQuery(
         new PhraseQuery(query, "content_text", { slop: this.phraseSlop }),
         whereClause,
-        fetchLimit
+        fetchLimit,
       ),
-      this.runVectorQuery(query, whereClause, fetchLimit)
+      this.runVectorQuery(query, whereClause, fetchLimit),
     ]);
 
     const matchWeight = request.rrf_weights?.match ?? 1;
     const phraseWeight = request.rrf_weights?.phrase ?? this.proximityWeight;
     const vecWeight = request.rrf_weights?.vector ?? this.vectorWeight;
-    const blended = blendRows(matchRows, phraseRows, vectorRows, phraseWeight, vecWeight, matchWeight);
+    const blended = blendRows(
+      matchRows,
+      phraseRows,
+      vectorRows,
+      phraseWeight,
+      vecWeight,
+      matchWeight,
+    );
 
     // Collapse content-equivalent results across variant axes (e.g. same
     // operation documented in multiple SDK languages). Skipped when active
@@ -230,33 +234,34 @@ export class LanceDbSearchEngine implements SearchEngine {
     const paged = deduped.slice(offset, offset + limit);
 
     const hits = paged.map((entry) =>
-      toSearchHit(entry.row, entry.score, query, this.metadataKeys)
+      toSearchHit(entry.row, entry.score, query, this.metadataKeys),
     );
 
     const nextOffset = offset + paged.length;
-    const nextCursor = nextOffset < deduped.length
-      ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
-      : null;
+    const nextCursor =
+      nextOffset < deduped.length
+        ? encodeSearchCursor({ offset: nextOffset, limit }, { query, filters })
+        : null;
 
     if (hits.length > 0) {
       return {
         hits,
         next_cursor: nextCursor,
-        hint: null
+        hint: null,
       };
     }
 
     return {
       hits,
       next_cursor: nextCursor,
-      hint: await this.buildHint(query, filters)
+      hint: await this.buildHint(query, filters),
     };
   }
 
   async getDoc(request: GetDocRequest): Promise<GetDocResult> {
     if (!isChunkIdFormat(request.chunk_id)) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`
+        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
       );
     }
 
@@ -270,7 +275,7 @@ export class LanceDbSearchEngine implements SearchEngine {
 
     if (targetRows.length === 0) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`
+        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`,
       );
     }
 
@@ -316,14 +321,14 @@ export class LanceDbSearchEngine implements SearchEngine {
     }
 
     return {
-      text: blocks.join("\n\n")
+      text: blocks.join("\n\n"),
     };
   }
 
   private async runFtsQuery(
     query: FullTextQuery,
     whereClause: string | null,
-    limit: number
+    limit: number,
   ): Promise<ChunkRow[]> {
     let builder = this.table.search(query, "fts");
     if (whereClause) {
@@ -347,7 +352,7 @@ export class LanceDbSearchEngine implements SearchEngine {
   private async runVectorQuery(
     query: string,
     whereClause: string | null,
-    limit: number
+    limit: number,
   ): Promise<ChunkRow[]> {
     if (!this.queryEmbeddingProvider) {
       return [];
@@ -377,16 +382,20 @@ export class LanceDbSearchEngine implements SearchEngine {
     }
   }
 
-  private async buildHint(
-    query: string,
-    filters: Record<string, string>
-  ): Promise<SearchHint> {
+  private async buildHint(query: string, filters: Record<string, string>): Promise<SearchHint> {
     let fallbackRows: ChunkRow[];
     try {
-      fallbackRows = (await this.table
-        .search(new MultiMatchQuery(query, ["heading", "content_text"], { boosts: [3, 1] }), "fts")
-        .limit(100)
-        .toArray()).map((row) => row as ChunkRow);
+      fallbackRows = (
+        await this.table
+          .search(
+            new MultiMatchQuery(query, ["heading", "content_text"], {
+              boosts: [3, 1],
+            }),
+            "fts",
+          )
+          .limit(100)
+          .toArray()
+      ).map((row) => row as ChunkRow);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "";
       if (msg.includes("Invalid count value")) {
@@ -399,7 +408,7 @@ export class LanceDbSearchEngine implements SearchEngine {
     if (fallbackRows.length === 0) {
       return {
         message: "0 results found. No matches were found for this query in the indexed corpus.",
-        suggested_filters: {}
+        suggested_filters: {},
       };
     }
 
@@ -428,7 +437,7 @@ export class LanceDbSearchEngine implements SearchEngine {
       message: filterSummary
         ? `0 results found for query '${query}' with filters ${filterSummary}.`
         : `0 results found for query '${query}'.`,
-      suggested_filters: suggestions
+      suggested_filters: suggestions,
     };
   }
 
@@ -449,7 +458,7 @@ function blendRows(
   vectorRows: ChunkRow[],
   proximityWeight: number,
   vectorWeight: number,
-  matchWeight: number = 1
+  matchWeight: number = 1,
 ): Array<{ row: ChunkRow; score: number }> {
   const byChunkId = new Map<
     string,
@@ -461,10 +470,7 @@ function blendRows(
     }
   >();
 
-  const captureRanks = (
-    rows: ChunkRow[],
-    key: "matchRank" | "phraseRank" | "vectorRank"
-  ): void => {
+  const captureRanks = (rows: ChunkRow[], key: "matchRank" | "phraseRank" | "vectorRank"): void => {
     for (const [index, row] of rows.entries()) {
       const chunkId = expectStringField(row, "chunk_id");
       const rank = index + 1;
@@ -492,20 +498,22 @@ function blendRows(
 
       return {
         row: entry.row,
-        score: Number(score.toFixed(6))
+        score: Number(score.toFixed(6)),
       };
     })
     .sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
-      return expectStringField(a.row, "chunk_id").localeCompare(expectStringField(b.row, "chunk_id"));
+      return expectStringField(a.row, "chunk_id").localeCompare(
+        expectStringField(b.row, "chunk_id"),
+      );
     });
 }
 
 function deduplicateRows(
   rows: Array<{ row: ChunkRow; score: number }>,
-  collapseKeys: string[]
+  collapseKeys: string[],
 ): Array<{ row: ChunkRow; score: number }> {
   if (collapseKeys.length === 0) return rows;
 
@@ -516,7 +524,7 @@ function deduplicateRows(
       expectStringField(entry.row, "heading"),
       expectStringField(entry.row, "chunk_id"),
       (k) => expectStringField(entry.row, k),
-      collapseKeys
+      collapseKeys,
     );
     if (key === null) return true;
     if (seen.has(key)) return false;
@@ -540,7 +548,7 @@ function buildWhereClause(filters: Record<string, string>, taxonomyKeys?: string
     const scopeColumn = quoteIdentifier("scope");
     const languageColumn = quoteIdentifier("language");
     clauses.push(
-      `((${scopeColumn} = 'sdk-specific' AND ${languageColumn} = '${escapedLanguage}') OR ${scopeColumn} = 'global-guide' OR (${scopeColumn} <> 'sdk-specific' AND ${scopeColumn} <> 'global-guide' AND (${languageColumn} = '' OR ${languageColumn} = '${escapedLanguage}')))`
+      `((${scopeColumn} = 'sdk-specific' AND ${languageColumn} = '${escapedLanguage}') OR ${scopeColumn} = 'global-guide' OR (${scopeColumn} <> 'sdk-specific' AND ${scopeColumn} <> 'global-guide' AND (${languageColumn} = '' OR ${languageColumn} = '${escapedLanguage}')))`,
     );
   } else {
     if (language) {
@@ -566,7 +574,7 @@ function toSearchHit(
   row: ChunkRow,
   score: number,
   query: string,
-  metadataKeys: string[]
+  metadataKeys: string[],
 ): SearchHit {
   const contentText = expectStringField(row, "content_text");
 
@@ -577,14 +585,11 @@ function toSearchHit(
     snippet: makeSnippet(contentText, query),
     filepath: expectStringField(row, "filepath"),
     metadata: extractMetadata(row, metadataKeys),
-    score
+    score,
   };
 }
 
-function extractMetadata(
-  row: ChunkRow,
-  metadataKeys: string[]
-): Record<string, string> {
+function extractMetadata(row: ChunkRow, metadataKeys: string[]): Record<string, string> {
   const metadataJson = row.metadata_json;
   if (typeof metadataJson === "string" && metadataJson.trim()) {
     try {
@@ -616,7 +621,7 @@ function serializeChunkRow(
   chunk: Chunk,
   metadataKeys: string[],
   vectorsByChunkId?: Map<string, number[]>,
-  fileFingerprints?: Record<string, string>
+  fileFingerprints?: Record<string, string>,
 ): ChunkRow {
   const record: ChunkRow = {
     chunk_id: chunk.chunk_id,
@@ -627,7 +632,7 @@ function serializeChunkRow(
     content_text: chunk.content_text,
     breadcrumb: chunk.breadcrumb,
     chunk_index: chunk.chunk_index,
-    metadata_json: JSON.stringify(chunk.metadata)
+    metadata_json: JSON.stringify(chunk.metadata),
   };
 
   for (const key of metadataKeys) {
@@ -661,7 +666,7 @@ async function safeCreateScalarIndex(table: Table, column: string): Promise<void
   try {
     await table.createIndex(column, {
       config: Index.btree(),
-      replace: true
+      replace: true,
     });
   } catch {
     // Non-fatal optimization path.
@@ -669,10 +674,7 @@ async function safeCreateScalarIndex(table: Table, column: string): Promise<void
 }
 
 function escapeSqlString(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replaceAll("\0", "")
-    .replace(/'/g, "''");
+  return value.replace(/\\/g, "\\\\").replaceAll("\0", "").replace(/'/g, "''");
 }
 
 function rrf(rank: number | undefined, weight: number): number {

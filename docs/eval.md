@@ -7,29 +7,33 @@ The `@speakeasy-api/docs-mcp-eval` framework validates retrieval quality with tr
 The `docs-mcp-eval` tool drives the MCP server directly via stdio JSON-RPC (simulating a real agent) and captures the following metrics. All values are recorded and compared as deltas against a prior baseline; there are no fixed pass/fail thresholds.
 
 ### 1. Latency (Speed)
-*   **Average Search (p50):** The median time taken to execute a `search_docs` call.
-*   **Tail Latency (p95):** The 95th percentile latency.
-*   **Context Fetch (p50):** The time taken to execute a `get_doc` call for a specific chunk ID.
+
+- **Average Search (p50):** The median time taken to execute a `search_docs` call.
+- **Tail Latency (p95):** The 95th percentile latency.
+- **Context Fetch (p50):** The time taken to execute a `get_doc` call for a specific chunk ID.
 
 ### 2. Efficiency (Resource Usage)
-*   **Peak Memory Usage:** The maximum RSS (Resident Set Size) memory consumed by the Node.js process during a heavy search workload. Validates that LanceDB's memory-mapped I/O is functioning correctly and preventing V8 heap bloat.
-*   **Index Build Time:** The time required to parse, chunk, embed, and construct the `.lancedb` directory for the standard fixture corpus.
+
+- **Peak Memory Usage:** The maximum RSS (Resident Set Size) memory consumed by the Node.js process during a heavy search workload. Validates that LanceDB's memory-mapped I/O is functioning correctly and preventing V8 heap bloat.
+- **Index Build Time:** The time required to parse, chunk, embed, and construct the `.lancedb` directory for the standard fixture corpus.
 
 ### 3. Agent Efficacy (Accuracy)
-*   **MRR@5 (Mean Reciprocal Rank):** The average reciprocal of the rank at which the first correct chunk appears in the top 5 results. A score of 1.0 means the correct chunk is always the top result.
-*   **NDCG@5 (Normalized Discounted Cumulative Gain):** Measures ranking quality across the top 5 results, accounting for the position of all relevant chunks, not just the first.
-*   **Avg Rounds to Right Doc:** How many tool calls (`search_docs` followed by `get_doc`) does it take a simulated agent to retrieve the exact chunk containing the answer to a predefined question? A lower number means higher signal-to-noise ratio.
-*   **Taxonomy/Facet Precision:** Validates the JSON Schema injection and LanceDB pre-filtering. If an eval queries for "pagination" but strictly requires `language: "python"`, the framework asserts that *zero* TypeScript documents are returned.
+
+- **MRR@5 (Mean Reciprocal Rank):** The average reciprocal of the rank at which the first correct chunk appears in the top 5 results. A score of 1.0 means the correct chunk is always the top result.
+- **NDCG@5 (Normalized Discounted Cumulative Gain):** Measures ranking quality across the top 5 results, accounting for the position of all relevant chunks, not just the first.
+- **Avg Rounds to Right Doc:** How many tool calls (`search_docs` followed by `get_doc`) does it take a simulated agent to retrieve the exact chunk containing the answer to a predefined question? A lower number means higher signal-to-noise ratio.
+- **Taxonomy/Facet Precision:** Validates the JSON Schema injection and LanceDB pre-filtering. If an eval queries for "pagination" but strictly requires `language: "python"`, the framework asserts that _zero_ TypeScript documents are returned.
 
 ## Corpus Fixtures
 
 The framework runs against a fixed, version-controlled documentation corpus:
 
-*   **Standard Fixture (`tests/fixtures/realistic/`):** A small (~5MB) curated slice of Speakeasy SDK documentation covering multiple languages (TS, Python, Go) for a single service. Used for fast CI runs and validating cross-language deduplication logic.
+- **Standard Fixture (`tests/fixtures/realistic/`):** A small (~5MB) curated slice of Speakeasy SDK documentation covering multiple languages (TS, Python, Go) for a single service. Used for fast CI runs and validating cross-language deduplication logic.
 
 ## The `docs-mcp-eval` CLI
 
 ### Execution Flow
+
 1.  **Initialize:** Spin up the TS MCP Server process as a child process using stdio.
 2.  **Warm-up:** Send random `search_docs` queries to warm up the V8 JIT compiler and OS page cache (mmap).
 3.  **Benchmarking:** Execute a suite of predefined queries (JSON objects containing the query, optional taxonomy filters, and the expected `chunk_id`).
@@ -104,31 +108,31 @@ An eval suite is a JSON array of test cases. Each case describes a query, option
 
 ### Fields
 
-| Field | Required | Description |
-|---|---|---|
-| `query` | yes | The search query to send to `search_docs` |
-| `expectedChunkId` | yes | The chunk ID that should appear in the results. Format: `filepath#heading-slug` |
-| `filters` | no | Taxonomy filters to pass (e.g. `{"language": "python"}`). Defaults to `{}` |
-| `limit` | no | Number of results per page. Defaults to 5 |
-| `maxRounds` | no | Maximum pagination rounds before giving up. Defaults to 3 |
-| `name` | no | Human-readable name for reporting |
-| `category` | no | Category tag for per-category breakdown analysis |
+| Field             | Required | Description                                                                     |
+| ----------------- | -------- | ------------------------------------------------------------------------------- |
+| `query`           | yes      | The search query to send to `search_docs`                                       |
+| `expectedChunkId` | yes      | The chunk ID that should appear in the results. Format: `filepath#heading-slug` |
+| `filters`         | no       | Taxonomy filters to pass (e.g. `{"language": "python"}`). Defaults to `{}`      |
+| `limit`           | no       | Number of results per page. Defaults to 5                                       |
+| `maxRounds`       | no       | Maximum pagination rounds before giving up. Defaults to 3                       |
+| `name`            | no       | Human-readable name for reporting                                               |
+| `category`        | no       | Category tag for per-category breakdown analysis                                |
 
 ### Choosing Categories
 
 Categories enable per-category metric breakdowns, revealing where your search engine excels and where it struggles. Common categories:
 
-| Category | Tests | Example query |
-|---|---|---|
-| `lexical` | Exact keyword / class name matches | `"AcmeAuthClientV2 initialization"` |
-| `paraphrased` | Semantically equivalent but differently worded | `"how do I handle 429 rate limits"` |
-| `intent` | Conceptual queries requiring understanding | `"retry configuration"` |
-| `sdk-reference` | SDK-specific API lookups | `"list organizations method"` |
-| `cross-service` | Queries spanning multiple services | `"authentication across services"` |
-| `multi-hop` | Requires connecting multiple chunks | `"pagination with retry on failure"` |
-| `distractor` | Queries with plausible but wrong matches | `"authentication" (expecting auth guide, not SDK)` |
-| `error-handling` | Error code and exception lookups | `"ERR_RATE_LIMIT handling"` |
-| `api-discovery` | Finding available operations | `"what endpoints are available"` |
+| Category         | Tests                                          | Example query                                      |
+| ---------------- | ---------------------------------------------- | -------------------------------------------------- |
+| `lexical`        | Exact keyword / class name matches             | `"AcmeAuthClientV2 initialization"`                |
+| `paraphrased`    | Semantically equivalent but differently worded | `"how do I handle 429 rate limits"`                |
+| `intent`         | Conceptual queries requiring understanding     | `"retry configuration"`                            |
+| `sdk-reference`  | SDK-specific API lookups                       | `"list organizations method"`                      |
+| `cross-service`  | Queries spanning multiple services             | `"authentication across services"`                 |
+| `multi-hop`      | Requires connecting multiple chunks            | `"pagination with retry on failure"`               |
+| `distractor`     | Queries with plausible but wrong matches       | `"authentication" (expecting auth guide, not SDK)` |
+| `error-handling` | Error code and exception lookups               | `"ERR_RATE_LIMIT handling"`                        |
+| `api-discovery`  | Finding available operations                   | `"what endpoints are available"`                   |
 
 ## Running Benchmarks
 
@@ -143,6 +147,7 @@ npx docs-mcp-eval run \
 ```
 
 Options:
+
 - `--cases` — path to your eval suite JSON file (required)
 - `--server-command` — command to launch the MCP server (required)
 - `--build-command` — optional pre-eval index build step

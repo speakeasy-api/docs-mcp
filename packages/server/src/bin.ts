@@ -16,14 +16,16 @@ import {
   type EmbeddingMetadata,
   type EmbeddingProvider,
   type RrfWeights,
-  type SearchEngine
+  type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "./server.js";
 import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
 
 const require = createRequire(import.meta.url);
-const { version: SERVER_VERSION } = require("../package.json") as { version: string };
+const { version: SERVER_VERSION } = require("../package.json") as {
+  version: string;
+};
 
 interface ServerCliOptions {
   indexDir: string;
@@ -41,35 +43,47 @@ interface ServerCliOptions {
   port: number;
 }
 
-const TaxonomyFieldSchema = z.object({
-  description: z.string().optional(),
-  values: z.array(z.string())
-}).passthrough();
+const TaxonomyFieldSchema = z
+  .object({
+    description: z.string().optional(),
+    values: z.array(z.string()),
+  })
+  .passthrough();
 
-const MetadataDocumentSchema = z.object({
-  metadata_version: z.string(),
-  corpus_description: z.string(),
-  taxonomy: z.record(z.string(), TaxonomyFieldSchema),
-  stats: z.object({
-    total_chunks: z.number().int(),
-    total_files: z.number().int(),
-    indexed_at: z.string(),
-    source_commit: z.string().nullable().optional()
-  }).passthrough(),
-  embedding: z.object({
-    provider: z.string(),
-    model: z.string(),
-    dimensions: z.number().int()
-  }).nullable(),
-  tool_descriptions: z.object({
-    search_docs: z.string().optional(),
-    get_doc: z.string().optional()
-  }).optional(),
-  index: z.object({
-    path: z.string(),
-    table: z.string()
-  }).optional()
-}).passthrough();
+const MetadataDocumentSchema = z
+  .object({
+    metadata_version: z.string(),
+    corpus_description: z.string(),
+    taxonomy: z.record(z.string(), TaxonomyFieldSchema),
+    stats: z
+      .object({
+        total_chunks: z.number().int(),
+        total_files: z.number().int(),
+        indexed_at: z.string(),
+        source_commit: z.string().nullable().optional(),
+      })
+      .passthrough(),
+    embedding: z
+      .object({
+        provider: z.string(),
+        model: z.string(),
+        dimensions: z.number().int(),
+      })
+      .nullable(),
+    tool_descriptions: z
+      .object({
+        search_docs: z.string().optional(),
+        get_doc: z.string().optional(),
+      })
+      .optional(),
+    index: z
+      .object({
+        path: z.string(),
+        table: z.string(),
+      })
+      .optional(),
+  })
+  .passthrough();
 
 const program = new Command();
 
@@ -80,10 +94,7 @@ program
   .option("--name <value>", "MCP server name", "@speakeasy-api/docs-mcp-server")
   .option("--tool-prefix <value>", "Tool name prefix (e.g. 'acme' produces acme_search_docs)")
   .option("--version <value>", "MCP server version", SERVER_VERSION)
-  .option(
-    "--query-embedding-api-key <value>",
-    "Query embedding API key (or set OPENAI_API_KEY)"
-  )
+  .option("--query-embedding-api-key <value>", "Query embedding API key (or set OPENAI_API_KEY)")
   .option("--query-embedding-base-url <value>", "Query embedding API base URL")
   .option("--query-embedding-batch-size <number>", "Query embedding batch size", parseIntOption)
   .option("--proximity-weight <number>", "Lexical phrase blend weight", parseNumberOption)
@@ -92,10 +103,15 @@ program
   .option(
     "--allow-chunks-fallback",
     "Allow fallback to chunks.json when .lancedb is missing",
-    false
+    false,
   )
   .option("--transport <type>", "Transport type: stdio or http", "stdio")
-  .option("--port <number>", "HTTP server port (only used with --transport http)", parseIntOption, 20310)
+  .option(
+    "--port <number>",
+    "HTTP server port (only used with --transport http)",
+    parseIntOption,
+    20310,
+  )
   .action(async (options: ServerCliOptions) => {
     const indexDir = path.resolve(options.indexDir);
     const metadataPath = path.join(indexDir, "metadata.json");
@@ -109,7 +125,9 @@ program
       const detail = error instanceof z.ZodError ? z.prettifyError(error) : String(error);
       throw new Error(`Invalid metadata.json at '${metadataPath}':\n${detail}`, { cause: error });
     }
-    const metadata = normalizeMetadata(metadataDocument as unknown as CorpusMetadata) as CorpusMetadata;
+    const metadata = normalizeMetadata(
+      metadataDocument as unknown as CorpusMetadata,
+    ) as CorpusMetadata;
     const metadataKeys = Object.keys(metadata.taxonomy);
     const collapseKeys = getCollapseKeys(metadata.taxonomy);
     const indexConfig = parseIndexConfig(metadataDocument);
@@ -132,7 +150,7 @@ program
       chunksPath,
       metadataKeys,
       collapseKeys,
-      allowChunksFallback: options.allowChunksFallback
+      allowChunksFallback: options.allowChunksFallback,
     };
     if (queryEmbeddingProvider !== undefined) {
       loadInput.queryEmbeddingProvider = queryEmbeddingProvider;
@@ -153,25 +171,27 @@ program
     const app = new McpDocsServer({
       index,
       metadata,
-      vectorSearchAvailable: queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
+      vectorSearchAvailable:
+        queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
       ...(options.toolPrefix ? { toolPrefix: options.toolPrefix } : {}),
-      ...(rrfWeights ? { rrfWeights } : {})
+      ...(rrfWeights ? { rrfWeights } : {}),
     });
 
-    const serverName = options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
-      ? `${options.toolPrefix}-docs-server`
-      : options.name;
+    const serverName =
+      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
+        ? `${options.toolPrefix}-docs-server`
+        : options.name;
 
     if (options.transport === "http") {
       await startHttpServer(app, {
         name: serverName,
         version: options.version,
-        port: options.port
+        port: options.port,
       });
     } else {
       await startStdioServer(app, {
         name: serverName,
-        version: options.version
+        version: options.version,
       });
     }
   });
@@ -206,7 +226,7 @@ async function loadSearchEngine(input: {
       tableName: input.tableName,
       metadataKeys: input.metadataKeys,
       ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {}),
-      onWarning: (message: string) => console.warn(`warn: ${message}`)
+      onWarning: (message: string) => console.warn(`warn: ${message}`),
     };
     if (input.queryEmbeddingProvider !== undefined) {
       openInput.queryEmbeddingProvider = input.queryEmbeddingProvider;
@@ -226,39 +246,42 @@ async function loadSearchEngine(input: {
 
   if (!input.allowChunksFallback) {
     throw new Error(
-      `LanceDB index not found at '${input.lancedbPath}'. Re-run docs-mcp build or pass --allow-chunks-fallback to use chunks.json fallback.`
+      `LanceDB index not found at '${input.lancedbPath}'. Re-run docs-mcp build or pass --allow-chunks-fallback to use chunks.json fallback.`,
     );
   }
 
   console.warn(
-    `warn: LanceDB index not found at '${input.lancedbPath}'; falling back to chunks.json in-memory search`
+    `warn: LanceDB index not found at '${input.lancedbPath}'; falling back to chunks.json in-memory search`,
   );
   const chunksRaw = await readFile(input.chunksPath, "utf8");
   const chunks = JSON.parse(chunksRaw) as Chunk[];
   return new DocsIndex(chunks, {
-    ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {})
+    ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {}),
   });
 }
 
-function parseIndexConfig(metadata: Record<string, unknown>): { path: string; table: string } {
+function parseIndexConfig(metadata: Record<string, unknown>): {
+  path: string;
+  table: string;
+} {
   const index = metadata.index;
   if (!index || typeof index !== "object") {
     return {
       path: ".lancedb",
-      table: "chunks"
+      table: "chunks",
     };
   }
 
   const record = index as Record<string, unknown>;
   return {
     path: toNonEmptyString(record.path) ?? ".lancedb",
-    table: toNonEmptyString(record.table) ?? "chunks"
+    table: toNonEmptyString(record.table) ?? "chunks",
   };
 }
 
 function resolveQueryEmbeddingProvider(
   options: ServerCliOptions,
-  metadataEmbedding: EmbeddingMetadata | null
+  metadataEmbedding: EmbeddingMetadata | null,
 ): EmbeddingProvider | undefined {
   const provider = metadataEmbedding?.provider?.trim().toLowerCase();
   if (!provider || provider === "none") {
@@ -267,7 +290,7 @@ function resolveQueryEmbeddingProvider(
 
   if (provider !== "hash" && provider !== "openai") {
     console.warn(
-      `warn: embedding provider '${metadataEmbedding?.provider}' is not supported at runtime; falling back to FTS-only search`
+      `warn: embedding provider '${metadataEmbedding?.provider}' is not supported at runtime; falling back to FTS-only search`,
     );
     return undefined;
   }
@@ -280,7 +303,7 @@ function resolveQueryEmbeddingProvider(
     baseUrl?: string;
     batchSize?: number;
   } = {
-    provider
+    provider,
   };
 
   if (metadataEmbedding?.model !== undefined) {
@@ -291,8 +314,7 @@ function resolveQueryEmbeddingProvider(
     input.dimensions = metadataEmbedding.dimensions;
   }
 
-  const apiKey =
-    options.queryEmbeddingApiKey ?? process.env.OPENAI_API_KEY;
+  const apiKey = options.queryEmbeddingApiKey ?? process.env.OPENAI_API_KEY;
   if (apiKey !== undefined) {
     input.apiKey = apiKey;
   }

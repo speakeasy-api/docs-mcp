@@ -4,27 +4,28 @@ export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, 
   const properties: Record<string, unknown> = {
     query: {
       type: "string",
-      description: "The search query — use method names, class names, error types, or describe what you want to do (e.g., 'links.create', 'RateLimitError', 'how to paginate')."
+      description:
+        "The search query — use method names, class names, error types, or describe what you want to do (e.g., 'links.create', 'RateLimitError', 'how to paginate').",
     },
     limit: {
       type: "integer",
       description: "Maximum number of results to return. Default is 10.",
       minimum: 1,
       maximum: 50,
-      default: 10
+      default: 10,
     },
     cursor: {
       type: "string",
       description:
-        "Opaque pagination token returned from a previous search. Omit for the first page."
-    }
+        "Opaque pagination token returned from a previous search. Omit for the first page.",
+    },
   };
 
   for (const [key, field] of Object.entries(metadata.taxonomy)) {
     properties[key] = {
       type: "string",
       description: field.description ?? `Filter results by ${key}.`,
-      enum: field.values
+      enum: field.values,
     };
   }
 
@@ -32,7 +33,7 @@ export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, 
     type: "object",
     additionalProperties: false,
     properties,
-    required: ["query"]
+    required: ["query"],
   };
 }
 
@@ -44,7 +45,7 @@ export function buildGetDocSchema(): Record<string, unknown> {
       chunk_id: {
         type: "string",
         description:
-          "The exact ID of the chunk to retrieve, as returned by search_docs (e.g., 'guides/retries.md#backoff-strategy')."
+          "The exact ID of the chunk to retrieve, as returned by search_docs (e.g., 'guides/retries.md#backoff-strategy').",
       },
       context: {
         type: "integer",
@@ -52,9 +53,9 @@ export function buildGetDocSchema(): Record<string, unknown> {
           "Number of adjacent chunks to include before and after the target chunk. Default 0 (recommended). Chunks are self-contained; only increase after an initial read if you need broader page context.",
         minimum: 0,
         maximum: 5,
-        default: 0
-      }
+        default: 0,
+      },
     },
-    required: ["chunk_id"]
+    required: ["chunk_id"],
   };
 }

@@ -6,7 +6,7 @@ import type {
   Manifest,
   ManifestOverride,
   ManifestTaxonomyFieldConfig,
-  ResolvedFileConfig
+  ResolvedFileConfig,
 } from "./types.js";
 
 const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
@@ -16,7 +16,7 @@ const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
  * sets `vector_collapse: true` for a key, the merged result includes it.
  */
 export function mergeTaxonomyConfigs(
-  manifests: Iterable<Manifest>
+  manifests: Iterable<Manifest>,
 ): Record<string, ManifestTaxonomyFieldConfig> {
   const merged: Record<string, ManifestTaxonomyFieldConfig> = {};
 
@@ -57,7 +57,9 @@ export function parseManifest(input: unknown): Manifest {
     try {
       parsed.taxonomy = ManifestTaxonomyConfigSchema.parse(manifest.taxonomy);
     } catch (err) {
-      throw new Error(`Invalid taxonomy config: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `Invalid taxonomy config: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   if (manifest.overrides) {
@@ -86,19 +88,16 @@ export function resolveFileConfig(params: {
 }): ResolvedFileConfig {
   const defaults: ResolvedFileConfig = {
     strategy: params.defaults?.strategy ?? DEFAULT_STRATEGY,
-    metadata: params.defaults?.metadata ?? {}
+    metadata: params.defaults?.metadata ?? {},
   };
 
   const manifest = params.manifest;
   let metadata = {
     ...defaults.metadata,
-    ...(manifest?.metadata ?? {})
+    ...(manifest?.metadata ?? {}),
   };
   let strategy = manifest?.strategy ?? defaults.strategy;
-  const overrideMatchPath = toManifestRelativePath(
-    params.relativeFilePath,
-    params.manifestBaseDir
-  );
+  const overrideMatchPath = toManifestRelativePath(params.relativeFilePath, params.manifestBaseDir);
 
   if (manifest?.overrides) {
     for (const override of manifest.overrides) {
@@ -110,7 +109,7 @@ export function resolveFileConfig(params: {
       if (override.metadata) {
         metadata = {
           ...metadata,
-          ...override.metadata
+          ...override.metadata,
         };
       }
 
@@ -133,7 +132,7 @@ export function resolveFileConfig(params: {
     if (frontmatterOverrides.metadata) {
       metadata = {
         ...metadata,
-        ...frontmatterOverrides.metadata
+        ...frontmatterOverrides.metadata,
       };
     }
 
@@ -144,7 +143,7 @@ export function resolveFileConfig(params: {
 
   return {
     strategy,
-    metadata
+    metadata,
   };
 }
 
@@ -187,7 +186,7 @@ function parseFrontmatterOverrides(markdown: string): {
     strategy = parseStrategy(data.mcp_strategy);
   } else if (data.mcp_chunking_hint) {
     strategy = {
-      chunk_by: parseChunkBy(data.mcp_chunking_hint)
+      chunk_by: parseChunkBy(data.mcp_chunking_hint),
     };
   }
 
@@ -198,11 +197,14 @@ function parseFrontmatterOverrides(markdown: string): {
   if (data.mcp_metadata) {
     metadata = {
       ...(metadata ?? {}),
-      ...parseMetadata(data.mcp_metadata, "mcp_metadata")
+      ...parseMetadata(data.mcp_metadata, "mcp_metadata"),
     };
   }
 
-  const result: { strategy?: ChunkingStrategy; metadata?: Record<string, string> } = {};
+  const result: {
+    strategy?: ChunkingStrategy;
+    metadata?: Record<string, string>;
+  } = {};
   if (strategy) {
     result.strategy = strategy;
   }
@@ -220,7 +222,7 @@ function parseFrontmatterOverrides(markdown: string): {
  * or undefined if no hint is present or parsing fails.
  */
 export function parseHtmlChunkingHint(
-  markdown: string
+  markdown: string,
 ): Pick<ChunkingStrategy, "chunk_by"> | undefined {
   const match = HTML_HINT_REGEX.exec(markdown);
   if (!match) {
@@ -260,7 +262,7 @@ function parseOverrides(value: unknown): ManifestOverride[] {
     }
 
     const parsed: ManifestOverride = {
-      pattern: override.pattern.trim()
+      pattern: override.pattern.trim(),
     };
 
     if (override.strategy) {
@@ -286,7 +288,7 @@ function parseStrategy(value: unknown): ChunkingStrategy {
   const minChunkSize = strategy.min_chunk_size;
 
   const parsed: ChunkingStrategy = {
-    chunk_by: chunkBy
+    chunk_by: chunkBy,
   };
 
   if (maxChunkSize !== undefined) {

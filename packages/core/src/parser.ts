@@ -10,10 +10,7 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import type { Root } from "mdast";
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkFrontmatter, ["yaml"])
-  .use(remarkGfm);
+const processor = unified().use(remarkParse).use(remarkFrontmatter, ["yaml"]).use(remarkGfm);
 
 /**
  * Parse a markdown string into an mdast AST tree.

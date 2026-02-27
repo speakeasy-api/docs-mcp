@@ -5,12 +5,14 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
-  type ListToolsResult
+  type ListToolsResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { McpDocsServer } from "./server.js";
 
 const require = createRequire(import.meta.url);
-const { version: PKG_VERSION } = require("../package.json") as { version: string };
+const { version: PKG_VERSION } = require("../package.json") as {
+  version: string;
+};
 
 export interface StartStdioServerOptions {
   name?: string;
@@ -19,25 +21,25 @@ export interface StartStdioServerOptions {
 
 export async function startStdioServer(
   app: McpDocsServer,
-  options: StartStdioServerOptions = {}
+  options: StartStdioServerOptions = {},
 ): Promise<void> {
   const server = new Server(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
-      version: options.version ?? PKG_VERSION
+      version: options.version ?? PKG_VERSION,
     },
     {
       capabilities: {
-        tools: {}
-      }
-    }
+        tools: {},
+      },
+    },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools = app.getTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"]
+      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"],
     }));
 
     return { tools } satisfies ListToolsResult;

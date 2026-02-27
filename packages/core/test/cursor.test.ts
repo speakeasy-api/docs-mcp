@@ -53,131 +53,112 @@ describe("cursor encode/decode", () => {
   it("throws on invalid base64 that cannot be parsed as JSON", () => {
     // Buffer.from with base64url is lenient, so the error comes from JSON.parse
     expect(() => decodeCursor("not-valid-base64!!!")).toThrow(
-      "Invalid cursor: malformed JSON payload"
+      "Invalid cursor: malformed JSON payload",
     );
   });
 
   it("throws on valid base64url but invalid JSON", () => {
-    const invalidJson = Buffer.from("not json {{{", "utf-8").toString(
-      "base64url"
-    );
-    expect(() => decodeCursor(invalidJson)).toThrow(
-      "Invalid cursor: malformed JSON payload"
-    );
+    const invalidJson = Buffer.from("not json {{{", "utf-8").toString("base64url");
+    expect(() => decodeCursor(invalidJson)).toThrow("Invalid cursor: malformed JSON payload");
   });
 
   it("throws when decoded payload is not an object (string)", () => {
-    const encoded = Buffer.from(JSON.stringify("string"), "utf-8").toString(
-      "base64url"
-    );
+    const encoded = Buffer.from(JSON.stringify("string"), "utf-8").toString("base64url");
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when decoded payload is an array", () => {
-    const encoded = Buffer.from(JSON.stringify([1, 2]), "utf-8").toString(
-      "base64url"
-    );
+    const encoded = Buffer.from(JSON.stringify([1, 2]), "utf-8").toString("base64url");
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when decoded payload is null", () => {
-    const encoded = Buffer.from(JSON.stringify(null), "utf-8").toString(
-      "base64url"
-    );
+    const encoded = Buffer.from(JSON.stringify(null), "utf-8").toString("base64url");
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   // ─── Missing/invalid fields ───────────────────────────────────
 
   it("throws when offset is missing", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ limit: 10 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ limit: 10 }), "utf-8").toString("base64url");
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when limit is missing", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: 0 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: 0 }), "utf-8").toString("base64url");
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when offset is negative", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: -1, limit: 10 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: -1, limit: 10 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when limit is zero", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: 0, limit: 0 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: 0, limit: 0 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when limit is negative", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: 0, limit: -5 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: 0, limit: -5 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when offset is a float", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: 1.5, limit: 10 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: 1.5, limit: 10 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when limit is a float", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: 0, limit: 2.5 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: 0, limit: 2.5 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 
   it("throws when offset is a string", () => {
-    const encoded = Buffer.from(
-      JSON.stringify({ offset: "ten", limit: 10 }),
-      "utf-8"
-    ).toString("base64url");
+    const encoded = Buffer.from(JSON.stringify({ offset: "ten", limit: 10 }), "utf-8").toString(
+      "base64url",
+    );
     expect(() => decodeCursor(encoded)).toThrow(
-      "Invalid cursor: expected { offset:number, limit:number }"
+      "Invalid cursor: expected { offset:number, limit:number }",
     );
   });
 });
 
 describe("search cursor encode/decode", () => {
-  const context = { query: "authentication", filters: { language: "typescript" } };
+  const context = {
+    query: "authentication",
+    filters: { language: "typescript" },
+  };
 
   // ─── Round-trip with signature ─────────────────────────────────
 
@@ -202,7 +183,7 @@ describe("search cursor encode/decode", () => {
     const encoded = encodeSearchCursor(payload, context);
     const differentContext = { query: "pagination", filters: {} };
     expect(() => decodeSearchCursor(encoded, differentContext)).toThrow(
-      "Invalid cursor: does not match current query or filters"
+      "Invalid cursor: does not match current query or filters",
     );
   });
 
@@ -212,9 +193,9 @@ describe("search cursor encode/decode", () => {
       query: "test",
       filters: { lang: "go" },
     });
-    expect(() =>
-      decodeSearchCursor(encoded, { query: "test", filters: { lang: "rust" } })
-    ).toThrow("Invalid cursor: does not match current query or filters");
+    expect(() => decodeSearchCursor(encoded, { query: "test", filters: { lang: "rust" } })).toThrow(
+      "Invalid cursor: does not match current query or filters",
+    );
   });
 
   // ─── Plain cursor used as search cursor ────────────────────────
@@ -223,7 +204,7 @@ describe("search cursor encode/decode", () => {
     const payload: CursorPayload = { offset: 10, limit: 5 };
     const encoded = encodeCursor(payload);
     expect(() => decodeSearchCursor(encoded, context)).toThrow(
-      "Invalid cursor: expected a search cursor payload"
+      "Invalid cursor: expected a search cursor payload",
     );
   });
 

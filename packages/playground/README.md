@@ -22,12 +22,12 @@ Then open `http://localhost:3001` in your browser.
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Port the playground server listens on |
-| `MCP_TARGET` | `http://localhost:20310` | URL of the docs-mcp-server to proxy MCP requests to |
-| `PLAYGROUND_PASSWORD` | _(none)_ | If set, enables password authentication |
-| `SERVER_NAME` | `speakeasy-docs` | Display name shown in the playground UI |
+| Variable              | Default                  | Description                                         |
+| --------------------- | ------------------------ | --------------------------------------------------- |
+| `PORT`                | `3001`                   | Port the playground server listens on               |
+| `MCP_TARGET`          | `http://localhost:20310` | URL of the docs-mcp-server to proxy MCP requests to |
+| `PLAYGROUND_PASSWORD` | _(none)_                 | If set, enables password authentication             |
+| `SERVER_NAME`         | `speakeasy-docs`         | Display name shown in the playground UI             |
 
 ## License
 
