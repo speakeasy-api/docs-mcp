@@ -233,4 +233,74 @@ describe("mergeTaxonomyConfigs", () => {
 
     expect(mergeTaxonomyConfigs(manifests)).toEqual({});
   });
+
+  it("merges properties with mcp_resource from multiple manifests", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        taxonomy: {
+          language: {
+            vector_collapse: true,
+            properties: { typescript: { mcp_resource: true } },
+          },
+        },
+      },
+      {
+        version: "1",
+        taxonomy: {
+          language: {
+            vector_collapse: false,
+            properties: { python: { mcp_resource: true } },
+          },
+        },
+      },
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      language: {
+        vector_collapse: true,
+        properties: {
+          typescript: { mcp_resource: true },
+          python: { mcp_resource: true },
+        },
+      },
+    });
+  });
+
+  it("ignores properties with mcp_resource: false", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        taxonomy: {
+          language: {
+            vector_collapse: false,
+            properties: { typescript: { mcp_resource: false } },
+          },
+        },
+      },
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({});
+  });
+
+  it("parses taxonomy config with properties", () => {
+    const manifest = parseManifest({
+      version: "1",
+      taxonomy: {
+        language: {
+          vector_collapse: true,
+          properties: {
+            typescript: { mcp_resource: true },
+          },
+        },
+      },
+    });
+
+    expect(manifest.taxonomy).toEqual({
+      language: {
+        vector_collapse: true,
+        properties: { typescript: { mcp_resource: true } },
+      },
+    });
+  });
 });

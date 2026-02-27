@@ -647,7 +647,15 @@ function buildMetadata(
 ): {
   metadata_version: string;
   corpus_description: string;
-  taxonomy: Record<string, { description: string; values: string[]; vector_collapse?: boolean }>;
+  taxonomy: Record<
+    string,
+    {
+      description: string;
+      values: string[];
+      vector_collapse?: boolean;
+      properties?: Record<string, { mcp_resource: boolean }>;
+    }
+  >;
   stats: {
     total_chunks: number;
     total_files: number;
@@ -668,7 +676,12 @@ function buildMetadata(
 
   const taxonomy: Record<
     string,
-    { description: string; values: string[]; vector_collapse?: boolean }
+    {
+      description: string;
+      values: string[];
+      vector_collapse?: boolean;
+      properties?: Record<string, { mcp_resource: boolean }>;
+    }
   > = {};
   for (const [key, values] of taxonomyValues.entries()) {
     const config = taxonomyConfig[key];
@@ -676,6 +689,7 @@ function buildMetadata(
       description: `Filter results by ${key}.`,
       values: [...values].sort((a, b) => a.localeCompare(b)),
       ...(config?.vector_collapse ? { vector_collapse: true } : {}),
+      ...(config?.properties ? { properties: config.properties } : {}),
     };
   }
 

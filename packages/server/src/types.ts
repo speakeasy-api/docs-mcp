@@ -31,6 +31,8 @@ export interface CallToolResult {
 export interface ToolProvider {
   getTools(): ToolDefinition[];
   callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult>;
+  getResources(): Promise<ResourceDefinition[]>;
+  readResource(uri: string): Promise<ReadResourceResult>;
 }
 
 export interface CustomTool {
@@ -38,4 +40,21 @@ export interface CustomTool {
   description: string;
   inputSchema: Record<string, unknown>;
   handler: (args: unknown, context: ToolCallContext) => Promise<CallToolResult>;
+}
+
+export interface ResourceDefinition {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface ResourceContent {
+  uri: string;
+  mimeType?: string;
+  text: string;
+}
+
+export interface ReadResourceResult {
+  contents: ResourceContent[];
 }

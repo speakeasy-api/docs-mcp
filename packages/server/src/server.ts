@@ -6,7 +6,15 @@ import type {
   SearchRequest,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
-import type { CallToolResult, CustomTool, ToolCallContext, ToolDefinition, ToolProvider } from "./types.js";
+import type {
+  CallToolResult,
+  CustomTool,
+  ReadResourceResult,
+  ResourceDefinition,
+  ToolCallContext,
+  ToolDefinition,
+  ToolProvider,
+} from "./types.js";
 
 export interface McpDocsServerOptions {
   index: SearchEngine;
@@ -42,7 +50,7 @@ export class McpDocsServer implements ToolProvider {
     for (const name of [this.searchToolName, this.getDocToolName]) {
       if (!MCP_TOOL_NAME_PATTERN.test(name)) {
         throw new Error(
-          `Built-in tool name '${name}' exceeds 64 characters or contains invalid characters. Use a shorter toolPrefix.`
+          `Built-in tool name '${name}' exceeds 64 characters or contains invalid characters. Use a shorter toolPrefix.`,
         );
       }
     }
@@ -53,13 +61,11 @@ export class McpDocsServer implements ToolProvider {
     for (const tool of this.customTools) {
       if (!MCP_TOOL_NAME_PATTERN.test(tool.name)) {
         throw new Error(
-          `Custom tool name '${tool.name}' must match MCP spec: alphanumeric/dash/underscore, 1-64 chars.`
+          `Custom tool name '${tool.name}' must match MCP spec: alphanumeric/dash/underscore, 1-64 chars.`,
         );
       }
       if (builtInNames.has(tool.name)) {
-        throw new Error(
-          `Custom tool name '${tool.name}' collides with a built-in tool name.`
-        );
+        throw new Error(`Custom tool name '${tool.name}' collides with a built-in tool name.`);
       }
       if (seenCustomNames.has(tool.name)) {
         throw new Error(`Duplicate custom tool name '${tool.name}'.`);
@@ -90,7 +96,7 @@ export class McpDocsServer implements ToolProvider {
     const custom: ToolDefinition[] = this.customTools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.inputSchema
+      inputSchema: tool.inputSchema,
     }));
 
     return [...builtIn, ...custom];
@@ -141,6 +147,77 @@ export class McpDocsServer implements ToolProvider {
     } catch (error) {
       return errorResult(error instanceof Error ? error.message : "get_doc failed");
     }
+  }
+
+  async getResources(): Promise<ResourceDefinition[]> {
+    const resources: ResourceDefinition[] = [];
+
+    for (const [dimKey, field] of Object.entries(this.metadata.taxonomy)) {
+      if (!field.properties) continue;
+
+      for (const [value, props] of Object.entries(field.properties)) {
+        if (!props.mcp_resource) continue;
+
+        const entries = await this.index.listFilepaths({
+          filters: { [dimKey]: value },
+        });
+
+        for (const entry of entries) {
+          resources.push({
+            uri: `docs:///${entry.filepath}`,
+            name: entry.filepath,
+            description: `${entry.filepath} (${dimKey}=${value})`,
+            mimeType: "text/markdown",
+          });
+        }
+      }
+    }
+
+    return resources;
+  }
+
+  async readResource(uri: string): Promise<ReadResourceResult> {
+    const parsed = new URL(uri);
+    if (parsed.protocol !== "docs:") {
+      throw new Error(`Invalid URI scheme: ${parsed.protocol}. Expected 'docs:'`);
+    }
+
+    let filepath = parsed.pathname;
+    // remove leading slash
+    if (filepath.startsWith("/")) {
+      filepath = filepath.slice(1);
+    }
+    if (!filepath) {
+      throw new Error(`Invalid URI: missing filepath in '${uri}'`);
+    }
+
+    console.log("Looking up resource for filepath:", filepath);
+    const entries = await this.index.listFilepaths({
+      filters: {
+        filepath,
+      },
+    });
+
+    const entry = entries.find((e) => e.filepath === filepath);
+    if (!entry) {
+      throw new Error(`Resource not found: ${uri}`);
+    }
+
+    // Change this to grab the full document, not chunks.
+    const result = await this.index.getDoc({
+      chunk_id: entry.firstChunkId,
+      context: -1,
+    });
+
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "text/markdown",
+          text: result.text,
+        },
+      ],
+    };
   }
 }
 

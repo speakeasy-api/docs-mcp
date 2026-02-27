@@ -14,6 +14,8 @@ const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
 /**
  * Union-merges taxonomy field configs from multiple manifests. If any manifest
  * sets `vector_collapse: true` for a key, the merged result includes it.
+ * Similarly, if any manifest sets `mcp_resource: true` for a value, the merged
+ * result includes it.
  */
 export function mergeTaxonomyConfigs(
   manifests: Iterable<Manifest>,
@@ -24,7 +26,23 @@ export function mergeTaxonomyConfigs(
     if (!manifest.taxonomy) continue;
     for (const [key, config] of Object.entries(manifest.taxonomy)) {
       if (config.vector_collapse) {
-        merged[key] = { ...merged[key], vector_collapse: true };
+        if (!merged[key]) {
+          merged[key] = { vector_collapse: false };
+        }
+        merged[key].vector_collapse = true;
+      }
+      if (config.properties) {
+        for (const [value, props] of Object.entries(config.properties)) {
+          if (props.mcp_resource) {
+            if (!merged[key]) {
+              merged[key] = { vector_collapse: false };
+            }
+            if (!merged[key].properties) {
+              merged[key].properties = {};
+            }
+            merged[key].properties[value] = { mcp_resource: true };
+          }
+        }
       }
     }
   }

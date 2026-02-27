@@ -51,6 +51,17 @@ export const ManifestOverrideSchema = z
     "Overrides the default chunking strategy and/or metadata for files matching a glob pattern. Within the overrides array, later matches take precedence.",
   );
 
+export const TaxonomyValuePropertiesSchema = z
+  .object({
+    mcp_resource: z
+      .boolean()
+      .default(false)
+      .describe(
+        "When true, documents with this taxonomy dimension value are exposed as first-class MCP resources.",
+      ),
+  })
+  .describe("Per-value configuration for a taxonomy dimension value.");
+
 export const TaxonomyFieldConfigSchema = z
   .object({
     vector_collapse: z
@@ -58,6 +69,12 @@ export const TaxonomyFieldConfigSchema = z
       .default(false)
       .describe(
         "When true, this taxonomy dimension identifies content variants that are near-identical in vector space (e.g. the same API operation documented in multiple SDK languages). At search time, results sharing the same content identity — determined by normalizing this field's value out of the filepath — are collapsed to the highest-scoring result. Has no effect when a filter for this field is active, since the filter already restricts to a single value.",
+      ),
+    properties: z
+      .record(z.string(), TaxonomyValuePropertiesSchema)
+      .optional()
+      .describe(
+        "Per-value configuration for this taxonomy dimension. Keys are taxonomy values (e.g. 'typescript', 'python').",
       ),
   })
   .describe("Configuration for a taxonomy field's search-time behavior.");

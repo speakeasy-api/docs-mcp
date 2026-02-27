@@ -200,6 +200,80 @@ describe("MCP HTTP transport compliance", () => {
   });
 });
 
+describe("MCP HTTP transport resources", () => {
+  let resourceHttpServer: http.Server;
+  let resourceBaseUrl: string;
+
+  const metadataWithResources = normalizeMetadata({
+    metadata_version: "1.1.0",
+    corpus_description: "Test docs",
+    taxonomy: {
+      language: {
+        description: "Filter by language.",
+        values: ["python", "typescript"],
+        properties: {
+          typescript: { mcp_resource: true },
+        },
+      },
+      scope: {
+        values: ["global-guide", "sdk-specific"],
+      },
+    },
+    stats: {
+      total_chunks: 2,
+      total_files: 2,
+      indexed_at: "2026-01-01T00:00:00Z",
+    },
+    embedding: null,
+  });
+
+  beforeAll(async () => {
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithResources,
+    });
+    const handle = await startHttpServer(app, { port: 0 });
+    resourceHttpServer = handle.httpServer;
+    const addr = resourceHttpServer.address();
+    const port = typeof addr === "object" && addr ? addr.port : handle.port;
+    resourceBaseUrl = `http://localhost:${port}`;
+  });
+
+  afterAll(async () => {
+    if (resourceHttpServer) {
+      await new Promise<void>((resolve) => resourceHttpServer.close(() => resolve()));
+    }
+  });
+
+  it("lists resources via MCP protocol", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${resourceBaseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    const { resources } = await client.listResources();
+    expect(resources).toHaveLength(1);
+    expect(resources[0].uri).toBe("docs://language/typescript/guides/ts.md");
+    expect(resources[0].name).toBe("guides/ts.md");
+    expect(resources[0].mimeType).toBe("text/markdown");
+
+    await client.close();
+  });
+
+  it("reads a resource via MCP protocol", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${resourceBaseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    const result = await client.readResource({
+      uri: "docs://language/typescript/guides/ts.md",
+    });
+    expect(result.contents).toHaveLength(1);
+    expect(result.contents[0].text).toContain("TypeScript retry");
+
+    await client.close();
+  });
+});
+
 describe("MCP HTTP transport with toolPrefix", () => {
   let prefixedHttpServer: http.Server;
   let prefixedBaseUrl: string;

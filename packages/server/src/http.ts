@@ -9,10 +9,12 @@ import {
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
   type CallToolResult,
   type ListToolsResult,
   type ListResourcesResult,
   type ListResourceTemplatesResult,
+  type ReadResourceResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo, ToolCallContext, ToolProvider } from "./types.js";
 
@@ -30,7 +32,9 @@ export interface StartHttpServerOptions {
    * Receives the HTTP request; return AuthInfo to attach to the request context,
    * or throw to reject with 401.
    */
-  authenticate?: (request: { headers: Record<string, string | string[] | undefined> }) => AuthInfo | Promise<AuthInfo>;
+  authenticate?: (request: {
+    headers: Record<string, string | string[] | undefined>;
+  }) => AuthInfo | Promise<AuthInfo>;
   /** Idle timeout per session in milliseconds. Sessions with no activity are cleaned up. Default: 600_000 (10 min). */
   sessionTimeoutMs?: number;
   /** Maximum number of concurrent sessions. New sessions are rejected with 503 when at capacity. Default: 100. */
@@ -152,14 +156,6 @@ function createSessionServer(
     return { tools } satisfies ListToolsResult;
   });
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return { resources: [] } satisfies ListResourcesResult;
-  });
-
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
-  });
-
   server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const context: ToolCallContext = { signal: extra.signal };
     if (extra.authInfo) {
@@ -174,6 +170,27 @@ function createSessionServer(
     }
     const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
     return result as CallToolResult;
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const resources = await app.getResources();
+    return {
+      resources: resources.map((r) => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description,
+        mimeType: r.mimeType,
+      })),
+    } satisfies ListResourcesResult;
+  });
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const result = await app.readResource(request.params.uri);
+    return result as ReadResourceResult;
   });
 
   const transport = new StreamableHTTPServerTransport({
@@ -288,8 +305,8 @@ async function handleRequest(
         JSON.stringify({
           jsonrpc: "2.0",
           error: { code: -32000, message: error instanceof Error ? error.message : "Unauthorized" },
-          id: null
-        })
+          id: null,
+        }),
       );
       return;
     }

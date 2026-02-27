@@ -11,8 +11,10 @@ import {
 import type {
   Chunk,
   DocsIndexOptions,
+  FileEntry,
   GetDocRequest,
   GetDocResult,
+  ListFilepathsRequest,
   SearchEngine,
   SearchHit,
   SearchHint,
@@ -103,7 +105,6 @@ export class InMemorySearchEngine implements SearchEngine {
       );
     }
 
-    const context = Math.max(0, Math.min(5, request.context ?? 0));
     const target = this.byId.get(request.chunk_id);
     if (!target) {
       throw new Error(
@@ -116,6 +117,13 @@ export class InMemorySearchEngine implements SearchEngine {
       throw new Error(`Internal error: file '${target.filepath}' is missing from index`);
     }
 
+    if (request.context === -1) {
+      return {
+        text: fileChunks.map((chunk) => chunk.content).join("\n\n"),
+      };
+    }
+
+    const context = Math.max(0, Math.min(5, request.context ?? 0));
     const indexInFile = fileChunks.findIndex((chunk) => chunk.chunk_id === target.chunk_id);
     const start = Math.max(0, indexInFile - context);
     const end = Math.min(fileChunks.length - 1, indexInFile + context);
@@ -141,6 +149,34 @@ export class InMemorySearchEngine implements SearchEngine {
     return {
       text: blocks.join("\n\n"),
     };
+  }
+
+  async listFilepaths(request: ListFilepathsRequest): Promise<FileEntry[]> {
+    const filters = request.filters;
+    const seen = new Set<string>();
+    const entries: FileEntry[] = [];
+
+    for (const chunk of this.chunks) {
+      if (seen.has(chunk.filepath)) continue;
+      let matches = true;
+      for (const [key, value] of Object.entries(filters)) {
+        if (chunk.metadata[key] !== value) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+
+      seen.add(chunk.filepath);
+      const fileChunks = this.byFile.get(chunk.filepath);
+      const firstChunk = fileChunks?.[0];
+      entries.push({
+        filepath: chunk.filepath,
+        firstChunkId: firstChunk?.chunk_id ?? chunk.chunk_id,
+      });
+    }
+
+    return entries.sort((a, b) => a.filepath.localeCompare(b.filepath));
   }
 }
 

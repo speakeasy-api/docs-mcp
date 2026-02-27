@@ -3,6 +3,7 @@ import type {
   CorpusMetadata,
   EmbeddingMetadata,
   TaxonomyField,
+  TaxonomyValueProperties,
   ToolDescriptions,
 } from "./types.js";
 
@@ -100,11 +101,13 @@ function normalizeTaxonomy(value: unknown): Record<string, TaxonomyField> {
       field.description === undefined ? undefined : asTrimmedString(field.description);
 
     const vectorCollapse = field.vector_collapse === true ? true : undefined;
+    const properties = normalizeProperties(field.properties, key);
 
     normalized[key] = {
       ...(description ? { description } : {}),
       values,
       ...(vectorCollapse ? { vector_collapse: true } : {}),
+      ...(properties ? { properties } : {}),
     };
   }
 
@@ -135,6 +138,35 @@ function normalizeValues(value: unknown, key: string): string[] {
   }
 
   return [...deduped].sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeProperties(
+  value: unknown,
+  taxonomyKey: string,
+): Record<string, TaxonomyValueProperties> | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`taxonomy['${taxonomyKey}'].properties must be an object`);
+  }
+
+  const raw = value as Record<string, unknown>;
+  const result: Record<string, TaxonomyValueProperties> = {};
+  let hasAny = false;
+
+  for (const [valKey, valProps] of Object.entries(raw)) {
+    if (!valProps || typeof valProps !== "object") {
+      throw new Error(`taxonomy['${taxonomyKey}'].properties['${valKey}'] must be an object`);
+    }
+    const props = valProps as Record<string, unknown>;
+    if (props.mcp_resource === true) {
+      result[valKey] = { mcp_resource: true };
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? result : undefined;
 }
 
 function normalizeStats(value: unknown): CorpusMetadata["stats"] {
