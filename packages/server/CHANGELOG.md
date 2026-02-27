@@ -1,5 +1,16 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.3.0
+
+### Patch Changes
+
+- 029ec37: Add agent evaluation harness for end-to-end testing of MCP tool usage
+
+  Introduces a self-contained agent eval framework that uses Claude Agent SDK to run realistic coding scenarios against docs-mcp, with assertion-based scoring, file content validation, and an interactive CLI (`docs-mcp-eval`). Includes multi-language scenarios for several SDKs, build caching, history tracking, and configurable tool descriptions in the server.
+
+- Updated dependencies [029ec37]
+  - @speakeasy-api/docs-mcp-core@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes

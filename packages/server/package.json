@@ -1,6 +1,6 @@
 {
   "name": "@speakeasy-api/docs-mcp-server",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "MCP server runtime exposing hybrid search over documentation via HTTP and stdio transports",
   "license": "AGPL-3.0-only",
   "type": "module",
