@@ -211,6 +211,8 @@ program
   .option("--embedding-max-retries <number>", "Embedding max retries for 429/5xx", parseIntOption)
   .option("--rebuild-cache", "Skip cache read and re-embed all chunks (still writes a fresh cache)")
   .option("--cache-dir <path>", "Directory for .embedding-cache/ (defaults to --out path)")
+  .option("--tool-description-search <value>", "Custom description for the search_docs MCP tool")
+  .option("--tool-description-get-doc <value>", "Custom description for the get_doc MCP tool")
   .action(async (options: {
     docsDir: string;
     out: string;
@@ -225,6 +227,8 @@ program
     embeddingMaxRetries?: number;
     rebuildCache?: boolean;
     cacheDir?: string;
+    toolDescriptionSearch?: string;
+    toolDescriptionGetDoc?: string;
   }) => {
     const docsDir = path.resolve(options.docsDir);
     const outDir = path.resolve(options.out);
@@ -438,6 +442,14 @@ program
             dimensions: embeddingProvider.dimensions
           };
 
+    const toolDescriptions: Record<string, string> = {};
+    if (options.toolDescriptionSearch) {
+      toolDescriptions.search_docs = options.toolDescriptionSearch;
+    }
+    if (options.toolDescriptionGetDoc) {
+      toolDescriptions.get_doc = options.toolDescriptionGetDoc;
+    }
+
     const sourceCommit = await resolveSourceCommit(docsDir);
     const metadata = buildMetadata(
       chunks,
@@ -445,7 +457,8 @@ program
       options.description,
       embeddingMetadata,
       sourceCommit,
-      taxonomyConfig
+      taxonomyConfig,
+      Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined
     );
     const metadataKeys = Object.keys(metadata.taxonomy);
 
@@ -601,7 +614,8 @@ function buildMetadata(
   corpusDescription: string,
   embedding: EmbeddingMetadata | null,
   sourceCommit: string | null,
-  taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>
+  taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>,
+  toolDescriptions?: Record<string, string>
 ): {
   metadata_version: string;
   corpus_description: string;
@@ -613,6 +627,7 @@ function buildMetadata(
     source_commit: string | null;
   };
   embedding: EmbeddingMetadata | null;
+  tool_descriptions?: Record<string, string>;
 } {
   const taxonomyValues = new Map<string, Set<string>>();
   for (const chunk of chunks) {
@@ -643,7 +658,8 @@ function buildMetadata(
       indexed_at: new Date().toISOString(),
       source_commit: sourceCommit
     },
-    embedding
+    embedding,
+    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {})
   };
 }
 

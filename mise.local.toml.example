@@ -1,0 +1,11 @@
+# Copy this file to mise.local.toml and fill in your API keys.
+# mise.local.toml is gitignored — it won't be committed.
+
+[env]
+ANTHROPIC_API_KEY = ""
+# Optional: OpenAI API key for embedding-based index builds
+# OPENAI_API_KEY = ""
+# Optional: SDK-specific API keys for runtime assertion scenarios
+# DUB_API_KEY = ""
+# MISTRAL_API_KEY = ""
+# PUSHPRESS_API_KEY = ""

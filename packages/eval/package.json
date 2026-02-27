@@ -39,8 +39,11 @@
     "lint": "eslint src test"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@speakeasy-api/docs-mcp-core": "workspace:*",
-    "commander": "^13.1.0"
+    "cli-highlight": "^2.1.11",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7"
   }
 }

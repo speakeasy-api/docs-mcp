@@ -1,0 +1,56 @@
+{
+  "chat-completion": {
+    "name": "Create a Mistral chat completion",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that creates a chat completion with a simple user message. Use the SDK's chat.complete method. Install all dependencies first with npm. The MISTRAL_API_KEY environment variable is already set — use process.env.MISTRAL_API_KEY for authentication. Do not run the script.",
+    "description": "Mistral AI TypeScript SDK — API references for chat completions, embeddings, models, and function calling",
+    "docsSpec": { "url": "https://github.com/mistralai/client-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
+      { "type": "script", "command": "grep -q 'mistralai' package.json", "name": "mistral-in-deps" },
+      { "type": "file_contains", "path": "solution.ts", "value": "chat" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
+    ]
+  },
+  "embeddings": {
+    "name": "Generate Mistral embeddings",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that generates embeddings for a list of text strings using the embeddings API. Install all dependencies first with npm. The MISTRAL_API_KEY environment variable is already set — use process.env.MISTRAL_API_KEY for authentication. Do not run the script.",
+    "docsSpec": { "url": "https://github.com/mistralai/client-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "embed" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
+    ]
+  },
+  "list-models": {
+    "name": "List Mistral models",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that lists all available models. Use the SDK's models API. Install all dependencies first with npm. The MISTRAL_API_KEY environment variable is already set — use process.env.MISTRAL_API_KEY for authentication. Do not run the script.",
+    "docsSpec": { "url": "https://github.com/mistralai/client-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "model" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
+    ]
+  },
+  "function-calling": {
+    "name": "Mistral function calling",
+    "prompt": "Using the Mistral TypeScript SDK (`@mistralai/mistralai`), write a script in solution.ts that demonstrates function/tool calling with a chat completion. Define a simple tool (e.g., a weather lookup function) and pass it to the chat completion. Install all dependencies first with npm. The MISTRAL_API_KEY environment variable is already set — use process.env.MISTRAL_API_KEY for authentication. Do not run the script.",
+    "docsSpec": { "url": "https://github.com/mistralai/client-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
+    "category": "advanced",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "mistral", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "tool" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY", "soft": true }
+    ]
+  }
+}

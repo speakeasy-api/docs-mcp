@@ -4,7 +4,7 @@ export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, 
   const properties: Record<string, unknown> = {
     query: {
       type: "string",
-      description: "The search query (e.g., 'how to paginate', 'RateLimitError')."
+      description: "The search query — use method names, class names, error types, or describe what you want to do (e.g., 'links.create', 'RateLimitError', 'how to paginate')."
     },
     limit: {
       type: "integer",
@@ -49,7 +49,7 @@ export function buildGetDocSchema(): Record<string, unknown> {
       context: {
         type: "integer",
         description:
-          "Number of adjacent chunks to include before and after the target chunk. Default is 0.",
+          "Number of adjacent chunks to include before and after the target chunk. Default 0 (recommended). Chunks are self-contained; only increase after an initial read if you need broader page context.",
         minimum: 0,
         maximum: 5,
         default: 0

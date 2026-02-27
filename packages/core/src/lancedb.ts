@@ -330,8 +330,18 @@ export class LanceDbSearchEngine implements SearchEngine {
       builder = builder.where(whereClause);
     }
 
-    const rows = await builder.limit(limit).toArray();
-    return rows.map((row) => row as ChunkRow);
+    try {
+      const rows = await builder.limit(limit).toArray();
+      return rows.map((row) => row as ChunkRow);
+    } catch (error) {
+      // LanceDB throws "Invalid count value: -1" when a phrase query matches
+      // zero documents. Treat as empty result set.
+      const msg = error instanceof Error ? error.message : "";
+      if (msg.includes("Invalid count value")) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   private async runVectorQuery(
@@ -371,10 +381,20 @@ export class LanceDbSearchEngine implements SearchEngine {
     query: string,
     filters: Record<string, string>
   ): Promise<SearchHint> {
-    const fallbackRows = await this.table
-      .search(new MultiMatchQuery(query, ["heading", "content_text"], { boosts: [3, 1] }), "fts")
-      .limit(100)
-      .toArray();
+    let fallbackRows: ChunkRow[];
+    try {
+      fallbackRows = (await this.table
+        .search(new MultiMatchQuery(query, ["heading", "content_text"], { boosts: [3, 1] }), "fts")
+        .limit(100)
+        .toArray()).map((row) => row as ChunkRow);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "";
+      if (msg.includes("Invalid count value")) {
+        fallbackRows = [];
+      } else {
+        throw error;
+      }
+    }
 
     if (fallbackRows.length === 0) {
       return {

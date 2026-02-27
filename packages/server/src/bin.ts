@@ -61,6 +61,10 @@ const MetadataDocumentSchema = z.object({
     model: z.string(),
     dimensions: z.number().int()
   }).nullable(),
+  tool_descriptions: z.object({
+    search_docs: z.string().optional(),
+    get_doc: z.string().optional()
+  }).optional(),
   index: z.object({
     path: z.string(),
     table: z.string()

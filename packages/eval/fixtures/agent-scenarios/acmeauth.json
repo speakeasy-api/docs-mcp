@@ -1,0 +1,129 @@
+{
+  "ts-init": {
+    "name": "Initialize the TypeScript client",
+    "prompt": "Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in solution.ts that initializes the AcmeAuth client with an API key from the environment and fetches a user by ID.",
+    "description": "AcmeAuth SDK — multi-language authentication client covering API keys, OAuth, JWT, pagination, webhooks, and error handling",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" },
+      { "type": "file_contains", "path": "solution.ts", "value": "apiKey" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+    ]
+  },
+  "py-init": {
+    "name": "Initialize the Python client",
+    "prompt": "Using the AcmeAuth Python SDK (`acmeauth`), write a script in solution.py that initializes the AcmeAuth client with an API key and fetches a user by ID.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.py", "pattern": "acmeauth|AcmeAuth" },
+      { "type": "file_contains", "path": "solution.py", "value": "api_key" },
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true }
+    ]
+  },
+  "ts-rate-limit": {
+    "name": "Handle rate limit errors in TypeScript",
+    "prompt": "Write TypeScript code in solution.ts that calls the AcmeAuth API and properly handles rate limit (429) errors using the SDK's typed error classes.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "error-handling",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.ts", "value": "RateLimitError" },
+      { "type": "file_matches", "path": "solution.ts", "pattern": "retryAfter|retry_after" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+    ]
+  },
+  "ts-webhooks": {
+    "name": "Verify webhook signatures",
+    "prompt": "Write TypeScript code in solution.ts that verifies incoming AcmeAuth webhook signatures using the SDK.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "webhooks",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "verifyWebhookSignature|verify_webhook", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "x-acmeauth-signature" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+    ]
+  },
+  "ts-pagination": {
+    "name": "Paginate through users",
+    "prompt": "Write TypeScript code in solution.ts that lists all AcmeAuth users, handling pagination correctly.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "pagination",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_matches", "path": "solution.ts", "pattern": "list|paginate", "flags": "i" },
+      { "type": "file_matches", "path": "solution.ts", "pattern": "for.*await|cursor|next", "flags": "i" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+    ]
+  },
+  "py-async": {
+    "name": "Python async client usage",
+    "prompt": "Write Python code in solution.py that uses the AcmeAuth async client to fetch a user.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "sdk-usage",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.py", "value": "AsyncAcmeAuth" },
+      { "type": "file_contains", "path": "solution.py", "value": "await" },
+      { "type": "script", "command": "uvx pyright solution.py", "name": "typecheck", "soft": true }
+    ]
+  },
+  "ts-oauth": {
+    "name": "OAuth authentication setup",
+    "prompt": "Explain how OAuth 2.0 authentication works with AcmeAuth and write TypeScript code in solution.ts that initializes the client with an OAuth access token.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "auth",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Write clean, correct code based on the actual API — do not guess. Always write files in the current working directory using relative paths.",
+    "setup": "npm init -y --silent 2>/dev/null",
+    "assertions": [
+      { "type": "contains", "value": "accessToken" },
+      { "type": "file_contains", "path": "solution.ts", "value": "accessToken" },
+      { "type": "matches", "pattern": "authorization.code|PKCE|refresh.token", "flags": "i" },
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts", "name": "typecheck", "soft": true }
+    ]
+  },
+  "rate-limit-guide": {
+    "name": "Cross-cutting: rate limits and best practices",
+    "prompt": "What are the rate limits for each AcmeAuth plan tier, and what are the recommended best practices for staying within limits?",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "guide-discovery",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Provide accurate information — do not guess. Always write files in the current working directory using relative paths.",
+    "assertions": [
+      { "type": "matches", "pattern": "60|600|6000", "flags": "" },
+      { "type": "contains", "value": "429" },
+      { "type": "matches", "pattern": "cache|batch|circuit.breaker", "flags": "i" }
+    ]
+  },
+  "webhook-guide": {
+    "name": "Webhook event types and retry policy",
+    "prompt": "List all webhook event types that AcmeAuth supports and describe the retry policy for failed deliveries.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "guide-discovery",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Provide accurate information — do not guess. Always write files in the current working directory using relative paths.",
+    "assertions": [
+      { "type": "contains", "value": "user.created" },
+      { "type": "contains", "value": "session.revoked" },
+      { "type": "matches", "pattern": "5.*failed|5.*attempts|24.hours", "flags": "i" }
+    ]
+  },
+  "jwt-verification": {
+    "name": "JWT token verification",
+    "prompt": "Explain how to verify AcmeAuth JWT tokens locally, including what claims are in the token and where to find the public keys.",
+    "docsDir": "../../../../tests/fixtures/docs",
+    "category": "auth",
+    "systemPrompt": "You are an expert developer. You have access to SDK documentation for a fictional AcmeAuth API. Provide accurate information — do not guess. Always write files in the current working directory using relative paths.",
+    "assertions": [
+      { "type": "contains", "value": "jwks" },
+      { "type": "matches", "pattern": "sub|iat|exp|scope|aud" },
+      { "type": "matches", "pattern": "\\.well-known|JWKS", "flags": "i" }
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import semver from "semver";
-import type { CorpusMetadata, EmbeddingMetadata, TaxonomyField } from "./types.js";
+import type { CorpusMetadata, EmbeddingMetadata, TaxonomyField, ToolDescriptions } from "./types.js";
 
 /**
  * Returns taxonomy keys that have `vector_collapse: true`, i.e. dimensions
@@ -50,13 +50,15 @@ export function normalizeMetadata(
   const taxonomy = normalizeTaxonomy(metadata.taxonomy);
   const stats = normalizeStats(metadata.stats);
   const embedding = normalizeEmbedding(metadata.embedding);
+  const toolDescriptions = normalizeToolDescriptions(metadata.tool_descriptions);
 
   return {
     metadata_version: metadataVersion,
     corpus_description: corpusDescription,
     taxonomy,
     stats,
-    embedding
+    embedding,
+    ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {})
   };
 }
 
@@ -182,6 +184,32 @@ function normalizeEmbedding(value: unknown): EmbeddingMetadata | null {
   const dimensions = asPositiveInteger(embedding.dimensions, "embedding.dimensions", false);
 
   return { provider, model, dimensions };
+}
+
+function normalizeToolDescriptions(value: unknown): ToolDescriptions | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "object") {
+    throw new Error("tool_descriptions must be an object");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const result: ToolDescriptions = {};
+  let hasAny = false;
+
+  if (raw.search_docs !== undefined) {
+    result.search_docs = asNonEmptyString(raw.search_docs, "tool_descriptions.search_docs");
+    hasAny = true;
+  }
+
+  if (raw.get_doc !== undefined) {
+    result.get_doc = asNonEmptyString(raw.get_doc, "tool_descriptions.get_doc");
+    hasAny = true;
+  }
+
+  return hasAny ? result : undefined;
 }
 
 function asTrimmedString(value: unknown): string {

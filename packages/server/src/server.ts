@@ -35,20 +35,20 @@ export class McpDocsServer {
   }
 
   getTools(): ToolDefinition[] {
-    const searchDescription = this.vectorSearchAvailable
-      ? `Search ${this.metadata.corpus_description} with one hybrid query. Exact identifiers match lexically; conceptual phrasing matches semantically. Apply any known schema-enum filters for precision.`
-      : `Search ${this.metadata.corpus_description} with a lexical query. Use exact identifiers and keywords for best results. Apply any known schema-enum filters for precision.`;
+    const defaultSearchDescription = `Search the pre-indexed ${this.metadata.corpus_description} — the authoritative, complete reference for this documentation set. Contains API docs, code examples, and guides. Use exact identifiers, method names, or conceptual queries. Apply taxonomy filters to narrow results.`;
+
+    const defaultGetDocDescription =
+      "Retrieve the full content of a documentation page by its chunk_id (returned by search_docs). Each chunk is self-contained — do NOT set context on your first read. Only use context=1..3 if, after reading, you find the chunk references adjacent sections you need.";
 
     return [
       {
         name: this.searchToolName,
-        description: searchDescription,
+        description: this.metadata.tool_descriptions?.search_docs ?? defaultSearchDescription,
         inputSchema: buildSearchDocsSchema(this.metadata)
       },
       {
         name: this.getDocToolName,
-        description:
-          "Retrieve the full content of a specific documentation chunk using its chunk_id. You can optionally request surrounding context within the same file.",
+        description: this.metadata.tool_descriptions?.get_doc ?? defaultGetDocDescription,
         inputSchema: buildGetDocSchema()
       }
     ];
