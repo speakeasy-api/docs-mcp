@@ -164,7 +164,7 @@ export class McpDocsServer implements ToolProvider {
 
         for (const entry of entries) {
           resources.push({
-            uri: `docs://${entry.filepath}`,
+            uri: `docs:///${entry.filepath}`,
             name: entry.filepath,
             description: `${entry.filepath} (${dimKey}=${value})`,
             mimeType: "text/markdown",
@@ -177,16 +177,28 @@ export class McpDocsServer implements ToolProvider {
   }
 
   async readResource(uri: string): Promise<ReadResourceResult> {
-    const parsed = parseDocsUri(uri);
-    if (!parsed) {
-      throw new Error(`Invalid resource URI: ${uri}`);
+    const parsed = new URL(uri);
+    if (parsed.protocol !== "docs:") {
+      throw new Error(`Invalid URI scheme: ${parsed.protocol}. Expected 'docs:'`);
     }
 
+    let filepath = parsed.pathname;
+    // remove leading slash
+    if (filepath.startsWith("/")) {
+      filepath = filepath.slice(1);
+    }
+    if (!filepath) {
+      throw new Error(`Invalid URI: missing filepath in '${uri}'`);
+    }
+
+    console.log("Looking up resource for filepath:", filepath);
     const entries = await this.index.listFilepaths({
-      filters: { [parsed.dimension]: parsed.value },
+      filters: {
+        filepath,
+      },
     });
 
-    const entry = entries.find((e) => e.filepath === parsed.filepath);
+    const entry = entries.find((e) => e.filepath === filepath);
     if (!entry) {
       throw new Error(`Resource not found: ${uri}`);
     }
@@ -314,16 +326,6 @@ function assertAllowedKeys(input: Record<string, unknown>, allowedKeys: string[]
       throw new Error(`Unexpected field '${key}'`);
     }
   }
-}
-
-function parseDocsUri(uri: string): { dimension: string; value: string; filepath: string } | null {
-  const match = uri.match(/^docs:\/\/([^/]+)\/([^/]+)\/(.+)$/);
-  if (!match) return null;
-  return {
-    dimension: decodeURIComponent(match[1]!),
-    value: decodeURIComponent(match[2]!),
-    filepath: match[3]!,
-  };
 }
 
 function errorResult(message: string): CallToolResult {

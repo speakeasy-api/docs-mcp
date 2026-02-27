@@ -106,7 +106,9 @@
                   "type": "boolean"
                 }
               },
-              "required": ["mcp_resource"],
+              "required": [
+                "mcp_resource"
+              ],
               "additionalProperties": false,
               "description": "Per-value configuration for a taxonomy dimension value."
             }

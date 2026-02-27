@@ -171,6 +171,8 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    host: true,
+    allowedHosts: process.env.VITE_DEV_HOSTNAMES?.split(","),
     proxy: {
       "/mcp": "http://localhost:20310",
     },
