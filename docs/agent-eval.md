@@ -1,6 +1,20 @@
 # Agent Evaluation Framework (`agent-eval`)
 
-The `agent-eval` subcommand of `@speakeasy-api/docs-mcp-eval` runs end-to-end agent evaluations. It spawns a Claude agent with docs-mcp tools (`search_docs`, `get_doc`), runs it against a prompt, and evaluates assertions on the output. This validates the full stack — from search quality to how well a real model uses the tools to complete a task.
+The `agent-eval` subcommand of `@speakeasy-api/docs-mcp-eval` runs end-to-end agent evaluations. It spawns an AI coding agent with docs-mcp tools (`search_docs`, `get_doc`), runs it against a prompt, and evaluates assertions on the output. This validates the full stack — from search quality to how well a real model uses the tools to complete a task.
+
+## Providers
+
+The eval supports multiple agent providers via the `--provider` flag:
+
+| Provider | Flag | Backend | Prerequisites |
+|----------|------|---------|---------------|
+| Claude | `--provider claude` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
+| OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + [`codex`](https://github.com/openai/codex) CLI on PATH |
+| Auto (default) | `--provider auto` | Detected from environment | Whichever API key is set |
+
+Auto-detection priority: if only `OPENAI_API_KEY` is set, Codex is used; otherwise Claude is used (its CLI handles its own auth). If both keys are set, Claude is used with a warning.
+
+The Codex provider spawns `codex exec --json` as a child process and injects MCP server configuration via `-c` CLI flags. It performs a pre-flight check to verify the MCP server starts correctly before running the agent.
 
 ## Scenario Format
 
@@ -226,14 +240,15 @@ docs-mcp-eval agent-eval [options]
 
 ### Agent
 
-| Option                    | Default                    | Description                           |
-| ------------------------- | -------------------------- | ------------------------------------- |
-| `--model <value>`         | `claude-sonnet-4-20250514` | Claude model to use                   |
-| `--max-turns <n>`         | `15`                       | Default max turns per scenario        |
-| `--max-budget-usd <n>`    | `0.50`                     | Default max budget per scenario (USD) |
-| `--max-concurrency <n>`   | `1`                        | Max concurrent scenarios              |
-| `--system-prompt <value>` | —                          | Custom system prompt for the agent    |
-| `--workspace-dir <path>`  | —                          | Base directory for agent workspaces   |
+| Option                    | Default                          | Description                                            |
+| ------------------------- | -------------------------------- | ------------------------------------------------------ |
+| `--provider <value>`      | `auto`                           | Agent provider: `claude`, `openai`, or `auto`          |
+| `--model <value>`         | _(per-provider default)_         | Model to use (e.g. `claude-sonnet-4-20250514`)         |
+| `--max-turns <n>`         | `15`                             | Default max turns per scenario                         |
+| `--max-budget-usd <n>`    | `0.50`                           | Default max budget per scenario (USD)                  |
+| `--max-concurrency <n>`   | `1`                              | Max concurrent scenarios                               |
+| `--system-prompt <value>` | —                                | Custom system prompt for the agent                     |
+| `--workspace-dir <path>`  | —                                | Base directory for agent workspaces                    |
 
 ### Output
 
@@ -253,9 +268,14 @@ The eval framework works in two main contexts:
 The only thing you need in a consumer repo is a scenario JSON file. Invoke the eval via npx:
 
 ```bash
+# With Claude (default)
+npx @speakeasy-api/docs-mcp-eval agent-eval \
+  --scenarios ./agent-scenarios.json
+
+# With OpenAI Codex
 npx @speakeasy-api/docs-mcp-eval agent-eval \
   --scenarios ./agent-scenarios.json \
-  --model claude-sonnet-4-20250514
+  --provider openai
 ```
 
 ### Pointing at an OSS project
@@ -389,11 +409,23 @@ When previous results exist in `.eval-results/`, the CLI automatically compares 
 
 ## Environment Variables
 
-| Variable                               | Required | Description                                                             |
-| -------------------------------------- | -------- | ----------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                    | **yes**  | API key for the Claude agent (used by `@anthropic-ai/claude-agent-sdk`) |
-| `OPENAI_API_KEY`                       | no       | For embedding-based index builds (when using OpenAI embeddings)         |
-| SDK-specific keys (e.g. `DUB_API_KEY`) | no       | For `script` assertions guarded by `when_env` — skipped if absent       |
-| `NO_COLOR`                             | no       | Disables ANSI color output                                              |
+| Variable                               | Required | Description                                                                                          |
+| -------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                    | \*       | API key for the Claude provider (used by `@anthropic-ai/claude-agent-sdk`)                           |
+| `OPENAI_API_KEY`                       | \*       | API key for the OpenAI Codex provider (also used for embedding-based index builds)                   |
+| SDK-specific keys (e.g. `DUB_API_KEY`) | no       | For `script` assertions guarded by `when_env` — skipped if absent                                    |
+| `NO_COLOR`                             | no       | Disables ANSI color output                                                                           |
+
+\* At least one provider API key is required. With `--provider auto`, the eval detects which provider to use based on which key is set.
+
+### OpenAI Codex Prerequisites
+
+The OpenAI Codex provider requires the [`codex`](https://github.com/openai/codex) CLI to be installed and available on PATH. Install it with:
+
+```bash
+npm install -g @openai/codex
+```
+
+The Codex CLI manages its own authentication. Run `codex` once interactively to authenticate, or set `OPENAI_API_KEY` in your environment.
 
 When running from the monorepo via mise, copy `mise.local.toml.example` to `mise.local.toml` and fill in your API keys. The `.env` file in the eval package directory is also loaded automatically via `dotenv`.

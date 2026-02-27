@@ -30,9 +30,24 @@ See [docs/eval.md](https://github.com/speakeasy-api/docs-mcp/blob/main/docs/eval
 
 ### Agent Eval (`agent-eval`)
 
-End-to-end evaluation that spawns a Claude agent with docs-mcp tools, runs it against a prompt, and evaluates assertions on the output. Validates the full stack — from search quality to how well a real model uses the tools.
+End-to-end evaluation that spawns an AI coding agent with docs-mcp tools, runs it against a prompt, and evaluates assertions on the output. Validates the full stack — from search quality to how well a real model uses the tools.
+
+Supports multiple agent providers:
+
+| Provider | Flag | Backend | Prerequisites |
+|----------|------|---------|---------------|
+| Claude | `--provider claude` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
+| OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + [`codex`](https://github.com/openai/codex) on PATH |
+| Auto (default) | `--provider auto` | Detected from env | Whichever key is set |
 
 ```bash
+# Claude (default when ANTHROPIC_API_KEY is set)
+docs-mcp-eval agent-eval --suite acmeauth
+
+# OpenAI Codex
+docs-mcp-eval agent-eval --suite dub-go --provider openai
+
+# Custom scenario file
 docs-mcp-eval agent-eval --scenarios ./my-scenarios.json --docs-dir ./my-docs
 ```
 
