@@ -1,5 +1,16 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.4.0
+
+### Minor Changes
+
+- b7c1bb7: Add clean programmatic API: `createDocsServer()` factory, `ToolProvider` interface, custom tool support, and Zod-validated options schema
+
+### Patch Changes
+
+- c0da9f2: Implement resource listing handlers to work around a Codex bug (openai/codex#8565) that is expecting to successfully call resources/list regardless of whether a server exposes any resources or not.
+  - @speakeasy-api/docs-mcp-core@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes
