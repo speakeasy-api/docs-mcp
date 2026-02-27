@@ -1,3 +1,5 @@
+import type { AgentProvider } from "./provider.js";
+
 export interface DocsRepoSpec {
   /** Git clone URL */
   url: string;
@@ -99,6 +101,8 @@ export interface AgentScenarioResult {
   workspaceFiles: WorkspaceFile[];
   finalAnswer: string;
   resultSubtype: string;
+  /** Workspace directory used for this scenario run */
+  workspaceDir?: string;
   errors?: string[];
 }
 
@@ -133,6 +137,8 @@ export interface AgentEvalSummary {
 
 export interface AgentEvalConfig {
   scenarios: AgentScenario[];
+  /** Agent provider to use. Falls back to Claude if not set. */
+  provider?: AgentProvider;
   /** Server config for scenarios without an indexDir. Optional when all scenarios have indexDir set. */
   server?: {
     command: string;
@@ -150,6 +156,8 @@ export interface AgentEvalConfig {
   debug?: boolean;
   /** Run without docs-mcp server (baseline mode). The agent gets no MCP tools. */
   noMcp?: boolean;
+  /** Delete workspace directories after run. Default: false (preserve). */
+  cleanWorkspace?: boolean;
 }
 
 export interface AgentEvalOutput {
@@ -166,8 +174,10 @@ export interface AgentEvalOutput {
 export interface AgentObservedMessage {
   type: "system_init" | "assistant_text" | "tool_call" | "tool_result" | "result";
   summary: string;
+  toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolResultPreview?: string;
+  workspaceDir?: string;
   timestampMs: number;
 }
 

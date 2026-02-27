@@ -55,7 +55,7 @@ function panel(content: string, title?: string, border = c.dim): string {
 
   const top = title
     ? `${border}╭─ ${c.reset}${title}${border} ${"─".repeat(Math.max(0, width - stripAnsi(title).length - 4))}╮${c.reset}`
-    : `${border}╭${"─".repeat(width)}╮${c.reset}`;
+    : `${border}╭${"─".repeat(width)}╯${c.reset}`;
   const bot = `${border}╰${"─".repeat(width)}╯${c.reset}`;
 
   const innerWidth = width - 2; // usable chars between "│ " and " │"
@@ -160,6 +160,31 @@ function formatToolArgs(args: Record<string, unknown>): string {
   }
 }
 
+/** Compact one-liner for tool call args (always shown). */
+function formatCompactArgs(args: Record<string, unknown>): string {
+  // Pick the most informative arg to show inline
+  const key =
+    args.query ?? args.file_path ?? args.command ?? args.pattern ?? args.path ?? args.slug;
+  if (key && typeof key === "string") {
+    const display = key.length > 60 ? key.slice(0, 60) + "…" : key;
+    return display;
+  }
+  const entries = Object.entries(args);
+  if (entries.length === 0) return "";
+  const [k, v] = entries[0]!;
+  const val = typeof v === "string" ? (v.length > 40 ? v.slice(0, 40) + "…" : v) : JSON.stringify(v);
+  return `${k}=${val}`;
+}
+
+/** Compact one-liner for tool result (always shown). */
+function formatCompactResult(result: string): string {
+  if (!result || result === '""') return "(empty)";
+  const lines = result.split("\n");
+  if (result.length <= 80 && lines.length === 1) return result;
+  if (lines.length > 1) return `${lines.length} lines, ${result.length} chars`;
+  return `${result.length} chars`;
+}
+
 // ── Observer config ────────────────────────────────────────────────────
 
 export interface ConsoleObserverOptions {
@@ -212,21 +237,24 @@ export class ConsoleObserver implements AgentEvalObserver {
     switch (message.type) {
       case "system_init":
         write(`${ts} ${c.blue}▶ ${message.summary}${c.reset}\n`);
-        break;
-
-      case "assistant_text":
-        if (debug) {
-          write(`${ts} ${c.green}◆${c.reset} ${message.summary}\n`);
+        if (message.workspaceDir) {
+          write(`${ts} ${c.cyan}${c.bold}  workspace: ${message.workspaceDir}${c.reset}\n`);
         }
         break;
 
-      case "tool_call": {
-        // Extract tool name from summary: "toolName(args...)"
-        const toolName = message.summary.split("(")[0] ?? message.summary;
-        const color = toolColor(toolName);
-        write(`${ts} ${color}▸ ${toolName}${c.reset}\n`);
+      case "assistant_text":
+        // Always show assistant text (abbreviated in non-debug)
+        write(`${ts} ${c.green}◆${c.reset} ${message.summary}\n`);
+        break;
 
-        // Show args panel only in debug mode
+      case "tool_call": {
+        const toolName = message.toolName ?? message.summary.split("(")[0] ?? message.summary;
+        const color = toolColor(toolName);
+        const compact = message.toolArgs ? formatCompactArgs(message.toolArgs) : "";
+        const argDisplay = compact ? `  ${c.dim}${compact}${c.reset}` : "";
+        write(`${ts} ${color}▸ ${toolName}${c.reset}${argDisplay}\n`);
+
+        // Show full args panel only in debug mode
         if (debug && message.toolArgs && Object.keys(message.toolArgs).length > 0) {
           const argsStr = formatToolArgs(message.toolArgs);
           write(indent(panel(argsStr, undefined, color), 6) + "\n");
@@ -235,8 +263,9 @@ export class ConsoleObserver implements AgentEvalObserver {
       }
 
       case "tool_result": {
+        const preview = message.toolResultPreview ?? message.summary;
         if (debug) {
-          const preview = message.toolResultPreview ?? message.summary;
+          // Full panel in debug mode
           const formatted = formatToolResult(preview);
           if (formatted.includes("\n")) {
             write(`${ts} ${c.dim}  ↳ result${c.reset}\n`);
@@ -244,6 +273,10 @@ export class ConsoleObserver implements AgentEvalObserver {
           } else {
             write(`${ts} ${c.dim}  ↳ ${formatted}${c.reset}\n`);
           }
+        } else {
+          // Compact one-liner in normal mode
+          const compact = formatCompactResult(preview);
+          write(`${ts} ${c.dim}  ↳ ${compact}${c.reset}\n`);
         }
         break;
       }
@@ -297,6 +330,11 @@ export class ConsoleObserver implements AgentEvalObserver {
         const highlighted = highlightCode(displayLines.join("\n"), file.lang);
         write("\n" + panel(highlighted, `${c.dim}${header}${c.reset}`, c.dim) + "\n");
       }
+    }
+
+    // Show workspace directory
+    if (result.workspaceDir) {
+      write(`\n  ${c.cyan}workspace:${c.reset} ${c.bold}${result.workspaceDir}${c.reset}\n`);
     }
   }
 

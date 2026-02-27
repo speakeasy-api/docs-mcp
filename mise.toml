@@ -85,6 +85,15 @@ arg "[args]" var=#true help="Extra args passed to the eval CLI"
 run = 'node packages/eval/dist/bin.js agent-eval --prompt "$usage_prompt" --docs-dir "$usage_docs_dir" $usage_args'
 depends = ["build"]
 
+[tasks."agent-eval:openai"]
+description = "Run agent eval suite with OpenAI Codex provider"
+usage = '''
+arg "<suite>" help="Named scenario suite (e.g. acmeauth, dub-go)"
+arg "[args]" var=#true help="Extra args passed to the eval CLI"
+'''
+run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" --provider openai $usage_args'
+depends = ["build"]
+
 [tasks."agent-eval:suites"]
 description = "List available agent eval suites"
 run = "ls -1 packages/eval/fixtures/agent-scenarios/*.json | xargs -I{} basename {} .json"

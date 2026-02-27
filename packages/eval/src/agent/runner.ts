@@ -1,4 +1,3 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +8,8 @@ import { promisify } from "node:util";
 import { evaluateAssertions } from "./assertions.js";
 import { computeAgentEvalSummary } from "./metrics.js";
 import { NoopObserver } from "./observer.js";
+import { defaultModelForProvider } from "./provider.js";
+import { ClaudeAgentProvider } from "./provider-claude.js";
 import type {
   AgentEvalConfig,
   AgentEvalObserver,
@@ -24,22 +25,20 @@ const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dist", "bin.js");
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.5;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
-const DEFAULT_SYSTEM_PROMPT = `You are an interactive assistant that helps users with software engineering tasks. Use the tools available to you to assist the user.
-
-You have access to documentation tools for this project. Use search_docs and get_doc when you need exact API signatures, supported options, or authoritative SDK behavior. Otherwise, rely on your own knowledge and reasoning.
-
-Write clean, correct code. Write all files in the current working directory using relative paths (e.g. ./solution.ts, not absolute paths).`;
+// No default system prompt — each provider uses its own native instructions.
+// Scenarios can still override via systemPrompt if needed.
 
 export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOutput> {
   const observer = config.observer ?? new NoopObserver();
+  const provider = config.provider ?? new ClaudeAgentProvider();
   const startedAt = new Date().toISOString();
   const startMs = performance.now();
-  const model = config.model ?? DEFAULT_MODEL;
+  // model may be undefined when the provider picks its own default (e.g. Codex CLI)
+  const model = config.model ?? defaultModelForProvider(provider.name);
 
   const maxConcurrency = config.maxConcurrency ?? 1;
   const results: AgentScenarioResult[] = [];
@@ -48,7 +47,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
     for (let i = 0; i < config.scenarios.length; i++) {
       const scenario = config.scenarios[i]!;
       observer.onScenarioStart(scenario, i, config.scenarios.length);
-      const result = await runAgentScenario(scenario, config, observer);
+      const result = await runAgentScenario(scenario, config, provider, observer);
       results.push(result);
       observer.onScenarioComplete(scenario, result);
     }
@@ -61,7 +60,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
         const idx = cursor++;
         const item = queue[idx]!;
         observer.onScenarioStart(item.scenario, item.index, config.scenarios.length);
-        const result = await runAgentScenario(item.scenario, config, observer);
+        const result = await runAgentScenario(item.scenario, config, provider, observer);
         results[item.index] = result;
         observer.onScenarioComplete(item.scenario, result);
       }
@@ -78,7 +77,7 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
   const output: AgentEvalOutput = {
     summary: computeAgentEvalSummary(results),
     results,
-    metadata: { model, startedAt, completedAt, totalDurationMs },
+    metadata: { model: model ?? `${provider.name} (default)`, startedAt, completedAt, totalDurationMs },
   };
 
   observer.onEvalComplete(output);
@@ -88,11 +87,13 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
 export async function runAgentScenario(
   scenario: AgentScenario,
   config: AgentEvalConfig,
+  provider = config.provider ?? new ClaudeAgentProvider(),
   observer?: AgentEvalObserver,
 ): Promise<AgentScenarioResult> {
+  const model = config.model ?? defaultModelForProvider(provider.name);
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
-  const systemPrompt = scenario.systemPrompt ?? config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = scenario.systemPrompt ?? config.systemPrompt;
 
   const workspaceDir = config.workspaceDir
     ? path.join(config.workspaceDir, scenario.id)
@@ -136,9 +137,7 @@ export async function runAgentScenario(
     >();
 
     // Build MCP server config (skipped in noMcp baseline mode)
-    let mcpServerConfig:
-      | { command: string; args?: string[]; env?: Record<string, string> }
-      | undefined;
+    let mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> | undefined;
 
     if (!config.noMcp) {
       const serverEnv: Record<string, string> = {};
@@ -148,6 +147,10 @@ export async function runAgentScenario(
       if (config.server?.env) {
         Object.assign(serverEnv, config.server.env);
       }
+
+      let mcpServerConfig:
+        | { command: string; args?: string[]; env?: Record<string, string> }
+        | undefined;
 
       if (scenario.indexDir) {
         mcpServerConfig = {
@@ -166,150 +169,142 @@ export async function runAgentScenario(
           `Scenario "${scenario.name}" has no indexDir and no server config provided`,
         );
       }
+
+      mcpServers = { "docs-mcp": mcpServerConfig };
     }
 
-    const allowedTools = mcpServerConfig
+    const allowedTools = mcpServers
       ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"]
       : ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
     try {
-      for await (const message of query({
+      for await (const event of provider.run({
+        ...(model ? { model } : {}),
+        ...(systemPrompt ? { systemPrompt } : {}),
         prompt: scenario.prompt,
-        options: {
-          model: config.model ?? DEFAULT_MODEL,
-          systemPrompt,
-          allowedTools,
-          ...(mcpServerConfig ? { mcpServers: { "docs-mcp": mcpServerConfig } } : {}),
-          maxTurns,
-          maxBudgetUsd,
-          cwd: workspaceDir,
-          env: process.env as Record<string, string>,
-          permissionMode: "bypassPermissions",
-          allowDangerouslySkipPermissions: true,
-          persistSession: false,
-        },
+        workspaceDir,
+        maxTurns,
+        maxBudgetUsd,
+        ...(mcpServers ? { mcpServers } : {}),
+        allowedTools,
+        env: process.env as Record<string, string>,
+        ...(config.debug != null ? { debug: config.debug } : {}),
       })) {
         const nowMs = performance.now() - startMs;
 
-        if (message.type === "system" && message.subtype === "init") {
-          // Verify docs-mcp tools are registered
-          const mcpTools = message.tools.filter((t: string) => t.startsWith("mcp__docs"));
-          const mcpServers = (message.mcp_servers ?? []) as Array<{
-            name: string;
-            status: string;
-          }>;
-          const docsMcpServer = mcpServers.find((s) => s.name === "docs-mcp");
+        switch (event.type) {
+          case "init": {
+            const mcpTools = event.tools.filter((t: string) => t.startsWith("mcp__docs"));
+            const docsMcpServer = event.mcpServers.find((s) => s.name === "docs-mcp");
 
-          const parts = [
-            `model=${message.model}`,
-            `tools=${message.tools.length}`,
-            `mcp_tools=[${mcpTools.join(", ")}]`,
-            `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`,
-          ];
+            const parts = [
+              `model=${event.model}`,
+              `tools=${event.tools.length}`,
+              `mcp_tools=[${mcpTools.join(", ")}]`,
+              `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`,
+            ];
 
-          if (mcpTools.length === 0 && !config.noMcp) {
-            errors.push("docs-mcp tools not registered — server may have failed to start");
-          }
-
-          observer?.onAgentMessage(scenario, {
-            type: "system_init",
-            summary: parts.join(", "),
-            timestampMs: nowMs,
-          });
-        }
-
-        if (message.type === "assistant") {
-          numTurns++;
-          if (message.message.usage) {
-            const usage = message.message.usage as Record<string, number>;
-            inputTokens += usage.input_tokens ?? 0;
-            outputTokens += usage.output_tokens ?? 0;
-            cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
-            cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
-          }
-
-          for (const block of message.message.content) {
-            if ("text" in block && block.text) {
-              finalAnswer = block.text;
-              observer?.onAgentMessage(scenario, {
-                type: "assistant_text",
-                summary: block.text.slice(0, 150) + (block.text.length > 150 ? "..." : ""),
-                timestampMs: nowMs,
-              });
+            if (mcpTools.length === 0 && !config.noMcp) {
+              errors.push("docs-mcp tools not registered — server may have failed to start");
             }
 
-            if (block.type === "tool_use") {
-              const toolName = block.name;
-              const toolArgs = (block.input ?? {}) as Record<string, unknown>;
-              toolsCalled[toolName] = (toolsCalled[toolName] ?? 0) + 1;
-
-              if (DOCS_MCP_TOOLS.has(toolName)) {
-                activated = true;
-              }
-
-              pendingToolCalls.set(block.id, {
-                name: toolName,
-                args: toolArgs,
-                startMs: performance.now(),
-              });
-
-              observer?.onAgentMessage(scenario, {
-                type: "tool_call",
-                summary: `${toolName}(${summarizeArgs(toolArgs)})`,
-                toolArgs,
-                timestampMs: nowMs,
-              });
-            }
-          }
-        }
-
-        if (message.type === "user" && message.tool_use_result != null) {
-          const toolResult = message.tool_use_result as Record<string, unknown>;
-          const toolUseId =
-            typeof toolResult.tool_use_id === "string" ? toolResult.tool_use_id : undefined;
-          const resultText = extractToolResultText(toolResult);
-          const pending = toolUseId ? pendingToolCalls.get(toolUseId) : undefined;
-
-          if (pending && toolUseId) {
-            toolCallTrace.push({
-              name: pending.name,
-              args: pending.args,
-              result: resultText,
-              durationMs: performance.now() - pending.startMs,
-              timestampMs: pending.startMs - startMs,
+            observer?.onAgentMessage(scenario, {
+              type: "system_init",
+              summary: parts.join(", "),
+              workspaceDir,
+              timestampMs: nowMs,
             });
-            pendingToolCalls.delete(toolUseId);
+            break;
           }
 
-          observer?.onAgentMessage(scenario, {
-            type: "tool_result",
-            summary: "Tool result received",
-            toolResultPreview: resultText.slice(0, 2000),
-            timestampMs: performance.now() - startMs,
-          });
-        }
+          case "text": {
+            finalAnswer = event.text;
+            if (event.usage) {
+              numTurns++;
+              inputTokens += event.usage.inputTokens;
+              outputTokens += event.usage.outputTokens;
+              cacheReadInputTokens += event.usage.cacheReadInputTokens ?? 0;
+              cacheCreationInputTokens += event.usage.cacheCreationInputTokens ?? 0;
+            }
 
-        if (message.type === "result") {
-          resultSubtype = message.subtype;
-          totalCostUsd = message.total_cost_usd;
-          durationApiMs = message.duration_api_ms;
-          numTurns = message.num_turns;
-          const resultUsage = message.usage as Record<string, number>;
-          inputTokens = resultUsage.input_tokens ?? 0;
-          outputTokens = resultUsage.output_tokens ?? 0;
-          cacheReadInputTokens = resultUsage.cache_read_input_tokens ?? 0;
-          cacheCreationInputTokens = resultUsage.cache_creation_input_tokens ?? 0;
-          if (message.subtype === "success") {
-            finalAnswer = message.result;
-          } else {
-            errors.push(...message.errors);
+            observer?.onAgentMessage(scenario, {
+              type: "assistant_text",
+              summary:
+                event.text.slice(0, 150) + (event.text.length > 150 ? "..." : ""),
+              timestampMs: nowMs,
+            });
+            break;
           }
 
-          observer?.onAgentMessage(scenario, {
-            type: "result",
-            summary: `Result: ${resultSubtype} ($${totalCostUsd.toFixed(4)}, ${numTurns} turns)`,
-            timestampMs: performance.now() - startMs,
-          });
+          case "tool_call": {
+            const toolName = event.name;
+            toolsCalled[toolName] = (toolsCalled[toolName] ?? 0) + 1;
+
+            if (DOCS_MCP_TOOLS.has(toolName)) {
+              activated = true;
+            }
+
+            pendingToolCalls.set(event.id, {
+              name: toolName,
+              args: event.args,
+              startMs: performance.now(),
+            });
+
+            observer?.onAgentMessage(scenario, {
+              type: "tool_call",
+              summary: `${toolName}(${summarizeArgs(event.args)})`,
+              toolName,
+              toolArgs: event.args,
+              timestampMs: nowMs,
+            });
+            break;
+          }
+
+          case "tool_result": {
+            const pending = pendingToolCalls.get(event.id);
+
+            if (pending) {
+              toolCallTrace.push({
+                name: pending.name,
+                args: pending.args,
+                result: event.result,
+                durationMs: performance.now() - pending.startMs,
+                timestampMs: pending.startMs - startMs,
+              });
+              pendingToolCalls.delete(event.id);
+            }
+
+            observer?.onAgentMessage(scenario, {
+              type: "tool_result",
+              summary: "Tool result received",
+              toolResultPreview: event.result.slice(0, 2000),
+              timestampMs: performance.now() - startMs,
+            });
+            break;
+          }
+
+          case "done": {
+            resultSubtype = event.subtype;
+            totalCostUsd = event.usage.totalCostUsd;
+            durationApiMs = event.usage.durationApiMs;
+            numTurns = event.usage.numTurns;
+            inputTokens = event.usage.inputTokens;
+            outputTokens = event.usage.outputTokens;
+            cacheReadInputTokens = event.usage.cacheReadInputTokens;
+            cacheCreationInputTokens = event.usage.cacheCreationInputTokens;
+            if (event.subtype === "success") {
+              finalAnswer = event.answer;
+            } else {
+              errors.push(...event.errors);
+            }
+
+            observer?.onAgentMessage(scenario, {
+              type: "result",
+              summary: `Result: ${resultSubtype} ($${totalCostUsd.toFixed(4)}, ${numTurns} turns)`,
+              timestampMs: performance.now() - startMs,
+            });
+            break;
+          }
         }
       }
     } catch (err: unknown) {
@@ -362,10 +357,11 @@ export async function runAgentScenario(
       workspaceFiles,
       finalAnswer,
       resultSubtype,
+      workspaceDir,
       ...(errors.length > 0 ? { errors } : {}),
     };
   } finally {
-    if (!config.debug && !config.workspaceDir) {
+    if (config.cleanWorkspace) {
       await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
     }
   }
@@ -448,15 +444,4 @@ async function collectWorkspaceFiles(
     }
   }
   return files;
-}
-
-function extractToolResultText(toolResult: Record<string, unknown>): string {
-  if (typeof toolResult.content === "string") return toolResult.content;
-  if (Array.isArray(toolResult.content)) {
-    return (toolResult.content as Array<{ type?: string; text?: string }>)
-      .filter((c) => c.type === "text")
-      .map((c) => c.text ?? "")
-      .join("\n");
-  }
-  return JSON.stringify(toolResult);
 }

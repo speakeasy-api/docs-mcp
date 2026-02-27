@@ -10,6 +10,7 @@ import { ensureIndex } from "./agent/build-cache.js";
 import { loadPreviousResult, saveResult, generateTrendSummary } from "./agent/history.js";
 import { ConsoleObserver, NoopObserver } from "./agent/observer.js";
 import { ensureRepo } from "./agent/repo-cache.js";
+import { defaultModelForProvider, resolveAgentProvider } from "./agent/provider.js";
 import { runAgentEval } from "./agent/runner.js";
 import type { AgentScenario } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
@@ -203,7 +204,12 @@ program
     {} as Record<string, string>,
   )
   .option("--workspace-dir <path>", "Base directory for agent workspaces")
-  .option("--model <value>", "Claude model to use", "claude-sonnet-4-20250514")
+  .option(
+    "--provider <value>",
+    "Agent provider: claude, openai, or auto (default: auto)",
+    "auto",
+  )
+  .option("--model <value>", "Model to use (defaults based on provider)")
   .option("--max-turns <number>", "Default max turns per scenario", parseIntOption, 15)
   .option(
     "--max-budget-usd <number>",
@@ -214,7 +220,8 @@ program
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
-  .option("--debug", "Keep workspaces after run for inspection", false)
+  .option("--debug", "Enable verbose agent event logging", false)
+  .option("--clean-workspace", "Delete workspace directories after run (default: keep)", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
   .option("--out <path>", "Output JSON path")
   .action(
@@ -229,13 +236,15 @@ program
       serverCwd?: string;
       serverEnv: Record<string, string>;
       workspaceDir?: string;
-      model: string;
+      provider: string;
+      model?: string;
       maxTurns: number;
       maxBudgetUsd: number;
       maxConcurrency: number;
       systemPrompt?: string;
       mcp: boolean;
       debug: boolean;
+      cleanWorkspace: boolean;
       save: boolean;
       out?: string;
     }) => {
@@ -335,6 +344,12 @@ program
           : undefined;
       }
 
+      // Resolve agent provider
+      const explicitProvider = options.provider === "auto" ? undefined : options.provider;
+      const provider = await resolveAgentProvider(explicitProvider);
+      // model is undefined when provider picks its own default (e.g. Codex CLI)
+      const model = options.model ?? defaultModelForProvider(provider.name);
+
       const baseSuiteName =
         options.suite ??
         (options.scenarios
@@ -343,22 +358,24 @@ program
       const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
 
       const observer = new ConsoleObserver({
-        model: options.model,
+        model: model ?? `${provider.name} (default)`,
         suite: suiteName,
         debug: options.debug,
       });
 
       const output = await runAgentEval({
         scenarios,
+        provider,
         ...(server ? { server } : {}),
         ...(options.workspaceDir ? { workspaceDir: path.resolve(options.workspaceDir) } : {}),
-        model: options.model,
+        ...(model ? { model } : {}),
         maxTurns: options.maxTurns,
         maxBudgetUsd: options.maxBudgetUsd,
         maxConcurrency: options.maxConcurrency,
         ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
         observer,
         debug: options.debug,
+        cleanWorkspace: options.cleanWorkspace,
         noMcp,
       });
 
