@@ -90,6 +90,26 @@
             "default": false,
             "description": "When true, this taxonomy dimension identifies content variants that are near-identical in vector space (e.g. the same API operation documented in multiple SDK languages). At search time, results sharing the same content identity — determined by normalizing this field's value out of the filepath — are collapsed to the highest-scoring result. Has no effect when a filter for this field is active, since the filter already restricts to a single value.",
             "type": "boolean"
+          },
+          "properties": {
+            "description": "Per-value configuration for this taxonomy dimension. Keys are taxonomy values (e.g. 'typescript', 'python').",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "mcp_resource": {
+                  "default": false,
+                  "description": "When true, documents with this taxonomy dimension value are exposed as first-class MCP resources.",
+                  "type": "boolean"
+                }
+              },
+              "required": ["mcp_resource"],
+              "additionalProperties": false,
+              "description": "Per-value configuration for a taxonomy dimension value."
+            }
           }
         },
         "required": [

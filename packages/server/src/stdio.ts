@@ -3,9 +3,15 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
   type CallToolResult,
+  type ListResourcesResult,
+  type ListResourceTemplatesResult,
   type ListToolsResult,
+  type ReadResourceResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolCallContext, ToolProvider } from "./types.js";
 
@@ -31,6 +37,7 @@ export async function startStdioServer(
     {
       capabilities: {
         tools: {},
+        resources: {},
       },
     },
   );
@@ -53,6 +60,27 @@ export async function startStdioServer(
     }
     const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
     return result as CallToolResult;
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const resources = await app.getResources();
+    return {
+      resources: resources.map((r) => ({
+        uri: r.uri,
+        name: r.name,
+        description: r.description,
+        mimeType: r.mimeType,
+      })),
+    } satisfies ListResourcesResult;
+  });
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const result = await app.readResource(request.params.uri);
+    return result as ReadResourceResult;
   });
 
   const transport = new StdioServerTransport();

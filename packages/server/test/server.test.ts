@@ -181,3 +181,128 @@ describe("McpDocsServer with toolPrefix", () => {
     expect(result.content[0].text).toMatch(/Unknown tool/);
   });
 });
+
+describe("McpDocsServer resources", () => {
+  it("returns empty resources when no taxonomy values have mcp_resource", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+    });
+    const resources = await server.getResources();
+    expect(resources).toEqual([]);
+  });
+
+  it("lists resources for taxonomy values with mcp_resource: true", async () => {
+    const metadataWithResources = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Speakeasy SDK docs",
+      taxonomy: {
+        language: {
+          description: "Filter results by programming language.",
+          values: ["python", "typescript"],
+          properties: {
+            typescript: { mcp_resource: true },
+          },
+        },
+        scope: {
+          values: ["global-guide", "sdk-specific"],
+        },
+      },
+      stats: {
+        total_chunks: 2,
+        total_files: 2,
+        indexed_at: "2026-02-22T00:00:00Z",
+      },
+      embedding: null,
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithResources,
+    });
+
+    const resources = await server.getResources();
+    expect(resources).toHaveLength(1);
+    expect(resources[0].uri).toBe("docs://language/typescript/guides/ts.md");
+    expect(resources[0].name).toBe("guides/ts.md");
+    expect(resources[0].mimeType).toBe("text/markdown");
+  });
+
+  it("reads a resource and returns file content", async () => {
+    const metadataWithResources = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Speakeasy SDK docs",
+      taxonomy: {
+        language: {
+          description: "Filter results by programming language.",
+          values: ["python", "typescript"],
+          properties: {
+            typescript: { mcp_resource: true },
+          },
+        },
+        scope: {
+          values: ["global-guide", "sdk-specific"],
+        },
+      },
+      stats: {
+        total_chunks: 2,
+        total_files: 2,
+        indexed_at: "2026-02-22T00:00:00Z",
+      },
+      embedding: null,
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithResources,
+    });
+
+    const result = await server.readResource("docs://language/typescript/guides/ts.md");
+    expect(result.contents).toHaveLength(1);
+    expect(result.contents[0].text).toContain("TypeScript retry");
+    expect(result.contents[0].mimeType).toBe("text/markdown");
+  });
+
+  it("throws for nonexistent resource", async () => {
+    const metadataWithResources = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Speakeasy SDK docs",
+      taxonomy: {
+        language: {
+          description: "Filter results by programming language.",
+          values: ["python", "typescript"],
+          properties: {
+            typescript: { mcp_resource: true },
+          },
+        },
+        scope: {
+          values: ["global-guide", "sdk-specific"],
+        },
+      },
+      stats: {
+        total_chunks: 2,
+        total_files: 2,
+        indexed_at: "2026-02-22T00:00:00Z",
+      },
+      embedding: null,
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithResources,
+    });
+
+    await expect(server.readResource("docs://language/typescript/nonexistent.md")).rejects.toThrow(
+      /Resource not found/,
+    );
+  });
+
+  it("throws for malformed URI", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+    });
+
+    await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid resource URI/);
+  });
+});

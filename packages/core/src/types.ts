@@ -22,8 +22,13 @@ export interface ManifestOverride {
   metadata?: Record<string, string>;
 }
 
+export interface TaxonomyValueProperties {
+  mcp_resource: boolean;
+}
+
 export interface ManifestTaxonomyFieldConfig {
   vector_collapse: boolean;
+  properties?: Record<string, TaxonomyValueProperties> | undefined;
 }
 
 export interface Manifest {
@@ -72,9 +77,19 @@ export interface SearchResult {
   hint: SearchHint | null;
 }
 
+export interface ListFilepathsRequest {
+  filters: Record<string, string>;
+}
+
+export interface FileEntry {
+  filepath: string;
+  firstChunkId: string;
+}
+
 export interface SearchEngine {
   search(request: SearchRequest): Promise<SearchResult>;
   getDoc(request: GetDocRequest): Promise<GetDocResult>;
+  listFilepaths(request: ListFilepathsRequest): Promise<FileEntry[]>;
 }
 
 export interface TaxonomyField {
@@ -89,6 +104,8 @@ export interface TaxonomyField {
    * this field is active, since the filter already restricts to a single value.
    */
   vector_collapse?: boolean;
+  /** Per-value properties (e.g. `mcp_resource`) for this taxonomy dimension. */
+  properties?: Record<string, TaxonomyValueProperties>;
 }
 
 export interface MetadataStats {

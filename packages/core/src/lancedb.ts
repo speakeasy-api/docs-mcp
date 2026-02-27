@@ -12,8 +12,10 @@ import type {
   Chunk,
   DocsIndexOptions,
   EmbeddingProvider,
+  FileEntry,
   GetDocRequest,
   GetDocResult,
+  ListFilepathsRequest,
   SearchEngine,
   SearchHint,
   SearchHit,
@@ -323,6 +325,35 @@ export class LanceDbSearchEngine implements SearchEngine {
     return {
       text: blocks.join("\n\n"),
     };
+  }
+
+  async listFilepaths(request: ListFilepathsRequest): Promise<FileEntry[]> {
+    const filters = request.filters;
+    const clauses: string[] = [];
+
+    for (const [key, value] of Object.entries(filters)) {
+      clauses.push(`${quoteIdentifier(key)} = '${escapeSqlString(value)}'`);
+    }
+    clauses.push("chunk_index = 0");
+
+    const whereClause = clauses.join(" AND ");
+    const rows = await this.table
+      .query()
+      .where(whereClause)
+      .select(["filepath", "chunk_id"])
+      .toArray();
+
+    const entries: FileEntry[] = [];
+    for (const row of rows) {
+      const r = row as Record<string, unknown>;
+      const fp = r.filepath;
+      const cid = r.chunk_id;
+      if (typeof fp === "string" && fp && typeof cid === "string" && cid) {
+        entries.push({ filepath: fp, firstChunkId: cid });
+      }
+    }
+
+    return entries.sort((a, b) => a.filepath.localeCompare(b.filepath));
   }
 
   private async runFtsQuery(

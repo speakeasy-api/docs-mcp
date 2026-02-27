@@ -11,8 +11,10 @@ import {
 import type {
   Chunk,
   DocsIndexOptions,
+  FileEntry,
   GetDocRequest,
   GetDocResult,
+  ListFilepathsRequest,
   SearchEngine,
   SearchHit,
   SearchHint,
@@ -141,6 +143,34 @@ export class InMemorySearchEngine implements SearchEngine {
     return {
       text: blocks.join("\n\n"),
     };
+  }
+
+  async listFilepaths(request: ListFilepathsRequest): Promise<FileEntry[]> {
+    const filters = request.filters;
+    const seen = new Set<string>();
+    const entries: FileEntry[] = [];
+
+    for (const chunk of this.chunks) {
+      if (seen.has(chunk.filepath)) continue;
+      let matches = true;
+      for (const [key, value] of Object.entries(filters)) {
+        if (chunk.metadata[key] !== value) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+
+      seen.add(chunk.filepath);
+      const fileChunks = this.byFile.get(chunk.filepath);
+      const firstChunk = fileChunks?.[0];
+      entries.push({
+        filepath: chunk.filepath,
+        firstChunkId: firstChunk?.chunk_id ?? chunk.chunk_id,
+      });
+    }
+
+    return entries.sort((a, b) => a.filepath.localeCompare(b.filepath));
   }
 }
 
