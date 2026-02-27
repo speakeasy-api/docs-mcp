@@ -6,7 +6,7 @@ export interface ToolCallContext {
   authInfo?: AuthInfo;
   /** HTTP request headers (HTTP transport only). */
   headers?: Record<string, string | string[] | undefined>;
-  /** Client name/version from MCP init handshake. Available in stdio; undefined in stateless HTTP. */
+  /** Client name/version from MCP init handshake. Available after the init handshake completes. */
   clientInfo?: { name: string; version: string };
   /** Abort signal for request cancellation. */
   signal: AbortSignal;

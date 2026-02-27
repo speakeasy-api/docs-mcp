@@ -464,8 +464,8 @@ describe("HTTP authentication", () => {
     }
   });
 
-  it("context.clientInfo is undefined in stateless HTTP", async () => {
-    let receivedClientInfo: { name: string; version: string } | undefined = { name: "should-be-overwritten", version: "0" };
+  it("context.clientInfo is populated after session handshake in HTTP", async () => {
+    let receivedClientInfo: { name: string; version: string } | undefined;
 
     const app = new McpDocsServer({
       index: new DocsIndex(chunks),
@@ -493,7 +493,7 @@ describe("HTTP authentication", () => {
       await client.connect(transport);
 
       await client.callTool({ name: "client_info_check", arguments: {} });
-      expect(receivedClientInfo).toBeUndefined();
+      expect(receivedClientInfo).toEqual({ name: "test-client", version: "0.1.0" });
 
       await client.close();
     } finally {
