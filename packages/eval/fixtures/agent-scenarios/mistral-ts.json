@@ -25,7 +25,7 @@
       { "type": "file_contains", "path": "solution.ts", "value": "chat" },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -58,7 +58,7 @@
       { "type": "file_contains", "path": "solution.ts", "value": "embed" },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -91,7 +91,7 @@
       { "type": "file_contains", "path": "solution.ts", "value": "model" },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -124,7 +124,7 @@
       { "type": "file_contains", "path": "solution.ts", "value": "tool" },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },

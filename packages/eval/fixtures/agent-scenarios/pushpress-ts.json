@@ -24,7 +24,7 @@
       },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -62,7 +62,7 @@
       },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -100,7 +100,7 @@
       },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
@@ -138,7 +138,7 @@
       },
       {
         "type": "script",
-        "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
         "name": "typecheck",
         "soft": true
       },
