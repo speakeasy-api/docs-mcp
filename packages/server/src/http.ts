@@ -13,7 +13,7 @@ import {
   type ListResourcesResult,
   type ListResourceTemplatesResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ToolProvider } from "./types.js";
+import type { AuthInfo, ToolCallContext, ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json") as {
@@ -24,6 +24,12 @@ export interface StartHttpServerOptions {
   name?: string;
   version?: string;
   port?: number;
+  /**
+   * Async hook called before each request is processed.
+   * Receives the HTTP request; return AuthInfo to attach to the request context,
+   * or throw to reject with 401.
+   */
+  authenticate?: (request: { headers: Record<string, string | string[] | undefined> }) => AuthInfo | Promise<AuthInfo>;
 }
 
 export interface HttpServerHandle {
@@ -71,8 +77,15 @@ function createPerRequestServer(
     return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const result = await app.callTool(request.params.name, request.params.arguments ?? {});
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const context: ToolCallContext = { signal: extra.signal };
+    if (extra.authInfo) {
+      context.authInfo = extra.authInfo;
+    }
+    if (extra.requestInfo?.headers) {
+      context.headers = extra.requestInfo.headers;
+    }
+    const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
     return result as CallToolResult;
   });
 
@@ -161,6 +174,23 @@ async function handleRequest(
       }),
     );
     return;
+  }
+
+  if (options.authenticate) {
+    try {
+      const authInfo = await options.authenticate({ headers: req.headers });
+      (req as http.IncomingMessage & { auth?: AuthInfo }).auth = authInfo;
+    } catch (error) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32000, message: error instanceof Error ? error.message : "Unauthorized" },
+          id: null
+        })
+      );
+      return;
+    }
   }
 
   // Parse JSON body before handing off to the transport

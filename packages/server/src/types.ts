@@ -1,3 +1,17 @@
+export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+
+export interface ToolCallContext {
+  /** Validated auth info from transport middleware (HTTP only). */
+  authInfo?: AuthInfo;
+  /** HTTP request headers (HTTP transport only). */
+  headers?: Record<string, string | string[] | undefined>;
+  /** Client name/version from MCP init handshake. Available in stdio; undefined in stateless HTTP. */
+  clientInfo?: { name: string; version: string };
+  /** Abort signal for request cancellation. */
+  signal: AbortSignal;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -16,12 +30,12 @@ export interface CallToolResult {
 
 export interface ToolProvider {
   getTools(): ToolDefinition[];
-  callTool(name: string, args: unknown): Promise<CallToolResult>;
+  callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult>;
 }
 
 export interface CustomTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  handler: (args: unknown) => Promise<CallToolResult>;
+  handler: (args: unknown, context: ToolCallContext) => Promise<CallToolResult>;
 }

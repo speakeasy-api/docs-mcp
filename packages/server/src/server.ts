@@ -6,7 +6,7 @@ import type {
   SearchRequest,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
-import type { CallToolResult, CustomTool, ToolDefinition, ToolProvider } from "./types.js";
+import type { CallToolResult, CustomTool, ToolCallContext, ToolDefinition, ToolProvider } from "./types.js";
 
 export interface McpDocsServerOptions {
   index: SearchEngine;
@@ -96,7 +96,7 @@ export class McpDocsServer implements ToolProvider {
     return [...builtIn, ...custom];
   }
 
-  async callTool(name: string, args: unknown): Promise<CallToolResult> {
+  async callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult> {
     if (name === this.searchToolName) {
       return this.handleSearchDocs(args);
     }
@@ -108,7 +108,7 @@ export class McpDocsServer implements ToolProvider {
     const customTool = this.customTools.find((t) => t.name === name);
     if (customTool) {
       try {
-        return await customTool.handler(args);
+        return await customTool.handler(args, context);
       } catch (error) {
         return errorResult(error instanceof Error ? error.message : String(error));
       }

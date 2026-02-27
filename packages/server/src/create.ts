@@ -56,7 +56,7 @@ const CustomToolSchema = z.object({
     (s) => s.type === "object",
     "inputSchema.type must be 'object' (required by MCP tool listing)"
   ),
-  handler: z.function({ input: z.tuple([z.unknown()]), output: z.promise(z.any()) })
+  handler: z.function({ input: z.tuple([z.unknown(), z.any()]), output: z.promise(z.any()) })
 });
 
 /** Zod schema for `createDocsServer()` options. Consumers can use this to validate config. */

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "../src/server.js";
+import type { ToolCallContext } from "../src/types.js";
+
+const stubContext: ToolCallContext = { signal: AbortSignal.timeout(5_000) };
 
 const chunks: Chunk[] = [
   {
@@ -73,7 +76,7 @@ describe("McpDocsServer", () => {
     const result = await server.callTool("search_docs", {
       query: "retry",
       language: "typescript",
-    });
+    }, stubContext);
 
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
@@ -90,7 +93,7 @@ describe("McpDocsServer", () => {
     const result = await server.callTool("search_docs", {
       query: "retry",
       cursor: "bad-cursor",
-    });
+    }, stubContext);
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Invalid cursor/);
@@ -105,7 +108,7 @@ describe("McpDocsServer", () => {
     const result = await server.callTool("search_docs", {
       query: "retry",
       unsupported: "x",
-    });
+    }, stubContext);
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Unexpected field 'unsupported'/);
@@ -120,14 +123,14 @@ describe("McpDocsServer", () => {
     const badLimit = await server.callTool("search_docs", {
       query: "retry",
       limit: 0,
-    });
+    }, stubContext);
     expect(badLimit.isError).toBe(true);
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
 
     const badContext = await server.callTool("get_doc", {
       chunk_id: "guides/ts.md#retry",
       context: 6,
-    });
+    }, stubContext);
     expect(badContext.isError).toBe(true);
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
   });
@@ -159,7 +162,7 @@ describe("McpDocsServer with toolPrefix", () => {
     const result = await server.callTool("acme_search_docs", {
       query: "retry",
       language: "typescript",
-    });
+    }, stubContext);
 
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
@@ -173,7 +176,7 @@ describe("McpDocsServer with toolPrefix", () => {
       toolPrefix: "acme",
     });
 
-    const result = await server.callTool("search_docs", { query: "retry" });
+    const result = await server.callTool("search_docs", { query: "retry" }, stubContext);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Unknown tool/);
   });

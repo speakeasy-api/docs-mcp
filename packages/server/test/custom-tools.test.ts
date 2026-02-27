@@ -1,11 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type http from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "../src/server.js";
 import { startHttpServer } from "../src/http.js";
-import type { CustomTool } from "../src/types.js";
+import type { CustomTool, ToolCallContext } from "../src/types.js";
+
+const stubContext: ToolCallContext = { signal: AbortSignal.timeout(5_000) };
 
 const chunks: Chunk[] = [
   {
@@ -86,7 +88,7 @@ describe("McpDocsServer custom tools", () => {
     const result = await server.callTool("submit_feedback", {
       chunk_id: "guides/ts.md#retry",
       rating: 5
-    });
+    }, stubContext);
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe("Feedback received: 5");
   });
@@ -98,7 +100,7 @@ describe("McpDocsServer custom tools", () => {
       customTools: [throwingTool]
     });
 
-    const result = await server.callTool("always_throws", {});
+    const result = await server.callTool("always_throws", {}, stubContext);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe("Something went wrong");
   });
@@ -110,7 +112,7 @@ describe("McpDocsServer custom tools", () => {
       customTools: [feedbackTool]
     });
 
-    const result = await server.callTool("search_docs", { query: "retry" });
+    const result = await server.callTool("search_docs", { query: "retry" }, stubContext);
     expect(result.isError).toBe(false);
   });
 
@@ -121,10 +123,48 @@ describe("McpDocsServer custom tools", () => {
       customTools: [feedbackTool]
     });
 
-    const result = await server.callTool("nonexistent", {});
+    const result = await server.callTool("nonexistent", {}, stubContext);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Unknown tool/);
   });
+});
+
+describe("McpDocsServer context threading", () => {
+  it("passes context through to custom handler", async () => {
+    const spy = vi.fn<(args: unknown, context: ToolCallContext) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>>();
+    spy.mockResolvedValue({
+      content: [{ type: "text", text: "ok" }],
+      isError: false
+    });
+
+    const contextTool: CustomTool = {
+      name: "ctx_echo",
+      description: "Echoes context",
+      inputSchema: { type: "object", properties: {} },
+      handler: spy
+    };
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [contextTool]
+    });
+
+    const context: ToolCallContext = {
+      signal: AbortSignal.timeout(5_000),
+      authInfo: { token: "tok", clientId: "c1", scopes: ["read"] },
+      headers: { authorization: "Bearer tok" },
+      clientInfo: { name: "test", version: "1.0" }
+    };
+
+    await server.callTool("ctx_echo", { foo: "bar" }, context);
+
+    expect(spy).toHaveBeenCalledOnce();
+    const [receivedArgs, receivedCtx] = spy.mock.calls[0];
+    expect(receivedArgs).toEqual({ foo: "bar" });
+    expect(receivedCtx).toBe(context);
+  });
+
 });
 
 describe("McpDocsServer custom tool name validation", () => {
@@ -244,5 +284,220 @@ describe("Custom tools over HTTP transport", () => {
     expect(text).toBe("Something went wrong");
 
     await client.close();
+  });
+});
+
+describe("HTTP authentication", () => {
+  it("authenticate hook returns AuthInfo → custom handler sees context.authInfo", async () => {
+    const handlerSpy = vi.fn<(args: unknown, context: ToolCallContext) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>>();
+    handlerSpy.mockImplementation(async (_args, ctx) => ({
+      content: [{ type: "text", text: `client=${ctx.authInfo?.clientId ?? "none"}` }],
+      isError: false
+    }));
+
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [{
+        name: "auth_echo",
+        description: "Echoes auth info",
+        inputSchema: { type: "object", properties: {} },
+        handler: handlerSpy
+      }]
+    });
+
+    const handle = await startHttpServer(app, {
+      port: 0,
+      authenticate: async ({ headers }) => {
+        const auth = headers.authorization;
+        const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
+        if (!token) throw new Error("Missing token");
+        return { token, clientId: "test-client-id", scopes: ["read"] };
+      }
+    });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: {
+          headers: { Authorization: "Bearer my-secret-token" }
+        }
+      });
+      const client = new Client({ name: "test-client", version: "0.1.0" });
+      await client.connect(transport);
+
+      const result = await client.callTool({
+        name: "auth_echo",
+        arguments: {}
+      });
+      expect(result.isError).not.toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0].text;
+      expect(text).toBe("client=test-client-id");
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("authenticate hook throws → client receives 401", async () => {
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata
+    });
+
+    const handle = await startHttpServer(app, {
+      port: 0,
+      authenticate: async () => {
+        throw new Error("Invalid credentials");
+      }
+    });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      // Raw HTTP request to verify 401 status code
+      const res = await fetch(`http://localhost:${port}/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "initialize",
+          params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "1.0" } },
+          id: 1
+        })
+      });
+
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.error.message).toBe("Invalid credentials");
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("custom HTTP headers are visible in context.headers", async () => {
+    const handlerSpy = vi.fn<(args: unknown, context: ToolCallContext) => Promise<{ content: Array<{ type: "text"; text: string }>; isError: boolean }>>();
+    handlerSpy.mockImplementation(async (_args, ctx) => ({
+      content: [{ type: "text", text: `x-custom=${ctx.headers?.["x-custom-header"] ?? "missing"}` }],
+      isError: false
+    }));
+
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [{
+        name: "header_echo",
+        description: "Echoes headers",
+        inputSchema: { type: "object", properties: {} },
+        handler: handlerSpy
+      }]
+    });
+
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: {
+          headers: { "X-Custom-Header": "hello-world" }
+        }
+      });
+      const client = new Client({ name: "test-client", version: "0.1.0" });
+      await client.connect(transport);
+
+      const result = await client.callTool({
+        name: "header_echo",
+        arguments: {}
+      });
+      expect(result.isError).not.toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0].text;
+      expect(text).toBe("x-custom=hello-world");
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("context.signal is always present in HTTP handlers", async () => {
+    let receivedSignal: AbortSignal | undefined;
+
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [{
+        name: "signal_check",
+        description: "Checks signal presence",
+        inputSchema: { type: "object", properties: {} },
+        handler: async (_args, ctx) => {
+          receivedSignal = ctx.signal;
+          return { content: [{ type: "text" as const, text: "ok" }], isError: false };
+        }
+      }]
+    });
+
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url);
+      const client = new Client({ name: "test-client", version: "0.1.0" });
+      await client.connect(transport);
+
+      await client.callTool({ name: "signal_check", arguments: {} });
+      expect(receivedSignal).toBeInstanceOf(AbortSignal);
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("context.clientInfo is undefined in stateless HTTP", async () => {
+    let receivedClientInfo: { name: string; version: string } | undefined = { name: "should-be-overwritten", version: "0" };
+
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [{
+        name: "client_info_check",
+        description: "Checks clientInfo",
+        inputSchema: { type: "object", properties: {} },
+        handler: async (_args, ctx) => {
+          receivedClientInfo = ctx.clientInfo;
+          return { content: [{ type: "text" as const, text: "ok" }], isError: false };
+        }
+      }]
+    });
+
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url);
+      const client = new Client({ name: "test-client", version: "0.1.0" });
+      await client.connect(transport);
+
+      await client.callTool({ name: "client_info_check", arguments: {} });
+      expect(receivedClientInfo).toBeUndefined();
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
   });
 });
