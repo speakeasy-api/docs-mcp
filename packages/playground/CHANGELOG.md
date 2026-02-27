@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.4.1
+
+### Patch Changes
+
+- ac1c5f3: Fix MCP protocol handshake: send initialize and notifications/initialized before tools/list
+
 ## 0.4.0
 
 ## 0.3.0

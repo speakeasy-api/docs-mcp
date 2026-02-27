@@ -1,6 +1,6 @@
 {
   "name": "@speakeasy-api/docs-mcp-core",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Core retrieval and indexing primitives for docs-mcp: markdown chunking, hybrid search, and LanceDB integration",
   "license": "AGPL-3.0-only",
   "type": "module",
