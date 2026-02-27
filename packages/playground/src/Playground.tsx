@@ -3,6 +3,7 @@ import { Chat, ElementsConfig, GramElementsProvider } from "@gram-ai/elements";
 import { ServerUrl } from "./components/ServerUrl.js";
 import { InstallMethods } from "./components/InstallMethods.js";
 import { ToolsList } from "./components/ToolsList.js";
+import { ResourcesList } from "./components/ResourcesList.js";
 
 const getSession = async () => {
   return fetch("/chat/session", {
@@ -35,6 +36,7 @@ export default function Playground() {
       <ServerUrl url={mcpUrl} />
       <InstallMethods serverUrl={mcpUrl} serverName={serverName} token={token} />
       <ToolsList chatEnabled={chatEnabled} />
+      <ResourcesList />
     </div>
   );
 
