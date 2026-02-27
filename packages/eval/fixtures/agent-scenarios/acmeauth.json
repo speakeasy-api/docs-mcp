@@ -5,7 +5,7 @@
     "description": "AcmeAuth SDK — multi-language authentication client covering API keys, OAuth, JWT, pagination, webhooks, and error handling",
     "docsDir": "../../../../tests/fixtures/docs",
     "category": "sdk-usage",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" },
       { "type": "file_contains", "path": "solution.ts", "value": "apiKey" },
@@ -43,7 +43,7 @@
     "prompt": "Write TypeScript code in solution.ts that calls the AcmeAuth API (`@acmeauth/sdk`) and properly handles rate limit (429) errors using the SDK's typed error classes. Add the dependency to package.json. Do not run the program.",
     "docsDir": "../../../../tests/fixtures/docs",
     "category": "error-handling",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_contains",
@@ -69,7 +69,7 @@
     "prompt": "Write TypeScript code in solution.ts that verifies incoming AcmeAuth webhook signatures using the SDK (`@acmeauth/sdk`). Add the dependency to package.json. Do not run the program.",
     "docsDir": "../../../../tests/fixtures/docs",
     "category": "webhooks",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
@@ -96,7 +96,7 @@
     "prompt": "Write TypeScript code in solution.ts that lists all AcmeAuth users using the SDK (`@acmeauth/sdk`), handling pagination correctly. Add the dependency to package.json. Do not run the program.",
     "docsDir": "../../../../tests/fixtures/docs",
     "category": "pagination",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
@@ -144,7 +144,7 @@
     "prompt": "Explain how OAuth 2.0 authentication works with AcmeAuth and write TypeScript code in solution.ts that initializes the client (`@acmeauth/sdk`) with an OAuth access token. Add the dependency to package.json. Do not run the program.",
     "docsDir": "../../../../tests/fixtures/docs",
     "category": "auth",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       { "type": "contains", "value": "accessToken" },
       {

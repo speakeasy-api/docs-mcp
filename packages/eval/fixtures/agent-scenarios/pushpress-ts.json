@@ -9,7 +9,7 @@
       "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
     },
     "category": "sdk-usage",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
@@ -46,7 +46,7 @@
       "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
     },
     "category": "sdk-usage",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
@@ -84,7 +84,7 @@
       "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
     },
     "category": "advanced",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
@@ -122,7 +122,7 @@
       "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
     },
     "category": "sdk-usage",
-    "setup": "npm init -y --silent 2>/dev/null",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
     "assertions": [
       {
         "type": "file_matches",
