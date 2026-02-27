@@ -1,6 +1,6 @@
 {
   "name": "@speakeasy-api/docs-mcp-eval",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Evaluation and benchmarking harness for docs-mcp search quality metrics",
   "license": "AGPL-3.0-only",
   "type": "module",
