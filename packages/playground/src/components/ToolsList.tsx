@@ -34,26 +34,37 @@ function useToolsFromElements(): ToolEntry[] | undefined {
   return tools;
 }
 
-async function mcpPost(body: unknown): Promise<unknown> {
+async function mcpPost(
+  body: unknown,
+  sessionId?: string,
+): Promise<{ data: unknown; sessionId?: string }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (sessionId) {
+    headers["Mcp-Session-Id"] = sessionId;
+  }
   const res = await fetch("/mcp", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
+    headers,
     body: JSON.stringify(body),
   });
+  const returnedSessionId = res.headers.get("mcp-session-id") ?? sessionId;
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType.includes("text/event-stream")) {
     const text = await res.text();
     for (const line of text.split("\n")) {
       if (line.startsWith("data: ")) {
-        return JSON.parse(line.slice(6));
+        return { data: JSON.parse(line.slice(6)), sessionId: returnedSessionId };
       }
     }
-    return null;
+    return { data: null, sessionId: returnedSessionId };
   }
-  return res.json();
+  if (!contentType.includes("application/json")) {
+    return { data: null, sessionId: returnedSessionId };
+  }
+  return { data: await res.json(), sessionId: returnedSessionId };
 }
 
 function useToolsFromMcp(): ToolEntry[] | undefined {
@@ -62,7 +73,7 @@ function useToolsFromMcp(): ToolEntry[] | undefined {
   useEffect(() => {
     (async () => {
       // 1. Initialize handshake
-      await mcpPost({
+      const init = await mcpPost({
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
@@ -72,27 +83,35 @@ function useToolsFromMcp(): ToolEntry[] | undefined {
           clientInfo: { name: "docs-mcp-playground", version: "0.1.0" },
         },
       });
+      const sessionId = init.sessionId;
 
       // 2. Send initialized notification (no id — it's a notification)
-      await mcpPost({
-        jsonrpc: "2.0",
-        method: "notifications/initialized",
-      });
+      await mcpPost(
+        {
+          jsonrpc: "2.0",
+          method: "notifications/initialized",
+        },
+        sessionId,
+      );
 
       // 3. Now list tools
-      const data = (await mcpPost({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/list",
-        params: {},
-      })) as {
+      const { data } = await mcpPost(
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list",
+          params: {},
+        },
+        sessionId,
+      );
+      const typed = data as {
         result?: {
           tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
         };
       } | null;
 
-      if (!data) return setTools([]);
-      const result = data.result?.tools ?? [];
+      if (!typed) return setTools([]);
+      const result = typed.result?.tools ?? [];
       setTools(
         result.map((t) => ({
           name: t.name,

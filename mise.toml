@@ -38,6 +38,11 @@ description = "Start playground (MCP server + Vite dev server)"
 run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310}" "cd packages/playground && npx vite"'
 depends = ["index-fixtures"]
 
+[tasks."playground:no-gram"]
+description = "Start playground without GRAM_API_KEY (chat disabled)"
+run = 'GRAM_API_KEY= mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310}" "cd packages/playground && npx vite"'
+depends = ["index-fixtures"]
+
 [tasks."playground:server"]
 description = "Start only the playground API server"
 run = "node packages/playground/src/server.ts"
