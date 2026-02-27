@@ -22,7 +22,6 @@ interface ServerCliOptions {
   proximityWeight?: number;
   phraseSlop?: number;
   vectorWeight?: number;
-  allowChunksFallback: boolean;
   transport: "stdio" | "http";
   port: number;
 }
@@ -42,11 +41,6 @@ program
   .option("--proximity-weight <number>", "Lexical phrase blend weight", parseNumberOption)
   .option("--phrase-slop <number>", "Phrase query slop (0-5)", parseNumberOption)
   .option("--vector-weight <number>", "Vector rank blend weight", parseNumberOption)
-  .option(
-    "--allow-chunks-fallback",
-    "Allow fallback to chunks.json when .lancedb is missing",
-    false,
-  )
   .option("--transport <type>", "Transport type: stdio or http", "stdio")
   .option(
     "--port <number>",
@@ -64,7 +58,6 @@ program
       proximityWeight: options.proximityWeight,
       phraseSlop: options.phraseSlop,
       vectorWeight: options.vectorWeight,
-      allowChunksFallback: options.allowChunksFallback,
     });
 
     const serverName =

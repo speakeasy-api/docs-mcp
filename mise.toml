@@ -11,7 +11,7 @@ depends = ["build"]
 
 [tasks."serve:http"]
 description = "Start MCP docs server over Streamable HTTP (set PORT to override)"
-run = "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback"
+run = "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310}"
 sources = ["packages/server/src/**"]
 depends = ["index-fixtures"]
 
@@ -35,7 +35,7 @@ depends = ["index-fixtures"]
 
 [tasks.playground]
 description = "Start playground (MCP server + Vite dev server)"
-run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310} --allow-chunks-fallback" "cd packages/playground && npx vite"'
+run = 'mprocs "node packages/server/dist/bin.js --index-dir tests/fixtures/index --transport http --port ${PORT:-20310}" "cd packages/playground && npx vite"'
 depends = ["index-fixtures"]
 
 [tasks."playground:server"]

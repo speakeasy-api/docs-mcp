@@ -7,7 +7,6 @@ describe("CreateDocsServerOptionsSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.indexDir).toBe("./my-index");
-      expect(result.data.allowChunksFallback).toBe(false);
       expect(result.data.customTools).toEqual([]);
     }
   });
@@ -22,7 +21,6 @@ describe("CreateDocsServerOptionsSchema", () => {
       proximityWeight: 1.5,
       phraseSlop: 2,
       vectorWeight: 3.0,
-      allowChunksFallback: true,
       customTools: [
         {
           name: "my_tool",
@@ -125,10 +123,9 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("allows omitting defaulted fields in input type", () => {
     // This is a compile-time check — if CreateDocsServerOptionsInput requires
-    // allowChunksFallback or customTools, this won't compile.
+    // customTools, this won't compile.
     const input: CreateDocsServerOptionsInput = { indexDir: "./x" };
     const result = CreateDocsServerOptionsSchema.parse(input);
-    expect(result.allowChunksFallback).toBe(false);
     expect(result.customTools).toEqual([]);
   });
 
@@ -137,9 +134,7 @@ describe("CreateDocsServerOptionsSchema", () => {
       indexDir: "./x"
     });
     // These are always present after parse due to .default()
-    const _fallback: boolean = parsed.allowChunksFallback;
     const _tools: unknown[] = parsed.customTools;
-    expect(_fallback).toBe(false);
     expect(_tools).toEqual([]);
   });
 });

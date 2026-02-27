@@ -90,6 +90,10 @@ class SessionManager {
     return entry;
   }
 
+  peek(sessionId: string): SessionEntry | undefined {
+    return this.sessions.get(sessionId);
+  }
+
   remove(sessionId: string): void {
     const entry = this.sessions.get(sessionId);
     if (entry) {
@@ -305,7 +309,7 @@ async function handleRequest(
       );
       return;
     }
-    const entry = sessionManager.get(sessionId);
+    const entry = sessionManager.peek(sessionId);
     if (!entry) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(
@@ -318,6 +322,9 @@ async function handleRequest(
       return;
     }
     await entry.transport.handleRequest(req, res);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      sessionManager.remove(sessionId);
+    }
     return;
   }
 

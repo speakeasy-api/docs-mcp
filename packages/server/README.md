@@ -112,14 +112,13 @@ Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `indexDir` | `string` | *required* | Directory containing `chunks.json` and `metadata.json` from `docs-mcp build`. |
-| `toolPrefix` | `string` | — | Prefix for tool names, e.g. `"acme"` → `acme_search_docs`. Alphanumeric, dash, or underscore. |
+| `toolPrefix` | `string` | — | Prefix for built-in tool names, e.g. `"acme"` → `acme_search_docs`. Does not affect custom tool names. Alphanumeric, dash, or underscore. |
 | `queryEmbeddingApiKey` | `string` | `OPENAI_API_KEY` env | API key for query-time embeddings. |
-| `queryEmbeddingBaseUrl` | `string` | — | Base URL for the embedding API. |
-| `queryEmbeddingBatchSize` | `number` | — | Batch size for query embedding requests. Positive integer. |
-| `proximityWeight` | `number` | — | Lexical phrase blend weight for RRF ranking. Positive. |
-| `phraseSlop` | `number` | — | Phrase query slop (0–5). |
-| `vectorWeight` | `number` | — | Vector rank blend weight for RRF ranking. Positive. |
-| `allowChunksFallback` | `boolean` | `false` | Allow fallback to in-memory `chunks.json` when `.lancedb` index is missing. |
+| `queryEmbeddingBaseUrl` | `string` | Provider default | Base URL for the embedding API. Defaults to the provider's official endpoint (e.g. `https://api.openai.com/v1` for OpenAI). Override to use a proxy or compatible API. |
+| `queryEmbeddingBatchSize` | `number` | `128` | Number of texts per embedding API call. Reduce if hitting provider rate or payload limits. Positive integer. |
+| `proximityWeight` | `number` | `1.25` | RRF blend weight for lexical phrase-proximity matches. Higher values boost results where query terms appear close together. Positive. |
+| `phraseSlop` | `number` | `0` | Maximum word distance allowed for phrase matches (0 = exact phrase only, up to 5). |
+| `vectorWeight` | `number` | `1` | RRF blend weight for vector (semantic) search results. Higher values boost semantically similar results. Positive. |
 | `customTools` | `CustomTool[]` | `[]` | Additional tools registered alongside the built-in `search_docs` and `get_doc`. |
 
 The exported `CreateDocsServerOptionsSchema` (Zod) is the canonical machine-readable spec for these options.
