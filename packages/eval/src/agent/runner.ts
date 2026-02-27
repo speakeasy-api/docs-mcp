@@ -88,7 +88,7 @@ export async function runAgentScenario(
   const systemPrompt = scenario.systemPrompt ?? config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const workspaceDir = config.workspaceDir
-    ? path.join(config.workspaceDir, sanitizeName(scenario.name))
+    ? path.join(config.workspaceDir, scenario.id)
     : await mkdtemp(path.join(tmpdir(), "agent-eval-"));
 
   try {
@@ -282,6 +282,7 @@ export async function runAgentScenario(
     const passed = assertionResults.length > 0 && assertionResults.every((r) => r.passed);
 
     return {
+      id: scenario.id,
       name: scenario.name,
       ...(scenario.category !== undefined ? { category: scenario.category } : {}),
       activated,
@@ -304,14 +305,6 @@ export async function runAgentScenario(
       await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
     }
   }
-}
-
-function sanitizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
 }
 
 function summarizeArgs(args: Record<string, unknown>): string {

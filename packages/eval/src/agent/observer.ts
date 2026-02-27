@@ -187,7 +187,7 @@ export class ConsoleObserver implements AgentEvalObserver {
   onScenarioStart(scenario: AgentScenario, index: number, total: number): void {
     this.showHeader(total);
 
-    write(`\n${c.bold}${c.cyan}━━━ Scenario ${index + 1}/${total}: ${scenario.name} ━━━${c.reset}\n`);
+    write(`\n${c.bold}${c.cyan}━━━ Scenario ${index + 1}/${total}: ${c.reset}${c.dim}[${scenario.id}]${c.reset} ${c.bold}${c.cyan}${scenario.name} ━━━${c.reset}\n`);
     if (scenario.category) {
       write(`${c.dim}Category: ${scenario.category}${c.reset}\n`);
     }
@@ -284,7 +284,7 @@ export class ConsoleObserver implements AgentEvalObserver {
     // ── Scenario results table ──────────────────────────────────────
     write(`\n${c.bold}${c.cyan}━━━ Results ━━━${c.reset}\n\n`);
 
-    const nameW = Math.max(8, ...results.map((r) => r.name.length));
+    const nameW = Math.max(8, ...results.map((r) => r.id.length));
     const header = `  ${padRight("Scenario", nameW)}  Result    MCP  Turns  Cost      Duration`;
     const sep = `  ${"─".repeat(stripAnsi(header).length - 2)}`;
 
@@ -303,7 +303,7 @@ export class ConsoleObserver implements AgentEvalObserver {
       const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 
       write(
-        `  ${padRight(r.name, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, 8)}  ${dur}\n`
+        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, 8)}  ${dur}\n`
       );
     }
 

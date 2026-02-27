@@ -1,5 +1,5 @@
-[
-  {
+{
+  "create-link": {
     "name": "Create a Dub short link",
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates a short link pointing to https://example.com. Use the Dub SDK's `links.create` method. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
     "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
@@ -7,50 +7,46 @@
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
+      { "type": "file_contains", "path": "solution.ts", "value": "dub" },
       { "type": "script", "command": "grep -q 'dub' package.json", "name": "dub-in-deps" },
-      { "type": "script", "command": "grep -qi 'dub' solution.ts", "name": "imports-dub" },
-      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts 2>&1 || true", "name": "typecheck-attempt" },
-      { "type": "script", "command": "npx tsx solution.ts 2>&1 | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "npx tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts 2>&1 || true", "name": "typecheck" },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "list-analytics": {
     "name": "List Dub analytics events",
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that retrieves analytics for clicks. Use the SDK's analytics methods. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.ts", "name": "imports-dub" },
-      { "type": "script", "command": "grep -q 'analytics' solution.ts", "name": "uses-analytics" },
-      { "type": "script", "command": "npx tsx solution.ts 2>&1 | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "analytics" },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "upsert-link": {
     "name": "Upsert a Dub link",
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that upserts a link (creates it if it doesn't exist, updates it otherwise). Use the SDK's `links.upsert` method. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.ts", "name": "imports-dub" },
-      { "type": "script", "command": "grep -q 'upsert' solution.ts", "name": "uses-upsert" },
-      { "type": "script", "command": "npx tsx solution.ts 2>&1 | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "upsert" },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "get-link": {
     "name": "Retrieve a Dub link by ID",
     "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that retrieves an existing link's details by its link ID. Use the SDK's `links.get` method. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-ts", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "setup": "npm init -y --silent 2>/dev/null",
     "assertions": [
-      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.ts", "name": "imports-dub" },
-      { "type": "script", "command": "grep -q 'links' solution.ts", "name": "uses-links-api" },
-      { "type": "script", "command": "npx tsx solution.ts 2>&1 | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.ts", "pattern": "dub", "flags": "i" },
+      { "type": "file_contains", "path": "solution.ts", "value": "links" },
+      { "type": "script", "command": "output=$(npx tsx solution.ts 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   }
-]
+}

@@ -1,51 +1,47 @@
-[
-  {
+{
+  "create-link": {
     "name": "Create a Dub short link",
     "prompt": "Using the Dub Python SDK (`dub`), write a script in solution.py that creates a short link pointing to https://example.com. Use the SDK's links.create method. Install all dependencies first with pip. The DUB_API_KEY environment variable is already set — use os.environ[\"DUB_API_KEY\"] for authentication. Do not run the script.",
     "description": "Dub Python SDK — API references for links, analytics, domains, and workspaces",
     "docsSpec": { "url": "https://github.com/dubinc/dub-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
       { "type": "script", "command": "pip show dub >/dev/null 2>&1", "name": "dub-installed" },
-      { "type": "script", "command": "grep -qi 'dub' solution.py", "name": "imports-dub" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "list-analytics": {
     "name": "List Dub analytics events",
     "prompt": "Using the Dub Python SDK (`dub`), write a script in solution.py that retrieves analytics for clicks. Use the SDK's analytics methods. Install all dependencies first with pip. The DUB_API_KEY environment variable is already set — use os.environ[\"DUB_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.py", "name": "imports-dub" },
-      { "type": "script", "command": "grep -qi 'analytics' solution.py", "name": "uses-analytics" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "analytics", "flags": "i" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "upsert-link": {
     "name": "Upsert a Dub link",
     "prompt": "Using the Dub Python SDK (`dub`), write a script in solution.py that upserts a link (creates it if it doesn't exist, updates it otherwise). Use the SDK's links.upsert method. Install all dependencies first with pip. The DUB_API_KEY environment variable is already set — use os.environ[\"DUB_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.py", "name": "imports-dub" },
-      { "type": "script", "command": "grep -qi 'upsert' solution.py", "name": "uses-upsert" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "upsert", "flags": "i" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   },
-  {
+  "get-link": {
     "name": "Retrieve a Dub link by ID",
     "prompt": "Using the Dub Python SDK (`dub`), write a script in solution.py that retrieves an existing link's details by its link ID. Use the SDK's links.get method. Install all dependencies first with pip. The DUB_API_KEY environment variable is already set — use os.environ[\"DUB_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/dubinc/dub-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'dub' solution.py", "name": "imports-dub" },
-      { "type": "script", "command": "grep -qi 'links' solution.py", "name": "uses-links-api" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "dub", "flags": "i" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "links", "flags": "i" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'", "name": "runs-successfully", "when_env": "DUB_API_KEY" }
     ]
   }
-]
+}

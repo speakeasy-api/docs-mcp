@@ -10,6 +10,7 @@ export interface DocsRepoSpec {
 }
 
 export interface AgentScenario {
+  id: string;
   name: string;
   prompt: string;
   assertions: AgentAssertion[];
@@ -33,6 +34,8 @@ export type AgentAssertion =
   | { type: "contains"; value: string }
   | { type: "not_contains"; value: string }
   | { type: "matches"; pattern: string; flags?: string }
+  | { type: "file_contains"; path: string; value: string }
+  | { type: "file_matches"; path: string; pattern: string; flags?: string }
   | { type: "script"; command: string; name: string; when_env?: string };
 
 export interface AssertionResult {
@@ -50,6 +53,7 @@ export interface ToolCallRecord {
 }
 
 export interface AgentScenarioResult {
+  id: string;
   name: string;
   category?: string;
   /** Did the agent call any docs-mcp tool? */

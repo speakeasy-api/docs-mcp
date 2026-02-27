@@ -1,52 +1,48 @@
-[
-  {
+{
+  "chat-completion": {
     "name": "Create a Mistral chat completion",
     "prompt": "Using the Mistral Python SDK (`mistralai`), write a script in solution.py that creates a chat completion with a simple user message. Use the SDK's chat.complete method. Install all dependencies first with pip. The MISTRAL_API_KEY environment variable is already set — use os.environ[\"MISTRAL_API_KEY\"] for authentication. Do not run the script.",
     "description": "Mistral AI Python SDK — API references for chat completions, embeddings, models, and function calling",
     "docsSpec": { "url": "https://github.com/mistralai/client-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
       { "type": "script", "command": "pip show mistralai >/dev/null 2>&1", "name": "mistral-installed" },
-      { "type": "script", "command": "grep -qi 'mistral' solution.py", "name": "imports-mistral" },
-      { "type": "script", "command": "grep -qi 'chat' solution.py", "name": "uses-chat-api" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "file_contains", "path": "solution.py", "value": "chat" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'content\\|message\\|response\\|hello'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
     ]
   },
-  {
+  "embeddings": {
     "name": "Generate Mistral embeddings",
     "prompt": "Using the Mistral Python SDK (`mistralai`), write a script in solution.py that generates embeddings for a list of text strings using the embeddings API. Install all dependencies first with pip. The MISTRAL_API_KEY environment variable is already set — use os.environ[\"MISTRAL_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/mistralai/client-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'mistral' solution.py", "name": "imports-mistral" },
-      { "type": "script", "command": "grep -qi 'embed' solution.py", "name": "uses-embeddings" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "embed", "flags": "i" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'embed\\|vector\\|float\\|dimension'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
     ]
   },
-  {
+  "list-models": {
     "name": "List Mistral models",
     "prompt": "Using the Mistral Python SDK (`mistralai`), write a script in solution.py that lists all available models. Use the SDK's models API. Install all dependencies first with pip. The MISTRAL_API_KEY environment variable is already set — use os.environ[\"MISTRAL_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/mistralai/client-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "sdk-usage",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'mistral' solution.py", "name": "imports-mistral" },
-      { "type": "script", "command": "grep -qi 'model' solution.py", "name": "uses-models-api" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
+      { "type": "file_matches", "path": "solution.py", "pattern": "model", "flags": "i" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'mistral\\|model\\|id'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
     ]
   },
-  {
+  "function-calling": {
     "name": "Mistral function calling",
     "prompt": "Using the Mistral Python SDK (`mistralai`), write a script in solution.py that demonstrates function/tool calling with a chat completion. Define a simple tool (e.g., a weather lookup function) and pass it to the chat completion. Install all dependencies first with pip. The MISTRAL_API_KEY environment variable is already set — use os.environ[\"MISTRAL_API_KEY\"] for authentication. Do not run the script.",
     "docsSpec": { "url": "https://github.com/mistralai/client-python", "ref": "main", "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } } },
     "category": "advanced",
     "assertions": [
-      { "type": "script", "command": "test -f solution.py", "name": "file-exists" },
-      { "type": "script", "command": "grep -qi 'mistral' solution.py", "name": "imports-mistral" },
-      { "type": "script", "command": "grep -qi 'tool' solution.py", "name": "uses-tools" },
-      { "type": "script", "command": "python3 solution.py 2>&1 | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
+      { "type": "file_matches", "path": "solution.py", "pattern": "mistral", "flags": "i" },
+      { "type": "file_contains", "path": "solution.py", "value": "tool" },
+      { "type": "script", "command": "output=$(python3 solution.py 2>&1) && echo \"$output\" | head -20 | grep -qi 'tool\\|function\\|call\\|weather'", "name": "runs-successfully", "when_env": "MISTRAL_API_KEY" }
     ]
   }
-]
+}

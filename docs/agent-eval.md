@@ -4,34 +4,37 @@ The `agent-eval` subcommand of `@speakeasy-api/docs-mcp-eval` runs end-to-end ag
 
 ## Scenario Format
 
-A scenario file is a JSON array of `AgentScenario` objects:
+A scenario file is a JSON object keyed by scenario ID. Each key is a short, stable identifier used for `--include` filtering and result matching:
 
 ```json
-[
-  {
+{
+  "ts-init": {
     "name": "Initialize the TypeScript client",
-    "prompt": "Using the AcmeAuth TypeScript SDK, write a script in solution.ts that initializes the client with an API key and fetches a user by ID. Use the docs-mcp tools to look up the correct SDK usage.",
+    "prompt": "Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in solution.ts that initializes the AcmeAuth client with an API key from the environment and fetches a user by ID.",
     "description": "AcmeAuth SDK — multi-language authentication client",
     "docsDir": "./docs",
     "category": "sdk-usage",
-    "systemPrompt": "You are an expert developer. Always use the docs-mcp tools to look up SDK usage.",
     "setup": "npm init -y --silent 2>/dev/null",
-    "maxTurns": 15,
-    "maxBudgetUsd": 0.50,
     "assertions": [
-      { "type": "contains", "value": "AcmeAuth" },
-      { "type": "script", "command": "test -f solution.ts", "name": "file-exists" },
-      { "type": "script", "command": "grep -q 'apiKey' solution.ts", "name": "uses-api-key" }
+      { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" },
+      { "type": "file_contains", "path": "solution.ts", "value": "apiKey" }
     ]
   }
-]
+}
+```
+
+Run a specific scenario by ID:
+
+```bash
+docs-mcp-eval agent-eval --suite acmeauth --include ts-init
 ```
 
 ### Field Reference
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `name` | `string` | yes | — | Human-readable scenario name, used in output tables and result keys |
+| *(object key)* | `string` | yes | — | Scenario ID — short, stable identifier used for `--include` and result matching |
+| `name` | `string` | yes | — | Human-readable scenario name, shown in output tables |
 | `prompt` | `string` | yes | — | The user prompt sent to the Claude agent |
 | `assertions` | `AgentAssertion[]` | yes | — | Array of assertions to evaluate against the agent's output |
 | `category` | `string` | no | — | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`) |
@@ -124,6 +127,33 @@ Tests the agent's final answer against a regular expression.
 | `pattern` | `string` | yes | Regular expression body |
 | `flags` | `string` | no | RegExp flags (e.g. `"i"` for case-insensitive) |
 
+### `file_contains`
+
+Reads a file in the agent's workspace and checks if it contains the specified string (case-sensitive). Fails with a clear message if the file doesn't exist.
+
+```json
+{ "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" }
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | yes | File path relative to the workspace directory |
+| `value` | `string` | yes | String to search for in the file content |
+
+### `file_matches`
+
+Reads a file in the agent's workspace and tests its content against a regular expression. Fails with a clear message if the file doesn't exist.
+
+```json
+{ "type": "file_matches", "path": "solution.ts", "pattern": "retryAfter|retry_after" }
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `path` | `string` | yes | File path relative to the workspace directory |
+| `pattern` | `string` | yes | Regular expression body |
+| `flags` | `string` | no | RegExp flags (e.g. `"i"` for case-insensitive) |
+
 ### `script`
 
 Runs a shell command in the agent's workspace directory. Passes if exit code is 0.
@@ -158,8 +188,14 @@ docs-mcp-eval agent-eval [options]
 | Option | Description |
 |---|---|
 | `--suite <name>` | Named scenario suite bundled with the eval package (resolves to `fixtures/agent-scenarios/<name>.json`) |
-| `--scenarios <path>` | Path to a JSON file containing an array of `AgentScenario` objects |
+| `--scenarios <path>` | Path to a scenario JSON file (object keyed by ID, or legacy array) |
 | `--prompt <text>` | Ad-hoc single scenario prompt (requires `--docs-dir`). Creates a one-off scenario with empty assertions |
+
+### Filtering
+
+| Option | Description |
+|---|---|
+| `--include <ids>` | Comma-separated scenario IDs to run (e.g. `--include ts-init,py-init`). Only matching scenarios are executed |
 
 ### Docs and server
 
@@ -203,8 +239,8 @@ npx @speakeasy-api/docs-mcp-eval agent-eval \
 Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs checkout is needed:
 
 ```json
-[
-  {
+{
+  "sdk-init": {
     "name": "SDK init",
     "prompt": "Initialize the SDK client...",
     "docsSpec": {
@@ -216,7 +252,7 @@ Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs c
       { "type": "contains", "value": "Client" }
     ]
   }
-]
+}
 ```
 
 Or point to a local docs directory with `--docs-dir`:

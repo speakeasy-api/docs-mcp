@@ -164,6 +164,7 @@ program
   .option("--suite <name>", "Named scenario suite (resolves to fixtures/agent-scenarios/<name>.json)")
   .option("--scenarios <path>", "Path to JSON array of agent scenarios")
   .option("--prompt <text>", "Ad-hoc single scenario prompt (requires --docs-dir)")
+  .option("--include <ids>", "Comma-separated scenario IDs to run (filters loaded scenarios)")
   .option("--docs-dir <path>", "Default docs directory for scenarios that don't specify their own")
   .option("--server-command <value>", "Command to launch the MCP server (auto-resolved when using docsDir)")
   .option("--server-arg <value>", "Server arg (repeatable)", collectValues, [] as string[])
@@ -182,6 +183,7 @@ program
     suite?: string;
     scenarios?: string;
     prompt?: string;
+    include?: string;
     docsDir?: string;
     serverCommand?: string;
     serverArg: string[];
@@ -213,7 +215,17 @@ program
     }
 
     // Load scenarios
-    const { scenarios, scenariosFilePath } = await loadScenarios(options);
+    let { scenarios, scenariosFilePath } = await loadScenarios(options);
+
+    // Filter by --include
+    if (options.include) {
+      const includeIds = new Set(options.include.split(",").map((s) => s.trim()));
+      scenarios = scenarios.filter((s) => includeIds.has(s.id));
+      if (scenarios.length === 0) {
+        console.error(`Error: no scenarios matched --include "${options.include}"`);
+        process.exit(1);
+      }
+    }
 
     // Resolve docsDir → build indexes → set indexDir on each scenario
     const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
@@ -318,22 +330,48 @@ async function loadScenarios(options: {
   if (options.suite) {
     const filePath = path.join(FIXTURES_DIR, `${options.suite}.json`);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: JSON.parse(raw) as AgentScenario[], scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
   }
   if (options.scenarios) {
     const filePath = path.resolve(options.scenarios);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: JSON.parse(raw) as AgentScenario[], scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
   }
   // --prompt mode
   return {
     scenarios: [{
+      id: "ad-hoc",
       name: "ad-hoc",
       prompt: options.prompt!,
       assertions: [],
       docsDir: options.docsDir!
     }]
   };
+}
+
+function parseScenarioFile(raw: string): AgentScenario[] {
+  const parsed = JSON.parse(raw);
+
+  // Legacy array format — auto-generate ids from names
+  if (Array.isArray(parsed)) {
+    return (parsed as AgentScenario[]).map((s) => ({
+      ...s,
+      id: s.id ?? slugify(s.name)
+    }));
+  }
+
+  // K:V format — key is the scenario id
+  return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>).map(
+    ([id, scenario]) => ({ ...scenario, id })
+  );
+}
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
 }
 
 function collectValues(value: string, previous: string[]): string[] {

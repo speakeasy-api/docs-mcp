@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import type { AgentAssertion, AssertionResult } from "./types.js";
 
@@ -23,6 +25,12 @@ export async function evaluateAssertions(
         break;
       case "matches":
         results.push(evaluateMatches(finalAnswer, assertion.pattern, assertion.flags));
+        break;
+      case "file_contains":
+        results.push(await evaluateFileContains(workspaceDir, assertion.path, assertion.value));
+        break;
+      case "file_matches":
+        results.push(await evaluateFileMatches(workspaceDir, assertion.path, assertion.pattern, assertion.flags));
         break;
       case "script":
         if (assertion.when_env && !process.env[assertion.when_env]) {
@@ -73,6 +81,64 @@ function evaluateMatches(text: string, pattern: string, flags?: string): Asserti
       ? `Output matches /${pattern}/${flags ?? ""}`
       : `Output does not match /${pattern}/${flags ?? ""}`
   };
+}
+
+async function evaluateFileContains(
+  workspaceDir: string,
+  filePath: string,
+  value: string
+): Promise<AssertionResult> {
+  const fullPath = join(workspaceDir, filePath);
+  try {
+    const content = await readFile(fullPath, "utf-8");
+    const passed = content.includes(value);
+    return {
+      assertion: { type: "file_contains", path: filePath, value },
+      passed,
+      message: passed
+        ? `File "${filePath}" contains "${value}"`
+        : `File "${filePath}" does not contain "${value}"`
+    };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return {
+      assertion: { type: "file_contains", path: filePath, value },
+      passed: false,
+      message: code === "ENOENT"
+        ? `File "${filePath}" not found in ${workspaceDir}`
+        : `File "${filePath}" unreadable: ${code ?? err}`
+    };
+  }
+}
+
+async function evaluateFileMatches(
+  workspaceDir: string,
+  filePath: string,
+  pattern: string,
+  flags?: string
+): Promise<AssertionResult> {
+  const fullPath = join(workspaceDir, filePath);
+  try {
+    const content = await readFile(fullPath, "utf-8");
+    const re = new RegExp(pattern, flags);
+    const passed = re.test(content);
+    return {
+      assertion: { type: "file_matches", path: filePath, pattern, ...(flags !== undefined ? { flags } : {}) },
+      passed,
+      message: passed
+        ? `File "${filePath}" matches /${pattern}/${flags ?? ""}`
+        : `File "${filePath}" does not match /${pattern}/${flags ?? ""}`
+    };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return {
+      assertion: { type: "file_matches", path: filePath, pattern, ...(flags !== undefined ? { flags } : {}) },
+      passed: false,
+      message: code === "ENOENT"
+        ? `File "${filePath}" not found in ${workspaceDir}`
+        : `File "${filePath}" unreadable: ${code ?? err}`
+    };
+  }
 }
 
 async function evaluateScript(

@@ -124,14 +124,14 @@ export function generateTrendSummary(
   const regressions: string[] = [];
   const improvements: string[] = [];
 
-  const prevByName = new Map(previous.results.map((r) => [r.name, r]));
+  const prevById = new Map(previous.results.map((r) => [r.id ?? r.name, r]));
   for (const curr_r of current.results) {
-    const prev_r = prevByName.get(curr_r.name);
+    const prev_r = prevById.get(curr_r.id ?? curr_r.name);
     if (!prev_r) continue;
     if (prev_r.passed && !curr_r.passed) {
-      regressions.push(`    \u2717 ${curr_r.name} \u2014 was PASS, now FAIL`);
+      regressions.push(`    \u2717 ${curr_r.id} \u2014 was PASS, now FAIL`);
     } else if (!prev_r.passed && curr_r.passed) {
-      improvements.push(`    \u2713 ${curr_r.name} \u2014 was FAIL, now PASS`);
+      improvements.push(`    \u2713 ${curr_r.id} \u2014 was FAIL, now PASS`);
     }
   }
 

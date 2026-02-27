@@ -46,6 +46,38 @@ description = "Benchmark embedding providers against realistic test fixture (non
 run = "node packages/eval/dist/bin.js benchmark --cases packages/eval/fixtures/realistic/cases.json --docs-dir packages/eval/fixtures/realistic --work-dir /tmp/bench-realistic --build-command packages/cli/dist/index.js --server-command packages/server/dist/bin.js --embeddings none,hash"
 depends = ["build"]
 
+[tasks."agent-eval"]
+description = "Run agent eval suite (e.g. `mise agent-eval acmeauth -- --include ts-init`)"
+usage = '''
+arg "<suite>" help="Named scenario suite (e.g. acmeauth, dub-go)"
+arg "[args]" var=#true help="Extra args passed to the eval CLI"
+'''
+run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" $usage_args'
+depends = ["build"]
+
+[tasks."agent-eval:debug"]
+description = "Run agent eval with --debug (keeps workspaces)"
+usage = '''
+arg "<suite>" help="Named scenario suite"
+arg "[args]" var=#true help="Extra args passed to the eval CLI"
+'''
+run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" --debug $usage_args'
+depends = ["build"]
+
+[tasks."agent-eval:prompt"]
+description = "Run ad-hoc agent eval with a prompt"
+usage = '''
+arg "<prompt>" help="The prompt to send to the agent"
+flag "--docs-dir <path>" help="Path to docs directory" required=#true
+arg "[args]" var=#true help="Extra args passed to the eval CLI"
+'''
+run = 'node packages/eval/dist/bin.js agent-eval --prompt "$usage_prompt" --docs-dir "$usage_docs_dir" $usage_args'
+depends = ["build"]
+
+[tasks."agent-eval:suites"]
+description = "List available agent eval suites"
+run = "ls -1 packages/eval/fixtures/agent-scenarios/*.json | xargs -I{} basename {} .json"
+
 [tasks.nuke]
 description = "Kill all processes attached to dev ports (20310, 3000)"
 run = '''
