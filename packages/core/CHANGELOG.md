@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-core
 
+## 0.6.0
+
+### Minor Changes
+
+- 4f93b52: Added support for exposing documents as MCP resources that can be added into agent context.
+
 ## 0.5.0
 
 ## 0.4.2
