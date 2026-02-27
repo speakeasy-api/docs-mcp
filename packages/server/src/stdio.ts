@@ -7,7 +7,7 @@ import {
   type CallToolResult,
   type ListToolsResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { McpDocsServer } from "./server.js";
+import type { ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json") as {
@@ -20,7 +20,7 @@ export interface StartStdioServerOptions {
 }
 
 export async function startStdioServer(
-  app: McpDocsServer,
+  app: ToolProvider,
   options: StartStdioServerOptions = {},
 ): Promise<void> {
   const server = new Server(

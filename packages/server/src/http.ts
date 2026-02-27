@@ -13,7 +13,7 @@ import {
   type ListResourcesResult,
   type ListResourceTemplatesResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { McpDocsServer } from "./server.js";
+import type { ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json") as {
@@ -38,7 +38,7 @@ export interface HttpServerHandle {
  * in `simpleStatelessStreamableHttp.ts`).
  */
 function createPerRequestServer(
-  app: McpDocsServer,
+  app: ToolProvider,
   options: StartHttpServerOptions,
 ): { server: Server; transport: StreamableHTTPServerTransport } {
   const server = new Server(
@@ -84,7 +84,7 @@ function createPerRequestServer(
 }
 
 export async function startHttpServer(
-  app: McpDocsServer,
+  app: ToolProvider,
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const port = options.port ?? 20310;
@@ -131,7 +131,7 @@ function setCorsHeaders(res: http.ServerResponse): void {
 async function handleRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  app: McpDocsServer,
+  app: ToolProvider,
   options: StartHttpServerOptions,
 ): Promise<void> {
   // Only the pathname matters; the base URL is arbitrary.

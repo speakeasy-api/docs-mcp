@@ -19,18 +19,72 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 # Stdio transport (for MCP host integration)
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
-
 ## Programmatic Usage
 
+### Boot with defaults
+
 ```typescript
-import { McpDocsServer } from "@speakeasy-api/docs-mcp-server";
+import { createDocsServer, startStdioServer } from "@speakeasy-api/docs-mcp-server";
 
-const server = new McpDocsServer({
-  dbPath: "./dist/.lancedb",
-});
-
-server.start();
+const server = await createDocsServer({ indexDir: "./my-index" });
+await startStdioServer(server);
 ```
+
+### Inject a custom tool
+
+```typescript
+import { createDocsServer, startStdioServer } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({
+  indexDir: "./my-index",
+  customTools: [
+    {
+      name: "submit_feedback",
+      description: "Submit user feedback about a doc page",
+      inputSchema: {
+        type: "object",
+        properties: {
+          chunk_id: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5 }
+        },
+        required: ["chunk_id", "rating"]
+      },
+      handler: async (args) => {
+        console.log("Feedback:", args);
+        return { content: [{ type: "text", text: "Thanks!" }], isError: false };
+      }
+    }
+  ]
+});
+await startStdioServer(server);
+```
+
+### Run over HTTP
+
+```typescript
+import { createDocsServer, startHttpServer } from "@speakeasy-api/docs-mcp-server";
+
+const server = await createDocsServer({ indexDir: "./my-index" });
+const { port } = await startHttpServer(server, { port: 3000 });
+console.log(`Listening on http://localhost:${port}/mcp`);
+```
+
+## Option Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `indexDir` | `string` | *required* | Directory containing `chunks.json` and `metadata.json` from `docs-mcp build`. |
+| `toolPrefix` | `string` | — | Prefix for tool names, e.g. `"acme"` → `acme_search_docs`. Alphanumeric, dash, or underscore. |
+| `queryEmbeddingApiKey` | `string` | `OPENAI_API_KEY` env | API key for query-time embeddings. |
+| `queryEmbeddingBaseUrl` | `string` | — | Base URL for the embedding API. |
+| `queryEmbeddingBatchSize` | `number` | — | Batch size for query embedding requests. Positive integer. |
+| `proximityWeight` | `number` | — | Lexical phrase blend weight for RRF ranking. Positive. |
+| `phraseSlop` | `number` | — | Phrase query slop (0–5). |
+| `vectorWeight` | `number` | — | Vector rank blend weight for RRF ranking. Positive. |
+| `allowChunksFallback` | `boolean` | `false` | Allow fallback to in-memory `chunks.json` when `.lancedb` index is missing. |
+| `customTools` | `CustomTool[]` | `[]` | Additional tools registered alongside the built-in `search_docs` and `get_doc`. |
+
+The exported `CreateDocsServerOptionsSchema` (Zod) is the canonical machine-readable spec for these options.
 
 ## MCP Tools
 
