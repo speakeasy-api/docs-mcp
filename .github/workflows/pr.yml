@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  client-build-lint:
+  build-lint-test:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout

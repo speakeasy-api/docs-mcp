@@ -18,38 +18,6 @@ if (!process.env["GITHUB_ENV"]) {
 
 const env = process.env["GITHUB_ENV"];
 
-async function setupGoCaching() {
-  const goBuildCache = execSync("go env GOCACHE", { encoding: "utf8" }).trim();
-  const goModCache = execSync("go env GOMODCACHE", { encoding: "utf8" }).trim();
-
-  await fs.appendFile(env, `GOCACHE=${goBuildCache}\n`);
-  await fs.appendFile(env, `GOMODCACHE=${goModCache}\n`);
-
-  const os = process.platform;
-  const arch = process.arch;
-
-  const hash = crypto.createHash("sha256");
-
-  for (const entry of ["go.mod", "go.sum"]) {
-    console.log("Hashing:", entry);
-    const goMod = await fs.readFile(entry);
-    hash.update(goMod);
-  }
-
-  const goModHash = hash.digest("hex");
-
-  const version = 1; // Increment this if you need to bust the cache
-  const cacheKey = `${version}-${os}-${arch}-${goModHash}`;
-  const partialKey = `${version}-${os}-${arch}-`;
-  await fs.appendFile(env, `GH_CACHE_GO_KEY=go-${cacheKey}\n`);
-  await fs.appendFile(env, `GH_CACHE_GO_KEY_PARTIAL=go-${partialKey}\n`);
-
-  console.log(`Go cache: ${goBuildCache}`);
-  console.log(`Go module cache: ${goModCache}`);
-  console.log(`GitHub Go cache key: ${cacheKey}`);
-  console.log(`GitHub Go partial cache key: ${partialKey}`);
-}
-
 async function setupPNPMCaching() {
   const storePath = execSync("pnpm store path", { encoding: "utf8" }).trim();
 
@@ -77,5 +45,4 @@ async function setupPNPMCaching() {
   console.log(`GitHub PNPM partial cache key: ${partialKey}`);
 }
 
-await setupGoCaching();
 await setupPNPMCaching();
