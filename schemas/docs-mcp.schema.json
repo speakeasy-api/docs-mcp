@@ -124,8 +124,7 @@
     },
     "instructions": {
       "description": "Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.",
-      "type": "string",
-      "minLength": 1
+      "type": "string"
     },
     "overrides": {
       "description": "Per-file-pattern overrides for chunking strategy and metadata. Evaluated top-to-bottom; last match wins.",

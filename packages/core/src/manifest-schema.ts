@@ -112,7 +112,6 @@ export const ManifestSchema = z
     }),
     instructions: z
       .string()
-      .min(1)
       .optional()
       .describe(
         "Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.",
