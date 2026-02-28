@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import fg from "fast-glob";
@@ -34,6 +34,7 @@ import {
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
 import { resolveCorpusLabel, resolveSourceCommit } from "./git.js";
+import { buildLlmsGoChunks } from "./llms-go.js";
 
 const program = new Command();
 
@@ -203,8 +204,10 @@ program
 
 program
   .command("build")
-  .description("Build deterministic index artifacts from a markdown corpus")
-  .requiredOption("--docs-dir <path>", "Path to markdown corpus")
+  .description("Build deterministic index artifacts")
+  .option("--docs-dir <path>", "Path to markdown corpus (required for --source markdown)")
+  .option("--source <source>", "Index source: markdown | llms-go", "markdown")
+  .option("--llms-dir <path>", "Path to generated Go llms directory (required for --source llms-go)")
   .requiredOption("--out <path>", "Output directory")
   .option("--description <value>", "Corpus description", "Documentation corpus")
   .option("--embedding-provider <provider>", "Embedding provider: none | hash | openai", "none")
@@ -221,7 +224,9 @@ program
   .option("--tool-description-get-doc <value>", "Custom description for the get_doc MCP tool")
   .action(
     async (options: {
-      docsDir: string;
+      docsDir?: string;
+      source?: string;
+      llmsDir?: string;
       out: string;
       description: string;
       embeddingProvider: string;
@@ -237,6 +242,16 @@ program
       toolDescriptionSearch?: string;
       toolDescriptionGetDoc?: string;
     }) => {
+      const source = normalizeBuildSource(options.source);
+      if (source === "llms-go") {
+        await runLlmsGoBuild(options);
+        return;
+      }
+
+      if (!options.docsDir) {
+        throw new Error("--docs-dir is required when --source markdown");
+      }
+
       const docsDir = path.resolve(options.docsDir);
       const outDir = path.resolve(options.out);
       const files = await listMarkdownFiles(docsDir);
@@ -706,6 +721,239 @@ function buildMetadata(
     embedding,
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
   };
+}
+
+type BuildSource = "markdown" | "llms-go";
+
+type BuildCommandOptions = {
+  docsDir?: string;
+  source?: string;
+  llmsDir?: string;
+  out: string;
+  description: string;
+  embeddingProvider: string;
+  embeddingModel?: string;
+  embeddingDimensions?: number;
+  embeddingApiKey?: string;
+  embeddingBaseUrl?: string;
+  embeddingBatchSize?: number;
+  embeddingConcurrency?: number;
+  embeddingMaxRetries?: number;
+  rebuildCache?: boolean;
+  cacheDir?: string;
+};
+
+function normalizeBuildSource(value: string | undefined): BuildSource {
+  const normalized = (value ?? "markdown").trim().toLowerCase();
+  if (normalized === "markdown" || normalized === "llms-go") {
+    return normalized;
+  }
+
+  throw new Error(
+    `unsupported source '${value}'. Expected one of: markdown, llms-go`
+  );
+}
+
+async function runLlmsGoBuild(options: BuildCommandOptions): Promise<void> {
+  if (!options.llmsDir) {
+    throw new Error("--llms-dir is required when --source llms-go");
+  }
+
+  const llmsDir = path.resolve(options.llmsDir);
+  const outDir = path.resolve(options.out);
+  const lanceDbPath = path.join(outDir, ".lancedb");
+  const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
+  const lanceDbOldPath = path.join(outDir, ".lancedb.old");
+
+  await rm(lanceDbTmpPath, { recursive: true, force: true });
+  await rm(lanceDbOldPath, { recursive: true, force: true });
+
+  const chunks = await buildLlmsGoChunks(llmsDir);
+  const files = [...new Set(chunks.map((chunk) => chunk.filepath))];
+  console.warn(`Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks`);
+
+  const providerInput: {
+    provider: "none" | "hash" | "openai";
+    model?: string;
+    dimensions?: number;
+    apiKey?: string;
+    baseUrl?: string;
+    batchSize?: number;
+    batchApiThreshold?: number;
+    batchName?: string;
+    concurrency?: number;
+    maxRetries?: number;
+    onBatchProgress?: (event: BatchProgressEvent) => void;
+  } = {
+    provider: normalizeProvider(options.embeddingProvider),
+    batchApiThreshold: 2500,
+    batchName: `docs-mcp:llms-go:${await resolveCorpusLabel(llmsDir)}`,
+    onBatchProgress: (event) => writeBatchProgress(event),
+  };
+  if (options.embeddingModel !== undefined) {
+    providerInput.model = options.embeddingModel;
+  }
+  if (options.embeddingDimensions !== undefined) {
+    providerInput.dimensions = options.embeddingDimensions;
+  }
+  if (options.embeddingBaseUrl !== undefined) {
+    providerInput.baseUrl = options.embeddingBaseUrl;
+  }
+  if (options.embeddingBatchSize !== undefined) {
+    providerInput.batchSize = options.embeddingBatchSize;
+  }
+  if (options.embeddingConcurrency !== undefined) {
+    providerInput.concurrency = options.embeddingConcurrency;
+  }
+  if (options.embeddingMaxRetries !== undefined) {
+    providerInput.maxRetries = options.embeddingMaxRetries;
+  }
+  const apiKey = options.embeddingApiKey ?? process.env.OPENAI_API_KEY;
+  if (apiKey !== undefined) {
+    providerInput.apiKey = apiKey;
+  }
+
+  const embeddingProvider = createEmbeddingProvider(providerInput);
+
+  await mkdir(outDir, { recursive: true });
+  const cacheBaseDir = path.resolve(options.cacheDir ?? outDir);
+
+  let vectorsByChunkId: Map<string, number[]> | undefined;
+
+  if (embeddingProvider.name !== "none") {
+    const config = {
+      provider: embeddingProvider.name,
+      model: embeddingProvider.model,
+      dimensions: embeddingProvider.dimensions,
+      configFingerprint: embeddingProvider.configFingerprint,
+    };
+
+    const cache = options.rebuildCache ? null : await loadCache(cacheBaseDir, config);
+
+    const embedStart = Date.now();
+    const onProgress = (event: EmbedProgressEvent) => {
+      writeProgress(`Embedding [${event.completed}/${event.total}] (${event.cached} cached)...`);
+    };
+    const result = await embedChunksIncremental(
+      chunks,
+      { ...config, embed: (texts) => embeddingProvider.embed(texts) },
+      cache,
+      {
+        ...(embeddingProvider.batchSize !== undefined ? { batchSize: embeddingProvider.batchSize } : {}),
+        ...(embeddingProvider.batchApiThreshold !== undefined ? { batchApiThreshold: embeddingProvider.batchApiThreshold } : {}),
+        onProgress,
+      },
+    );
+    clearProgress();
+    const embedMs = ((Date.now() - embedStart) / 1000).toFixed(1);
+
+    vectorsByChunkId = result.vectorsByChunkId;
+
+    const { stats } = result;
+    const hitRate = stats.total > 0
+      ? ((stats.hits / stats.total) * 100).toFixed(1)
+      : "0.0";
+    console.warn(`embedding cache: ${stats.hits} hits, ${stats.misses} misses (${hitRate}% hit rate)`);
+    if (stats.misses > 0) {
+      console.warn(`embedded ${stats.misses} chunks via ${embeddingProvider.name} in ${embedMs}s`);
+    }
+
+    try {
+      await saveCache(cacheBaseDir, result.updatedCache, config);
+    } catch (err) {
+      console.warn(`warn: failed to write embedding cache: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  const embeddingMetadata: EmbeddingMetadata | null =
+    embeddingProvider.name === "none"
+      ? null
+      : {
+          provider: embeddingProvider.name,
+          model: embeddingProvider.model,
+          dimensions: embeddingProvider.dimensions
+        };
+
+  const sourceCommit = await resolveSourceCommit(llmsDir);
+  const metadataChunks = chunks.map((chunk) => ({
+    ...chunk,
+    metadata: selectLlmsGoTaxonomyMetadata(chunk.metadata)
+  }));
+  const metadata = buildMetadata(
+    metadataChunks,
+    files,
+    options.description,
+    embeddingMetadata,
+    sourceCommit,
+    {}
+  );
+  const metadataKeys = Object.keys(metadata.taxonomy);
+
+  const indexStepLabels: Record<IndexBuildStep, string> = {
+    "writing-table": "Building search index: writing table...",
+    "indexing-fts": "Building search index: full-text index...",
+    "indexing-scalar": "Building search index: scalar indices...",
+    "indexing-vector": "Building search index: vector index...",
+  };
+  const buildInput: {
+    dbPath: string;
+    chunks: Chunk[];
+    metadataKeys: string[];
+    vectorsByChunkId?: Map<string, number[]>;
+    onProgress?: (step: IndexBuildStep) => void;
+  } = {
+    dbPath: lanceDbTmpPath,
+    chunks,
+    metadataKeys,
+    onProgress: (step) => writeProgress(indexStepLabels[step]),
+  };
+  if (vectorsByChunkId) {
+    buildInput.vectorsByChunkId = vectorsByChunkId;
+  }
+  await buildLanceDbIndex(buildInput);
+  clearProgress();
+
+  await writeFile(path.join(outDir, "chunks.json"), JSON.stringify(chunks, null, 2));
+  const bundledRegistryName = "llms-go.registry.json";
+  await copyFile(path.join(llmsDir, "registry.json"), path.join(outDir, bundledRegistryName));
+  await writeFile(
+    path.join(outDir, "metadata.json"),
+    JSON.stringify(
+      {
+        ...metadata,
+        taxonomy: {},
+        llms_go: {
+          registry_path: bundledRegistryName
+        },
+        index: {
+          engine: "lancedb",
+          table: "chunks",
+          path: ".lancedb"
+        }
+      },
+      null,
+      2
+    )
+  );
+
+  await rm(lanceDbOldPath, { recursive: true, force: true });
+  try { await rename(lanceDbPath, lanceDbOldPath); } catch {}
+  await rename(lanceDbTmpPath, lanceDbPath);
+  await rm(lanceDbOldPath, { recursive: true, force: true }).catch(() => {});
+
+  console.log(`wrote ${chunks.length} chunks and .lancedb index to ${outDir}`);
+}
+
+function selectLlmsGoTaxonomyMetadata(metadata: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const allowlist = ["source", "kind", "owner", "entrypoint"];
+  for (const key of allowlist) {
+    const value = metadata[key];
+    if (value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 function parseIntOption(value: string): number {

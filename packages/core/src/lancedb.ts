@@ -261,21 +261,22 @@ export class LanceDbSearchEngine implements SearchEngine {
   }
 
   async getDoc(request: GetDocRequest): Promise<GetDocResult> {
-    if (!isChunkIdFormat(request.chunk_id)) {
+    const chunkId = request.chunk_id;
+    if (!chunkId || !isChunkIdFormat(chunkId)) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
+        `Chunk ID '${chunkId ?? "(missing)"}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
       );
     }
 
     const targetRows = await this.table
       .query()
-      .where(`chunk_id = '${escapeSqlString(request.chunk_id)}'`)
+      .where(`chunk_id = '${escapeSqlString(chunkId)}'`)
       .limit(1)
       .toArray();
 
     if (targetRows.length === 0) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`,
+        `Chunk ID '${chunkId}' not found. Use search_docs to discover valid chunk IDs.`,
       );
     }
 

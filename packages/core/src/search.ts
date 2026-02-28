@@ -99,16 +99,17 @@ export class InMemorySearchEngine implements SearchEngine {
   }
 
   async getDoc(request: GetDocRequest): Promise<GetDocResult> {
-    if (!isChunkIdFormat(request.chunk_id)) {
+    const chunkId = request.chunk_id;
+    if (!chunkId || !isChunkIdFormat(chunkId)) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
+        `Chunk ID '${chunkId ?? "(missing)"}' has invalid format. Expected {filepath} or {filepath}#{heading-path}.`,
       );
     }
 
-    const target = this.byId.get(request.chunk_id);
+    const target = this.byId.get(chunkId);
     if (!target) {
       throw new Error(
-        `Chunk ID '${request.chunk_id}' not found. Use search_docs to discover valid chunk IDs.`,
+        `Chunk ID '${chunkId}' not found. Use search_docs to discover valid chunk IDs.`,
       );
     }
 

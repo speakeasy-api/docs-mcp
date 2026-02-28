@@ -88,7 +88,9 @@ export class McpDocsServer implements ToolProvider {
       },
       {
         name: this.getDocToolName,
-        description: this.metadata.tool_descriptions?.get_doc ?? defaultGetDocDescription,
+        description:
+          this.metadata.tool_descriptions?.get_doc ??
+          "Retrieve documentation by chunk_id or by symbol names. Use 'symbols' to fetch specific methods, types, or the entrypoint bundle (e.g., symbols=['entrypoint:...']). Set hydrate=true to include all transitive type dependencies.",
         inputSchema: buildGetDocSchema(),
       },
     ];
@@ -291,7 +293,42 @@ function parseGetDocRequest(args: unknown): GetDocRequest {
   }
 
   const input = args as Record<string, unknown>;
-  assertAllowedKeys(input, ["chunk_id", "context"]);
+  assertAllowedKeys(input, ["chunk_id", "context", "symbols", "hydrate"]);
+
+  const hasChunkId = input.chunk_id !== undefined;
+  const hasSymbols = input.symbols !== undefined;
+
+  if (hasChunkId && hasSymbols) {
+    throw new Error("'chunk_id' and 'symbols' are mutually exclusive — provide one or the other.");
+  }
+
+  if (!hasChunkId && !hasSymbols) {
+    throw new Error("Either 'chunk_id' or 'symbols' must be provided.");
+  }
+
+  if (hasSymbols) {
+    if (!Array.isArray(input.symbols)) {
+      throw new Error("'symbols' must be an array of strings");
+    }
+    const symbols = input.symbols as unknown[];
+    if (symbols.length === 0) {
+      throw new Error("'symbols' must contain at least one symbol");
+    }
+    if (symbols.length > 5) {
+      throw new Error("'symbols' can contain at most 5 symbols");
+    }
+    for (const s of symbols) {
+      if (typeof s !== "string" || !s.trim()) {
+        throw new Error("Each symbol must be a non-empty string");
+      }
+    }
+    const hydrate = input.hydrate === true;
+    return {
+      symbols: symbols as string[],
+      hydrate
+    };
+  }
+
   const chunkId = expectString(input.chunk_id, "chunk_id");
 
   let context = 0;

@@ -6,12 +6,14 @@ import {
   createEmbeddingProvider,
   getCollapseKeys,
   normalizeMetadata,
+  type Chunk,
   type CorpusMetadata,
   type EmbeddingMetadata,
   type EmbeddingProvider,
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "./server.js";
+import { LlmsGoSearchEngine } from "./llms-go-search.js";
 import type { CustomTool } from "./types.js";
 
 const TaxonomyFieldSchema = z
@@ -200,7 +202,16 @@ export async function createDocsServer(
     loadInput.vectorWeight = options.vectorWeight;
   }
 
-  const index = await loadSearchEngine(loadInput);
+  const baseIndex = await loadSearchEngine(loadInput);
+
+  const llmsGoConfig = parseLlmsGoConfig(metadataDocument);
+  const index = llmsGoConfig
+    ? await wrapWithLlmsGoSearch({
+        baseIndex,
+        chunksPath: path.join(indexDir, "chunks.json"),
+        registryPath: path.resolve(indexDir, llmsGoConfig.registryPath),
+      })
+    : baseIndex;
 
   return new McpDocsServer({
     index,
@@ -344,6 +355,63 @@ function toNonEmptyString(value: unknown): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+async function wrapWithLlmsGoSearch(input: {
+  baseIndex: SearchEngine;
+  chunksPath: string;
+  registryPath: string;
+}): Promise<SearchEngine> {
+  const chunksRaw = await readFile(input.chunksPath, "utf8");
+  const chunks = JSON.parse(chunksRaw) as Chunk[];
+  const registryRaw = await readFile(input.registryPath, "utf8");
+  const registry = parseRegistrySymbols(registryRaw);
+  return new LlmsGoSearchEngine(input.baseIndex, {
+    chunks,
+    registrySymbols: registry,
+  });
+}
+
+function parseLlmsGoConfig(
+  metadata: Record<string, unknown>,
+): { registryPath: string } | null {
+  const block = metadata.llms_go;
+  if (!block || typeof block !== "object") {
+    return null;
+  }
+  const record = block as Record<string, unknown>;
+  const registryPath = toNonEmptyString(record.registry_path);
+  if (!registryPath) {
+    return null;
+  }
+  return { registryPath };
+}
+
+function parseRegistrySymbols(source: string): Array<{ id: string; uses?: string[] }> {
+  const parsed = JSON.parse(source) as unknown;
+  if (!parsed || typeof parsed !== "object") {
+    return [];
+  }
+  const symbols = (parsed as { symbols?: unknown }).symbols;
+  if (!Array.isArray(symbols)) {
+    return [];
+  }
+  const out: Array<{ id: string; uses?: string[] }> = [];
+  for (const item of symbols) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const id = toNonEmptyString((item as Record<string, unknown>).id);
+    if (!id) {
+      continue;
+    }
+    const usesRaw = (item as Record<string, unknown>).uses;
+    const uses = Array.isArray(usesRaw)
+      ? usesRaw.filter((entry): entry is string => typeof entry === "string")
+      : undefined;
+    out.push({ id, ...(uses ? { uses } : {}) });
+  }
+  return out;
 }
 
 async function exists(targetPath: string): Promise<boolean> {

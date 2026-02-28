@@ -61,9 +61,13 @@ export interface SearchHit {
   heading: string;
   breadcrumb: string;
   snippet: string;
+  /** Full chunk content (markdown). Present when the search engine delivers inline content (e.g. llms-go). */
+  content?: string;
   filepath: string;
   metadata: Record<string, string>;
   score: number;
+  /** Number of transitive type dependencies for this symbol (llms-go). */
+  dependency_count?: number;
 }
 
 export interface SearchHint {
@@ -71,10 +75,18 @@ export interface SearchHint {
   suggested_filters: Record<string, string[]>;
 }
 
+export interface EntrypointBundleRef {
+  id: string;
+  version: string;
+  hint: string;
+}
+
 export interface SearchResult {
   hits: SearchHit[];
   next_cursor: string | null;
   hint: SearchHint | null;
+  /** Present on first-page llms-go results so the LLM can fetch the SDK construction surface. */
+  entrypoint_bundle?: EntrypointBundleRef;
 }
 
 export interface ListFilepathsRequest {
@@ -136,8 +148,12 @@ export interface CorpusMetadata {
 }
 
 export interface GetDocRequest {
-  chunk_id: string;
+  chunk_id?: string;
   context?: number;
+  /** Human-readable symbol names to retrieve (llms-go only, max 5). Mutually exclusive with chunk_id. */
+  symbols?: string[];
+  /** When true, resolve transitive dependencies for the requested symbols (llms-go only). */
+  hydrate?: boolean;
 }
 
 export interface GetDocResult {
