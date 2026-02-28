@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ensureIndex } from "./agent/build-cache.js";
 import { loadPreviousResult, saveResult, generateTrendSummary } from "./agent/history.js";
-import { ConsoleObserver, NoopObserver } from "./agent/observer.js";
+import { ConsoleObserver } from "./agent/observer.js";
 import { ensureRepo } from "./agent/repo-cache.js";
 import { defaultModelForProvider, resolveAgentProvider } from "./agent/provider.js";
 import { runAgentEval } from "./agent/runner.js";
@@ -26,7 +26,6 @@ const __dirname = path.dirname(__filename);
 const EVAL_PKG_ROOT = path.resolve(__dirname, "..");
 const FIXTURES_DIR = path.join(EVAL_PKG_ROOT, "fixtures", "agent-scenarios");
 const CLI_BIN_PATH = path.resolve(EVAL_PKG_ROOT, "..", "cli", "dist", "index.js");
-const SERVER_BIN_PATH = path.resolve(EVAL_PKG_ROOT, "..", "server", "dist", "bin.js");
 
 const program = new Command();
 

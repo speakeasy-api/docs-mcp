@@ -108,7 +108,7 @@ async function evaluateFileContains(
         : `File "${assertion.path}" does not contain "${assertion.value}"`,
     };
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
+    const code = (err as globalThis.NodeJS.ErrnoException).code;
     return {
       assertion,
       passed: false,
@@ -137,7 +137,7 @@ async function evaluateFileMatches(
         : `File "${assertion.path}" does not match /${assertion.pattern}/${assertion.flags ?? ""}`,
     };
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
+    const code = (err as globalThis.NodeJS.ErrnoException).code;
     return {
       assertion,
       passed: false,
