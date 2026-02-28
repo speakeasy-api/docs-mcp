@@ -130,6 +130,15 @@ export function GeminiIcon() {
   );
 }
 
+// Codex (OpenAI) — OpenAI logo from Bootstrap Icons
+export function CodexIcon() {
+  return (
+    <svg width={S} height={S} viewBox="0 0 16 16" fill="#000" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10.049.676c-.31-.473-.832-.676-1.373-.676h-1.352c-.541 0-1.063.203-1.373.676L.63 8.876c-.31.473-.39 1.058-.073 1.587l1.378 2.98c.243.527.753.793 1.262.793h1.078c.394 0 .763-.18 1.008-.486l1.553-1.95a.598.598 0 0 1 .928 0l1.555 1.95c.245.307.614.486 1.008.486h1.078c.51 0 1.019-.266 1.262-.793l1.378-2.98c.316-.53.237-1.114-.073-1.587zM7.696 10.15a.535.535 0 0 1-.476.291h-.054a.535.535 0 0 1-.476-.291l-2.18-4.176a.526.526 0 0 1 .476-.762H5.5a.536.536 0 0 1 .478.292l.939 1.862a.536.536 0 0 0 .478.292h.21a.536.536 0 0 0 .478-.292l.94-1.862A.536.536 0 0 1 9.5 5.212h.514a.526.526 0 0 1 .477.762z" />
+    </svg>
+  );
+}
+
 export const clientIcons: Record<string, () => React.JSX.Element> = {
   cursor: CursorIcon,
   "claude-code": ClaudeIcon,
@@ -137,4 +146,5 @@ export const clientIcons: Record<string, () => React.JSX.Element> = {
   vscode: VSCodeIcon,
   windsurf: WindsurfIcon,
   gemini: GeminiIcon,
+  codex: CodexIcon,
 };
