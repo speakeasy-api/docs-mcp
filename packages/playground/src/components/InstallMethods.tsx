@@ -63,6 +63,13 @@ function getClients(serverUrl: string, serverName: string, token?: string): Clie
       name: "Gemini CLI",
       snippet: `{\n  "mcpServers": {\n    "${serverName}": {\n      "httpUrl": "${serverUrl}"${headerLine}\n    }\n  }\n}`,
     },
+    {
+      id: "codex",
+      name: "Codex",
+      snippet: token
+        ? `[mcp_servers.${serverName}]\nurl = "${serverUrl}"\nhttp_headers = { "Authorization" = "Bearer ${token}" }`
+        : `[mcp_servers.${serverName}]\nurl = "${serverUrl}"`,
+    },
   ];
 }
 
