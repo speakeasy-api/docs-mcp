@@ -223,7 +223,7 @@ describe("McpDocsServer resources", () => {
 
     const resources = await server.getResources();
     expect(resources).toHaveLength(1);
-    expect(resources[0].uri).toBe("docs://language/typescript/guides/ts.md");
+    expect(resources[0].uri).toBe("docs:///guides/ts.md");
     expect(resources[0].name).toBe("guides/ts.md");
     expect(resources[0].mimeType).toBe("text/markdown");
   });
@@ -257,7 +257,7 @@ describe("McpDocsServer resources", () => {
       metadata: metadataWithResources,
     });
 
-    const result = await server.readResource("docs://language/typescript/guides/ts.md");
+    const result = await server.readResource("docs:///guides/ts.md");
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0].text).toContain("TypeScript retry");
     expect(result.contents[0].mimeType).toBe("text/markdown");
@@ -292,7 +292,7 @@ describe("McpDocsServer resources", () => {
       metadata: metadataWithResources,
     });
 
-    await expect(server.readResource("docs://language/typescript/nonexistent.md")).rejects.toThrow(
+    await expect(server.readResource("docs:///nonexistent.md")).rejects.toThrow(
       /Resource not found/,
     );
   });
@@ -303,6 +303,6 @@ describe("McpDocsServer resources", () => {
       metadata,
     });
 
-    await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid resource URI/);
+    await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid URI scheme/);
   });
 });

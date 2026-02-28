@@ -252,7 +252,7 @@ describe("MCP HTTP transport resources", () => {
 
     const { resources } = await client.listResources();
     expect(resources).toHaveLength(1);
-    expect(resources[0].uri).toBe("docs://language/typescript/guides/ts.md");
+    expect(resources[0].uri).toBe("docs:///guides/ts.md");
     expect(resources[0].name).toBe("guides/ts.md");
     expect(resources[0].mimeType).toBe("text/markdown");
 
@@ -265,7 +265,7 @@ describe("MCP HTTP transport resources", () => {
     await client.connect(transport);
 
     const result = await client.readResource({
-      uri: "docs://language/typescript/guides/ts.md",
+      uri: "docs:///guides/ts.md",
     });
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0].text).toContain("TypeScript retry");

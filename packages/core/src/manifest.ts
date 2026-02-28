@@ -77,6 +77,7 @@ export function parseManifest(input: unknown): Manifest {
     } catch (err) {
       throw new Error(
         `Invalid taxonomy config: ${err instanceof Error ? err.message : String(err)}`,
+        { cause: err },
       );
     }
   }

@@ -193,9 +193,7 @@ export class McpDocsServer implements ToolProvider {
 
     console.log("Looking up resource for filepath:", filepath);
     const entries = await this.index.listFilepaths({
-      filters: {
-        filepath,
-      },
+      filters: {},
     });
 
     const entry = entries.find((e) => e.filepath === filepath);

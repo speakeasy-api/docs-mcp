@@ -62,7 +62,9 @@ describe("embedding providers", () => {
     );
 
     // Verify the text was actually truncated in the request
-    const requestBody = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string) as {
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0]![1] as globalThis.RequestInit).body as string,
+    ) as {
       input: string[];
     };
     expect(requestBody.input[0]).toHaveLength(24_000);
@@ -294,11 +296,6 @@ describe("embedding providers", () => {
     // so two providers with the same config and inputs produce the same SHA.
     // We'll build the expected SHA by constructing a second provider.
     const { sha256hex } = await import("../src/embedding.js");
-    const refProvider = new OpenAIEmbeddingProvider({
-      apiKey: "test-key",
-      dimensions: 2,
-      batchApiThreshold: 2,
-    });
     // Build the JSONL the provider would create (access via same logic)
     const expectedJsonl = [
       JSON.stringify({

@@ -544,7 +544,9 @@ program
       await rm(lanceDbOldPath, { recursive: true, force: true });
       try {
         await rename(lanceDbPath, lanceDbOldPath);
-      } catch {}
+      } catch {
+        // lanceDbPath may not exist on first run; safe to ignore
+      }
       await rename(lanceDbTmpPath, lanceDbPath);
       await rm(lanceDbOldPath, { recursive: true, force: true }).catch(() => {});
 

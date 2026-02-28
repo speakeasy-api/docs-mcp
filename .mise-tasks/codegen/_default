@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+#MISE description="Run code generation tasks across the monorepo"
+#MISE dir="{{ config_root }}"
+
+pnpm run --filter ./packages/core generate:schema
