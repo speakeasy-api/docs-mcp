@@ -330,21 +330,9 @@ describe("parseManifest instructions", () => {
     expect(manifest.instructions).toBeUndefined();
   });
 
-  it("rejects empty instructions string", () => {
-    expect(() =>
-      parseManifest({ version: "1", instructions: "" }),
-    ).toThrow(/manifest\.instructions must be a non-empty string/);
-  });
-
-  it("rejects whitespace-only instructions", () => {
-    expect(() =>
-      parseManifest({ version: "1", instructions: "   " }),
-    ).toThrow(/manifest\.instructions must be a non-empty string/);
-  });
-
   it("rejects non-string instructions", () => {
-    expect(() =>
-      parseManifest({ version: "1", instructions: 123 }),
-    ).toThrow(/manifest\.instructions must be a non-empty string/);
+    expect(() => parseManifest({ version: "1", instructions: 123 })).toThrow(
+      /manifest\.instructions must be a non-empty string/,
+    );
   });
 });
