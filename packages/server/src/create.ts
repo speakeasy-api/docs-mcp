@@ -47,6 +47,7 @@ const MetadataDocumentSchema = z
         get_doc: z.string().optional(),
       })
       .optional(),
+    instructions: z.string().optional(),
     index: z
       .object({
         path: z.string(),

@@ -29,6 +29,7 @@ export interface CallToolResult {
 }
 
 export interface ToolProvider {
+  getInstructions(): string | undefined;
   getTools(): ToolDefinition[];
   callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult>;
   getResources(): Promise<ResourceDefinition[]>;

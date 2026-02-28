@@ -9,6 +9,7 @@
   "metadata": {
     "scope": "global-guide"
   },
+  "instructions": "Use this server to search for relevant documentation",
   "taxonomy": {
     "scope": {
       "vector_collapse": false,

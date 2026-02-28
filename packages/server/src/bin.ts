@@ -30,7 +30,7 @@ const program = new Command();
 
 program
   .name("docs-mcp-server")
-  .description("Run @speakeasy-api/docs-mcp-server over MCP stdio transport")
+  .description("Run @speakeasy-api/docs-mcp-server")
   .requiredOption("--index-dir <path>", "Directory containing chunks.json and metadata.json")
   .option("--name <value>", "MCP server name", "@speakeasy-api/docs-mcp-server")
   .option("--tool-prefix <value>", "Tool name prefix (e.g. 'acme' produces acme_search_docs)")

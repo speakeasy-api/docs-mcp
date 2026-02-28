@@ -81,6 +81,12 @@ export function parseManifest(input: unknown): Manifest {
       );
     }
   }
+  if (manifest.instructions) {
+    if (typeof manifest.instructions !== "string" || !manifest.instructions.trim()) {
+      throw new Error("manifest.instructions must be a non-empty string");
+    }
+    parsed.instructions = manifest.instructions.trim();
+  }
   if (manifest.overrides) {
     parsed.overrides = parseOverrides(manifest.overrides);
   }

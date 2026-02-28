@@ -304,3 +304,47 @@ describe("mergeTaxonomyConfigs", () => {
     });
   });
 });
+
+describe("parseManifest instructions", () => {
+  it("parses instructions when present", () => {
+    const manifest = parseManifest({
+      version: "1",
+      instructions: "Use this server to look up SDK docs.",
+    });
+
+    expect(manifest.instructions).toBe("Use this server to look up SDK docs.");
+  });
+
+  it("trims instructions whitespace", () => {
+    const manifest = parseManifest({
+      version: "1",
+      instructions: "  Search for API references.  ",
+    });
+
+    expect(manifest.instructions).toBe("Search for API references.");
+  });
+
+  it("omits instructions when not provided", () => {
+    const manifest = parseManifest({ version: "1" });
+
+    expect(manifest.instructions).toBeUndefined();
+  });
+
+  it("rejects empty instructions string", () => {
+    expect(() =>
+      parseManifest({ version: "1", instructions: "" }),
+    ).toThrow(/manifest\.instructions must be a non-empty string/);
+  });
+
+  it("rejects whitespace-only instructions", () => {
+    expect(() =>
+      parseManifest({ version: "1", instructions: "   " }),
+    ).toThrow(/manifest\.instructions must be a non-empty string/);
+  });
+
+  it("rejects non-string instructions", () => {
+    expect(() =>
+      parseManifest({ version: "1", instructions: 123 }),
+    ).toThrow(/manifest\.instructions must be a non-empty string/);
+  });
+});
