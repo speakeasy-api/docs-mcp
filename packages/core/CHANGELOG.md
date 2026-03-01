@@ -1,5 +1,15 @@
 # @speakeasy-api/docs-mcp-core
 
+## 0.7.0
+
+### Minor Changes
+
+- bb9e8d6: Added support for setting MCP server instructions using the manifest. It is collected at build time and exposed when MCP clients call the initialize RPC method against the server.
+
+### Patch Changes
+
+- de3f4c9: Fixed lint and test errors
+
 ## 0.6.0
 
 ### Minor Changes
