@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import type { McpToolInfo } from "./mcp-preflight.js";
 import type {
   AgentProvider,
   AgentProviderConfig,
@@ -90,109 +91,6 @@ function extractMcpToolOutput(result: unknown): string {
 }
 
 /**
- * Pre-flight check: spawn the MCP server directly and verify it responds to
- * the MCP initialize + tools/list handshake. Returns the discovered tool names
- * or throws with a descriptive error.
- */
-async function verifyMcpServer(
-  command: string,
-  args: string[],
-  env: Record<string, string>,
-  timeoutMs = 10_000,
-): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      env,
-    });
-
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`MCP server timed out after ${timeoutMs}ms. stderr: ${stderr.slice(0, 500)}`));
-    }, timeoutMs);
-
-    child.stdout!.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr!.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      reject(new Error(`MCP server failed to spawn: ${err.message}`));
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (!stdout.trim()) {
-        reject(new Error(`MCP server exited (code ${code}) with no output. stderr: ${stderr.slice(0, 500)}`));
-        return;
-      }
-      // Parse the tools/list response
-      try {
-        const toolNames = parseMcpToolsFromOutput(stdout);
-        resolve(toolNames);
-      } catch (err) {
-        reject(new Error(`MCP server responded but tools/list parse failed: ${err instanceof Error ? err.message : err}. stdout: ${stdout.slice(0, 500)}`));
-      }
-    });
-
-    // Send MCP initialize + tools/list over stdin (JSON-RPC over stdio)
-    const initialize = JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "eval-preflight", version: "1.0" },
-      },
-    });
-    const initialized = JSON.stringify({
-      jsonrpc: "2.0",
-      method: "notifications/initialized",
-      params: {},
-    });
-    const toolsList = JSON.stringify({
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/list",
-      params: {},
-    });
-
-    child.stdin!.write(initialize + "\n");
-    child.stdin!.write(initialized + "\n");
-    child.stdin!.write(toolsList + "\n");
-    // Close stdin so the server knows no more requests are coming
-    // (give it a moment to process the requests first)
-    setTimeout(() => {
-      child.stdin!.end();
-    }, 2000);
-  });
-}
-
-function parseMcpToolsFromOutput(stdout: string): string[] {
-  // stdout may contain multiple JSON-RPC responses, one per line
-  const lines = stdout.trim().split("\n");
-  for (const line of lines) {
-    try {
-      const msg = JSON.parse(line) as Record<string, unknown>;
-      if (msg.id === 2 && msg.result) {
-        const result = msg.result as Record<string, unknown>;
-        const tools = result.tools as Array<Record<string, unknown>> | undefined;
-        if (tools) {
-          return tools.map((t) => (typeof t.name === "string" ? t.name : "unknown"));
-        }
-      }
-    } catch {
-      // skip non-JSON lines
-    }
-  }
-  throw new Error("No tools/list response found in output");
-}
-
-/**
  * Detect the default Codex model from ~/.codex/models_cache.json.
  * Returns the first model slug (which is the default) or undefined.
  */
@@ -241,7 +139,8 @@ export class CodexAgentProvider implements AgentProvider {
     // Hyphens in server names are replaced with underscores for TOML key compat;
     // we keep a mapping to reconstruct the original name for tool naming.
     const mcpConfigKeyToName = new Map<string, string>();
-    let mcpVerifiedTools: string[] = [];
+    const mcpVerifiedTools: McpToolInfo[] = config.mcpPreflight?.tools ?? [];
+    const mcpServerInstructions: string | undefined = config.mcpPreflight?.instructions;
 
     if (config.mcpServers) {
       for (const [name, server] of Object.entries(config.mcpServers)) {
@@ -263,38 +162,43 @@ export class CodexAgentProvider implements AgentProvider {
           process.stderr.write(`  required = true\n`);
         }
       }
-
-      // Pre-flight: verify each MCP server responds before handing off to Codex
-      for (const [name, server] of Object.entries(config.mcpServers)) {
-        try {
-          const serverArgs = server.args ?? [];
-          const serverEnv = { ...config.env, ...(server.env ?? {}) };
-          const tools = await verifyMcpServer(server.command, serverArgs, serverEnv);
-          mcpVerifiedTools = tools;
-          process.stderr.write(
-            `[mcp preflight] ${name}: OK — ${tools.length} tools [${tools.join(", ")}]\n`,
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          process.stderr.write(`[mcp preflight] ${name}: FAILED — ${msg}\n`);
-        }
-      }
     }
 
-    // Build instructions from optional system prompt + MCP tool awareness.
+    // Build instructions from: system prompt + server instructions + MCP tool directive.
+    //
     // Codex presents MCP tools under namespaced names (e.g. docs_mcp__search_docs).
-    // Appending verified tool names helps the model discover them — this is
-    // analogous to Claude Code listing tools in its own system prompt.
+    // We must:
+    //   1. Include the MCP server instructions (from the protocol handshake) since
+    //      Codex may not surface them to the model on its own.
+    //   2. List the namespaced tool names so the model can find them.
+    //   3. Use strong directive language — "MUST use", not "Use".
     const parts: string[] = [];
     if (config.systemPrompt) {
       parts.push(config.systemPrompt);
     }
-    if (mcpVerifiedTools.length > 0) {
-      const toolList = mcpVerifiedTools.map((t) => `- ${t}`).join("\n");
-      parts.push(`You have the following documentation tools available via MCP:\n${toolList}\n\nUse these tools to look up API signatures and usage examples — they provide authoritative, pre-indexed SDK documentation that is faster and more reliable than reading source code or searching the web.`);
+    if (mcpServerInstructions) {
+      parts.push(mcpServerInstructions);
     }
-    if (parts.length > 0) {
-      args.push("-c", `instructions="${escapeToml(parts.join("\n\n"))}"`);
+    if (mcpVerifiedTools.length > 0) {
+      // Codex presents MCP tools as serverKey.toolName (dot-separated).
+      // The server key is the TOML config key (hyphens replaced with underscores).
+      const serverKeys = config.mcpServers
+        ? Object.keys(config.mcpServers).map((name) => name.replace(/-/g, "_"))
+        : [];
+      const serverKey = serverKeys[0] ?? "docs_mcp";
+      const toolList = mcpVerifiedTools
+        .map((t) => `- ${serverKey}.${t.name}: ${t.description}`)
+        .join("\n");
+      parts.push(
+        `You have the following documentation tools available via MCP:\n${toolList}\n\n` +
+        `You MUST use these tools to look up API signatures, method names, and usage examples BEFORE writing any code. ` +
+        `Do NOT guess at SDK method signatures or parameter names — always consult the documentation first. ` +
+        `These tools provide authoritative, pre-indexed SDK documentation that is faster and more reliable than searching the web or reading source code.`,
+      );
+    }
+    const effectiveInstructions = parts.length > 0 ? parts.join("\n\n") : undefined;
+    if (effectiveInstructions) {
+      args.push("-c", `instructions="${escapeToml(effectiveInstructions)}"`);
     }
 
     // The prompt is the final positional argument
@@ -329,6 +233,7 @@ export class CodexAgentProvider implements AgentProvider {
       model: resolvedModel ?? "codex (unknown)",
       tools: initTools,
       mcpServers: initMcpServers,
+      ...(effectiveInstructions ? { systemPrompt: effectiveInstructions } : {}),
     };
 
     // Accumulate usage across turns

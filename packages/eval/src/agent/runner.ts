@@ -6,6 +6,7 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { evaluateAssertions } from "./assertions.js";
+import { preflightMcpServer } from "./mcp-preflight.js";
 import { computeAgentEvalSummary } from "./metrics.js";
 import { NoopObserver } from "./observer.js";
 import { defaultModelForProvider } from "./provider.js";
@@ -27,7 +28,8 @@ const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dis
 
 const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.5;
-const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
+const DEFAULT_MCP_SERVER_NAME = "docs-mcp";
+const MCP_TOOL_NAMES = ["search_docs", "get_doc"];
 
 // No default system prompt — each provider uses its own native instructions.
 // Scenarios can still override via systemPrompt if needed.
@@ -137,7 +139,11 @@ export async function runAgentScenario(
     >();
 
     // Build MCP server config (skipped in noMcp baseline mode)
+    const mcpServerName = scenario.mcpServerName ?? DEFAULT_MCP_SERVER_NAME;
+    const mcpToolPrefix = `mcp__${mcpServerName}__`;
+    const mcpExpectedTools = new Set(MCP_TOOL_NAMES.map((t) => `${mcpToolPrefix}${t}`));
     let mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> | undefined;
+    let mcpPreflight: import("./mcp-preflight.js").McpPreflightResult | undefined;
 
     if (!config.noMcp) {
       const serverEnv: Record<string, string> = {};
@@ -170,11 +176,41 @@ export async function runAgentScenario(
         );
       }
 
-      mcpServers = { "docs-mcp": mcpServerConfig };
+      mcpServers = { [mcpServerName]: mcpServerConfig };
+
+      // Pre-flight: verify the MCP server starts and surface exactly what
+      // the model will see — server identity, instructions, and tool descriptions.
+      // The result is passed to the provider so it doesn't need to spawn again.
+      try {
+        const serverArgs = mcpServerConfig.args ?? [];
+        const serverEnv = { ...process.env, ...(mcpServerConfig.env ?? {}) } as Record<string, string>;
+        mcpPreflight = await preflightMcpServer(
+          mcpServerConfig.command,
+          serverArgs,
+          serverEnv,
+        );
+
+        observer?.onAgentMessage(scenario, {
+          type: "mcp_preflight",
+          summary: `${mcpPreflight.serverName ?? "?"}@${mcpPreflight.serverVersion ?? "?"} — ${mcpPreflight.tools.length} tools`,
+          workspaceDir,
+          timestampMs: performance.now() - startMs,
+          preflight: mcpPreflight,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`MCP preflight failed: ${msg}`);
+        observer?.onAgentMessage(scenario, {
+          type: "mcp_preflight",
+          summary: `FAILED: ${msg.slice(0, 200)}`,
+          workspaceDir,
+          timestampMs: performance.now() - startMs,
+        });
+      }
     }
 
     const allowedTools = mcpServers
-      ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"]
+      ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", `${mcpToolPrefix}*`]
       : ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
 
     try {
@@ -186,6 +222,7 @@ export async function runAgentScenario(
         maxTurns,
         maxBudgetUsd,
         ...(mcpServers ? { mcpServers } : {}),
+        ...(mcpPreflight ? { mcpPreflight } : {}),
         allowedTools,
         env: process.env as Record<string, string>,
         ...(config.debug != null ? { debug: config.debug } : {}),
@@ -194,18 +231,18 @@ export async function runAgentScenario(
 
         switch (event.type) {
           case "init": {
-            const mcpTools = event.tools.filter((t: string) => t.startsWith("mcp__docs"));
-            const docsMcpServer = event.mcpServers.find((s) => s.name === "docs-mcp");
+            const mcpTools = event.tools.filter((t: string) => t.startsWith(mcpToolPrefix));
+            const mcpServer = event.mcpServers.find((s) => s.name === mcpServerName);
 
             const parts = [
               `model=${event.model}`,
               `tools=${event.tools.length}`,
               `mcp_tools=[${mcpTools.join(", ")}]`,
-              `docs-mcp=${docsMcpServer ? docsMcpServer.status : "not found"}`,
+              `${mcpServerName}=${mcpServer ? mcpServer.status : "not found"}`,
             ];
 
             if (mcpTools.length === 0 && !config.noMcp) {
-              errors.push("docs-mcp tools not registered — server may have failed to start");
+              errors.push(`${mcpServerName} tools not registered — server may have failed to start`);
             }
 
             observer?.onAgentMessage(scenario, {
@@ -213,6 +250,7 @@ export async function runAgentScenario(
               summary: parts.join(", "),
               workspaceDir,
               timestampMs: nowMs,
+              ...(event.systemPrompt ? { systemPrompt: event.systemPrompt } : {}),
             });
             break;
           }
@@ -240,7 +278,7 @@ export async function runAgentScenario(
             const toolName = event.name;
             toolsCalled[toolName] = (toolsCalled[toolName] ?? 0) + 1;
 
-            if (DOCS_MCP_TOOLS.has(toolName)) {
+            if (mcpExpectedTools.has(toolName)) {
               activated = true;
             }
 
@@ -328,11 +366,11 @@ export async function runAgentScenario(
     // MCP-specific metrics
     let mcpToolCalls = 0;
     for (const [tool, count] of Object.entries(toolsCalled)) {
-      if (DOCS_MCP_TOOLS.has(tool)) mcpToolCalls += count;
+      if (mcpExpectedTools.has(tool)) mcpToolCalls += count;
     }
     let mcpToolResultChars = 0;
     for (const trace of toolCallTrace) {
-      if (DOCS_MCP_TOOLS.has(trace.name)) mcpToolResultChars += trace.result.length;
+      if (mcpExpectedTools.has(trace.name)) mcpToolResultChars += trace.result.length;
     }
 
     return {

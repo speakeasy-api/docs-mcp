@@ -1,0 +1,237 @@
+ts-init:
+  name: Initialize the TypeScript client
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in
+    solution.ts that initializes the AcmeAuth client with an API key from the
+    environment and fetches a user by ID. Add the dependency to package.json.
+    Do not run the program.
+  description: >-
+    AcmeAuth SDK — multi-language authentication client covering API keys,
+    OAuth, JWT, pagination, webhooks, and error handling
+  docsDir: ../../../../tests/fixtures/docs
+  category: sdk-usage
+  setup: npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null
+  assertions:
+    - type: file_contains
+      path: solution.ts
+      value: AcmeAuth
+    - type: file_contains
+      path: solution.ts
+      value: apiKey
+    - type: file_contains
+      path: package.json
+      value: "@acmeauth/sdk"
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution
+        node --module commonjs --target es2020 solution.ts
+      name: typecheck
+      soft: true
+
+py-init:
+  name: Initialize the Python client
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Using the AcmeAuth Python SDK (`acmeauth`), write a script in solution.py
+    that initializes the AcmeAuth client with an API key and fetches a user by ID.
+  docsDir: ../../../../tests/fixtures/docs
+  category: sdk-usage
+  assertions:
+    - type: file_matches
+      path: solution.py
+      pattern: acmeauth|AcmeAuth
+    - type: file_contains
+      path: solution.py
+      value: api_key
+    - type: script
+      command: uvx pyright solution.py
+      name: typecheck
+      soft: true
+
+ts-rate-limit:
+  name: Handle rate limit errors in TypeScript
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Write TypeScript code in solution.ts that calls the AcmeAuth API
+    (`@acmeauth/sdk`) and properly handles rate limit (429) errors using the
+    SDK's typed error classes. Add the dependency to package.json.
+    Do not run the program.
+  docsDir: ../../../../tests/fixtures/docs
+  category: error-handling
+  setup: npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null
+  assertions:
+    - type: file_contains
+      path: solution.ts
+      value: RateLimitError
+    - type: file_matches
+      path: solution.ts
+      pattern: retryAfter|retry_after
+    - type: file_contains
+      path: package.json
+      value: "@acmeauth/sdk"
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution
+        node --module commonjs --target es2020 solution.ts
+      name: typecheck
+      soft: true
+
+ts-webhooks:
+  name: Verify webhook signatures
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Write TypeScript code in solution.ts that verifies incoming AcmeAuth webhook
+    signatures using the SDK (`@acmeauth/sdk`). Add the dependency to
+    package.json. Do not run the program.
+  docsDir: ../../../../tests/fixtures/docs
+  category: webhooks
+  setup: npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null
+  assertions:
+    - type: file_matches
+      path: solution.ts
+      pattern: verifyWebhookSignature|verify_webhook
+      flags: i
+    - type: file_contains
+      path: solution.ts
+      value: x-acmeauth-signature
+    - type: file_contains
+      path: package.json
+      value: "@acmeauth/sdk"
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution
+        node --module commonjs --target es2020 solution.ts
+      name: typecheck
+      soft: true
+
+ts-pagination:
+  name: Paginate through users
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Write TypeScript code in solution.ts that lists all AcmeAuth users using the
+    SDK (`@acmeauth/sdk`), handling pagination correctly. Add the dependency to
+    package.json. Do not run the program.
+  docsDir: ../../../../tests/fixtures/docs
+  category: pagination
+  setup: npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null
+  assertions:
+    - type: file_matches
+      path: solution.ts
+      pattern: list|paginate
+      flags: i
+    - type: file_matches
+      path: solution.ts
+      pattern: for.*await|cursor|next
+      flags: i
+    - type: file_contains
+      path: package.json
+      value: "@acmeauth/sdk"
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution
+        node --module commonjs --target es2020 solution.ts
+      name: typecheck
+      soft: true
+
+py-async:
+  name: Python async client usage
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Write Python code in solution.py that uses the AcmeAuth async client to
+    fetch a user.
+  docsDir: ../../../../tests/fixtures/docs
+  category: sdk-usage
+  assertions:
+    - type: file_contains
+      path: solution.py
+      value: AsyncAcmeAuth
+    - type: file_contains
+      path: solution.py
+      value: await
+    - type: script
+      command: uvx pyright solution.py
+      name: typecheck
+      soft: true
+
+ts-oauth:
+  name: OAuth authentication setup
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Explain how OAuth 2.0 authentication works with AcmeAuth and write
+    TypeScript code in solution.ts that initializes the client (`@acmeauth/sdk`)
+    with an OAuth access token. Add the dependency to package.json.
+    Do not run the program.
+  docsDir: ../../../../tests/fixtures/docs
+  category: auth
+  setup: npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null
+  assertions:
+    - type: contains
+      value: accessToken
+    - type: file_contains
+      path: solution.ts
+      value: accessToken
+    - type: matches
+      pattern: authorization.code|PKCE|refresh.token
+      flags: i
+    - type: file_contains
+      path: package.json
+      value: "@acmeauth/sdk"
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution
+        node --module commonjs --target es2020 solution.ts
+      name: typecheck
+      soft: true
+
+rate-limit-guide:
+  name: "Cross-cutting: rate limits and best practices"
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    What are the rate limits for each AcmeAuth plan tier, and what are the
+    recommended best practices for staying within limits?
+  docsDir: ../../../../tests/fixtures/docs
+  category: guide-discovery
+  assertions:
+    - type: matches
+      pattern: 60|600|6000
+      flags: ""
+    - type: contains
+      value: "429"
+    - type: matches
+      pattern: cache|batch|circuit.breaker
+      flags: i
+
+webhook-guide:
+  name: Webhook event types and retry policy
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    List all webhook event types that AcmeAuth supports and describe the retry
+    policy for failed deliveries.
+  docsDir: ../../../../tests/fixtures/docs
+  category: guide-discovery
+  assertions:
+    - type: contains
+      value: user.created
+    - type: contains
+      value: session.revoked
+    - type: matches
+      pattern: 5.*failed|5.*attempts|24.hours
+      flags: i
+
+jwt-verification:
+  name: JWT token verification
+  mcpServerName: acmeauth-docs
+  prompt: >-
+    Explain how to verify AcmeAuth JWT tokens locally, including what claims are
+    in the token and where to find the public keys.
+  docsDir: ../../../../tests/fixtures/docs
+  category: auth
+  assertions:
+    - type: contains
+      value: jwks
+    - type: matches
+      pattern: sub|iat|exp|scope|aud
+    - type: matches
+      pattern: \.well-known|JWKS
+      flags: i

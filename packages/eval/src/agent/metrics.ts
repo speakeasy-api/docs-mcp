@@ -23,7 +23,7 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
   for (const r of results) {
     for (const [tool, count] of Object.entries(r.toolsCalled)) {
       toolUsageDistribution[tool] = (toolUsageDistribution[tool] ?? 0) + count;
-      if (tool.startsWith("mcp__docs-mcp__")) {
+      if (tool.startsWith("mcp__")) {
         mcpToolUsageDistribution[tool] = (mcpToolUsageDistribution[tool] ?? 0) + count;
       }
     }

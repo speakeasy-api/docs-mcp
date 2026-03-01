@@ -25,6 +25,8 @@ export type AgentProviderEvent =
       model: string;
       tools: string[];
       mcpServers: Array<{ name: string; status: string }>;
+      /** The effective system prompt / instructions sent to the model. */
+      systemPrompt?: string;
     }
   | {
       type: "text";
@@ -67,6 +69,9 @@ export interface AgentProviderConfig {
   maxTurns: number;
   maxBudgetUsd: number;
   mcpServers?: Record<string, AgentProviderMcpServer>;
+  /** Pre-flight result from the runner. Providers use this to inject
+   *  instructions and tool awareness — no need to spawn the server again. */
+  mcpPreflight?: import("./mcp-preflight.js").McpPreflightResult;
   allowedTools?: string[];
   env: Record<string, string>;
   debug?: boolean;

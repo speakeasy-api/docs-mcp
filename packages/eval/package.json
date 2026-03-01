@@ -44,6 +44,7 @@
     "@speakeasy-api/docs-mcp-core": "workspace:*",
     "cli-highlight": "^2.1.11",
     "commander": "^13.1.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "yaml": "^2.8.2"
   }
 }

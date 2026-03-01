@@ -11,7 +11,21 @@ export interface DocsRepoSpec {
   docsConfig?: Record<string, unknown>;
 }
 
-export interface AgentScenario {
+/**
+ * Parameters that configure how the docs index is built and served.
+ * Adding a field here automatically makes it available on AgentScenario
+ * and requires a corresponding CLI flag mapping in build-cache.ts.
+ */
+export interface IndexConfig {
+  /** Corpus description for the docs index. Flows into MCP tool descriptions. */
+  description?: string;
+  /** Custom tool descriptions for the MCP server tools. */
+  toolDescriptions?: { search_docs?: string; get_doc?: string };
+  /** Custom MCP server instructions sent to clients during initialization. */
+  mcpServerInstructions?: string;
+}
+
+export interface AgentScenario extends IndexConfig {
   id: string;
   name: string;
   prompt: string;
@@ -20,12 +34,14 @@ export interface AgentScenario {
   maxTurns?: number;
   maxBudgetUsd?: number;
   systemPrompt?: string;
+  /**
+   * MCP server name used in the agent's tool namespace. Defaults to "docs-mcp".
+   * Claude tools appear as `mcp__<name>__search_docs`; Codex uses underscored
+   * variant `<name_with_underscores>__search_docs`.
+   */
+  mcpServerName?: string;
   /** Shell command run in workspace before agent starts */
   setup?: string;
-  /** Corpus description for the docs index. Flows into MCP tool descriptions. */
-  description?: string;
-  /** Custom tool descriptions for the MCP server tools. */
-  toolDescriptions?: { search_docs?: string; get_doc?: string };
   /** Git repo to clone and index docs from. Takes precedence over docsDir. */
   docsSpec?: DocsRepoSpec;
   /** Path to docs directory. Resolved relative to scenario file. CLI auto-builds + caches the index. */
@@ -172,13 +188,17 @@ export interface AgentEvalOutput {
 }
 
 export interface AgentObservedMessage {
-  type: "system_init" | "assistant_text" | "tool_call" | "tool_result" | "result";
+  type: "system_init" | "mcp_preflight" | "assistant_text" | "tool_call" | "tool_result" | "result";
   summary: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolResultPreview?: string;
   workspaceDir?: string;
   timestampMs: number;
+  /** Structured preflight data — only set for type="mcp_preflight". */
+  preflight?: import("./mcp-preflight.js").McpPreflightResult;
+  /** Effective system prompt / instructions sent to the model — set on "system_init". */
+  systemPrompt?: string;
 }
 
 export interface AgentEvalObserver {

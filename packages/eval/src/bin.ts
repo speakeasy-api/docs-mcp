@@ -6,13 +6,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
+import { parse as parseYaml } from "yaml";
 import { ensureIndex } from "./agent/build-cache.js";
 import { loadPreviousResult, saveResult, generateTrendSummary } from "./agent/history.js";
 import { ConsoleObserver } from "./agent/observer.js";
 import { ensureRepo } from "./agent/repo-cache.js";
 import { defaultModelForProvider, resolveAgentProvider } from "./agent/provider.js";
 import { runAgentEval } from "./agent/runner.js";
-import type { AgentScenario } from "./agent/types.js";
+import type { AgentScenario, IndexConfig } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
 import {
@@ -218,6 +219,10 @@ program
   )
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
+  .option(
+    "--mcp-server-instructions <value>",
+    "Default MCP server instructions for scenarios that don't specify their own",
+  )
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
   .option("--debug", "Enable verbose agent event logging", false)
   .option("--clean-workspace", "Delete workspace directories after run (default: keep)", false)
@@ -241,6 +246,7 @@ program
       maxBudgetUsd: number;
       maxConcurrency: number;
       systemPrompt?: string;
+      mcpServerInstructions?: string;
       mcp: boolean;
       debug: boolean;
       cleanWorkspace: boolean;
@@ -310,16 +316,18 @@ program
               indexDescriptions.set(resolvedDocsDir, scenario.description);
             }
 
-            const cacheKey = `${resolvedDocsDir}\0${description ?? ""}\0${JSON.stringify(scenario.toolDescriptions ?? {})}`;
+            const config: IndexConfig = {
+              ...(description ? { description } : {}),
+              ...(scenario.toolDescriptions ? { toolDescriptions: scenario.toolDescriptions } : {}),
+              ...((scenario.mcpServerInstructions ?? options.mcpServerInstructions)
+                ? { mcpServerInstructions: scenario.mcpServerInstructions ?? options.mcpServerInstructions }
+                : {}),
+            };
+
+            const cacheKey = `${resolvedDocsDir}\0${JSON.stringify(config)}`;
             let indexDir = indexCache.get(cacheKey);
             if (!indexDir) {
-              indexDir = await ensureIndex(
-                resolvedDocsDir,
-                CLI_BIN_PATH,
-                undefined,
-                description,
-                scenario.toolDescriptions,
-              );
+              indexDir = await ensureIndex(resolvedDocsDir, CLI_BIN_PATH, undefined, config);
               indexCache.set(cacheKey, indexDir);
             }
             scenario.indexDir = indexDir;
@@ -409,7 +417,7 @@ async function loadScenarios(options: {
   docsDir?: string;
 }): Promise<{ scenarios: AgentScenario[]; scenariosFilePath?: string }> {
   if (options.suite) {
-    const filePath = path.join(FIXTURES_DIR, `${options.suite}.json`);
+    const filePath = await resolveSuitePath(options.suite);
     const raw = await readFile(filePath, "utf8");
     return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
   }
@@ -432,16 +440,12 @@ async function loadScenarios(options: {
   };
 }
 
-function parseScenarioFile(raw: string): AgentScenario[] {
-  const parsed = JSON.parse(raw);
+function resolveSuitePath(suite: string): string {
+  return path.join(FIXTURES_DIR, `${suite}.yaml`);
+}
 
-  // Legacy array format — auto-generate ids from names
-  if (Array.isArray(parsed)) {
-    return (parsed as AgentScenario[]).map((s) => ({
-      ...s,
-      id: s.id ?? slugify(s.name),
-    }));
-  }
+function parseScenarioFile(raw: string): AgentScenario[] {
+  const parsed = parseYaml(raw);
 
   // K:V format — key is the scenario id
   return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>).map(

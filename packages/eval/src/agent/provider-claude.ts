@@ -13,11 +13,36 @@ export class ClaudeAgentProvider implements AgentProvider {
       throw new Error("Claude provider requires a model to be specified");
     }
 
+    // Build effective system prompt: scenario prompt + MCP preflight data.
+    // Claude Agent SDK handles MCP tool registration automatically, but we
+    // still inject server instructions and tool descriptions into the system
+    // prompt to maximize activation — the SDK may not surface MCP protocol
+    // instructions to the model.
+    const systemParts: string[] = [];
+    if (config.systemPrompt) {
+      systemParts.push(config.systemPrompt);
+    }
+    if (config.mcpPreflight?.instructions) {
+      systemParts.push(config.mcpPreflight.instructions);
+    }
+    if (config.mcpPreflight && config.mcpPreflight.tools.length > 0) {
+      const toolList = config.mcpPreflight.tools
+        .map((t) => `- ${t.name}: ${t.description}`)
+        .join("\n");
+      systemParts.push(
+        `You have the following documentation tools available:\n${toolList}\n\n` +
+        `You MUST use these tools to look up API signatures, method names, and usage examples BEFORE writing any code. ` +
+        `Do NOT guess at SDK method signatures or parameter names — always consult the documentation first.`,
+      );
+    }
+
+    const effectiveSystemPrompt = systemParts.length > 0 ? systemParts.join("\n\n") : undefined;
+
     for await (const message of query({
       prompt: config.prompt,
       options: {
         model: config.model,
-        ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
+        ...(effectiveSystemPrompt ? { systemPrompt: effectiveSystemPrompt } : {}),
         ...(config.allowedTools ? { allowedTools: config.allowedTools } : {}),
         ...(config.mcpServers ? { mcpServers: config.mcpServers } : {}),
         maxTurns: config.maxTurns,
@@ -40,6 +65,7 @@ export class ClaudeAgentProvider implements AgentProvider {
           model: message.model as string,
           tools: message.tools as string[],
           mcpServers,
+          ...(effectiveSystemPrompt ? { systemPrompt: effectiveSystemPrompt } : {}),
         };
       }
 

@@ -136,6 +136,39 @@ describe("McpDocsServer", () => {
   });
 });
 
+describe("McpDocsServer getInstructions", () => {
+  it("returns mcpServerInstructions from metadata", () => {
+    const metadataWithInstructions = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Speakeasy SDK docs",
+      taxonomy: {},
+      stats: {
+        total_chunks: 2,
+        total_files: 2,
+        indexed_at: "2026-02-22T00:00:00Z",
+      },
+      embedding: null,
+      mcpServerInstructions: "Use this server to look up SDK documentation.",
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithInstructions,
+    });
+
+    expect(server.getInstructions()).toBe("Use this server to look up SDK documentation.");
+  });
+
+  it("returns undefined when mcpServerInstructions is not set", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+    });
+
+    expect(server.getInstructions()).toBeUndefined();
+  });
+});
+
 describe("McpDocsServer with toolPrefix", () => {
   it("prefixes tool names when toolPrefix is set", () => {
     const server = new McpDocsServer({

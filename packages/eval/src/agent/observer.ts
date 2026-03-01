@@ -235,10 +235,44 @@ export class ConsoleObserver implements AgentEvalObserver {
     const debug = this.opts.debug;
 
     switch (message.type) {
+      case "mcp_preflight": {
+        const pf = message.preflight;
+        if (pf) {
+          const lines: string[] = [];
+          lines.push(
+            `${c.bold}${pf.serverName ?? "unknown"}${c.reset} ${c.dim}v${pf.serverVersion ?? "?"}${c.reset}`,
+          );
+          if (pf.instructions) {
+            const preview = pf.instructions.length > 120
+              ? pf.instructions.slice(0, 120) + "…"
+              : pf.instructions;
+            lines.push(`${c.dim}instructions:${c.reset} ${preview}`);
+          }
+          for (const tool of pf.tools) {
+            const desc = tool.description.length > 80
+              ? tool.description.slice(0, 80) + "…"
+              : tool.description;
+            lines.push(`${c.magenta}${tool.name}${c.reset} ${c.dim}${desc}${c.reset}`);
+          }
+          write(`${ts} ${c.blue}▶ MCP server ready${c.reset}\n`);
+          write(indent(panel(lines.join("\n"), `${c.magenta}MCP Preflight${c.reset}`, c.magenta), 4) + "\n");
+        } else {
+          // Preflight failed — show summary as error
+          write(`${ts} ${c.red}▶ MCP preflight: ${message.summary}${c.reset}\n`);
+        }
+        if (message.workspaceDir) {
+          write(`    ${c.cyan}workspace:${c.reset} ${c.bold}${message.workspaceDir}${c.reset}\n`);
+        }
+        break;
+      }
+
       case "system_init":
         write(`${ts} ${c.blue}▶ ${message.summary}${c.reset}\n`);
         if (message.workspaceDir) {
           write(`${ts} ${c.cyan}${c.bold}  workspace: ${message.workspaceDir}${c.reset}\n`);
+        }
+        if (message.systemPrompt) {
+          write(indent(panel(message.systemPrompt, `${c.blue}System Prompt${c.reset}`, c.blue), 4) + "\n");
         }
         break;
 
@@ -409,7 +443,7 @@ function formatMcpCallsLine(s: import("./types.js").AgentEvalSummary): string {
 
   const parts = Object.entries(dist)
     .sort(([, a], [, b]) => b - a)
-    .map(([tool, count]) => `${tool.replace("mcp__docs-mcp__", "")}: ${count}`)
+    .map(([tool, count]) => `${tool.replace(/^mcp__.*?__/, "")}: ${count}`)
     .join(", ");
 
   return `${padRight("MCP calls", 16)}${(s.avgMcpToolCalls ?? 0).toFixed(1)} avg ${c.dim}(${parts})${c.reset}`;

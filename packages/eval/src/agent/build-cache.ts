@@ -3,9 +3,38 @@ import { readdir, readFile, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import type { IndexConfig } from "./types.js";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const DEFAULT_CACHE_DIR = path.join(PROJECT_ROOT, ".cache", "indexes");
+
+/**
+ * Maps each IndexConfig field to a function that produces CLI flags for the build command.
+ * `satisfies` enforces exhaustive coverage — adding a field to IndexConfig without
+ * adding a mapper here is a compile error.
+ */
+const INDEX_CONFIG_FLAGS = {
+  description: (v: string) => ["--description", v],
+  toolDescriptions: (v: { search_docs?: string; get_doc?: string }) => [
+    ...(v.search_docs ? ["--tool-description-search", v.search_docs] : []),
+    ...(v.get_doc ? ["--tool-description-get-doc", v.get_doc] : []),
+  ],
+  mcpServerInstructions: (v: string) => ["--mcp-server-instructions", v],
+} satisfies {
+  [K in keyof Required<IndexConfig>]: (value: NonNullable<IndexConfig[K]>) => string[];
+};
+
+function configToBuildArgs(config: IndexConfig): string[] {
+  const args: string[] = [];
+  for (const key of Object.keys(INDEX_CONFIG_FLAGS) as (keyof IndexConfig)[]) {
+    const value = config[key];
+    if (value != null) {
+      // Safe: satisfies guarantees each mapper matches its IndexConfig field type.
+      args.push(...INDEX_CONFIG_FLAGS[key](value as never));
+    }
+  }
+  return args;
+}
 
 /**
  * Ensures an index exists for the given docs directory, building it if necessary.
@@ -15,11 +44,10 @@ export async function ensureIndex(
   docsDir: string,
   cliBinPath: string,
   cacheDir?: string,
-  description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string },
+  config?: IndexConfig,
 ): Promise<string> {
   const resolvedCacheDir = cacheDir ?? path.resolve(DEFAULT_CACHE_DIR);
-  const cacheKey = await computeCacheKey(docsDir, description, toolDescriptions);
+  const cacheKey = await computeCacheKey(docsDir, config);
   const indexDir = path.join(resolvedCacheDir, cacheKey);
   const metadataPath = path.join(indexDir, "metadata.json");
 
@@ -34,16 +62,12 @@ export async function ensureIndex(
   await mkdir(indexDir, { recursive: true });
 
   console.error(`Building index for ${docsDir} → ${indexDir}`);
-  await runBuild(cliBinPath, docsDir, indexDir, description, toolDescriptions);
+  await runBuild(cliBinPath, docsDir, indexDir, config);
 
   return indexDir;
 }
 
-async function computeCacheKey(
-  docsDir: string,
-  description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string },
-): Promise<string> {
+async function computeCacheKey(docsDir: string, config?: IndexConfig): Promise<string> {
   const hash = createHash("sha256");
 
   // Hash file listing (relative paths + sizes + mtimes)
@@ -62,14 +86,9 @@ async function computeCacheKey(
     // No config file — that's fine
   }
 
-  // Hash description so changing it rebuilds the index
-  if (description) {
-    hash.update(`\0description\0${description}`);
-  }
-
-  // Hash tool descriptions so changing them rebuilds the index
-  if (toolDescriptions) {
-    hash.update(`\0tool_descriptions\0${JSON.stringify(toolDescriptions)}`);
+  // Hash all index config fields — new fields are automatically included
+  if (config) {
+    hash.update(`\0index_config\0${JSON.stringify(config)}`);
   }
 
   return hash.digest("hex").slice(0, 16);
@@ -105,19 +124,12 @@ function runBuild(
   cliBinPath: string,
   docsDir: string,
   outDir: string,
-  description?: string,
-  toolDescriptions?: { search_docs?: string; get_doc?: string },
+  config?: IndexConfig,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [cliBinPath, "build", "--docs-dir", docsDir, "--out", outDir];
-    if (description) {
-      args.push("--description", description);
-    }
-    if (toolDescriptions?.search_docs) {
-      args.push("--tool-description-search", toolDescriptions.search_docs);
-    }
-    if (toolDescriptions?.get_doc) {
-      args.push("--tool-description-get-doc", toolDescriptions.get_doc);
+    if (config) {
+      args.push(...configToBuildArgs(config));
     }
     const child = spawn("node", args, {
       env: process.env as Record<string, string>,

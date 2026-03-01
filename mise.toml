@@ -99,7 +99,7 @@ depends = ["build"]
 
 [tasks."agent-eval:suites"]
 description = "List available agent eval suites"
-run = "ls -1 packages/eval/fixtures/agent-scenarios/*.json | xargs -I{} basename {} .json"
+run = "ls -1 packages/eval/fixtures/agent-scenarios/*.yaml | xargs -I{} basename {} .yaml"
 
 [tasks.nuke]
 description = "Kill all processes attached to dev ports (20310, 3000)"
