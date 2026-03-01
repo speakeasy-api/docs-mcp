@@ -29,6 +29,7 @@ export async function startStdioServer(
   app: ToolProvider,
   options: StartStdioServerOptions = {},
 ): Promise<void> {
+  const instructions = app.getInstructions();
   const server = new Server(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
@@ -39,6 +40,7 @@ export async function startStdioServer(
         tools: {},
         resources: {},
       },
+      ...(instructions ? { instructions } : {}),
     },
   );
 

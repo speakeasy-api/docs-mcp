@@ -110,6 +110,12 @@ export const ManifestSchema = z
     taxonomy: ManifestTaxonomyConfigSchema.optional().meta({
       examples: [{ language: { vector_collapse: true } }],
     }),
+    mcpServerInstructions: z
+      .string()
+      .optional()
+      .describe(
+        "Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.",
+      ),
     overrides: z
       .array(ManifestOverrideSchema)
       .optional()

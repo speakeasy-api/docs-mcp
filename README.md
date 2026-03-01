@@ -151,6 +151,10 @@ my-docs/
     "language": { "vector_collapse": true },
   },
 
+  // Custom instructions sent to MCP clients during initialization.
+  // Helps coding agents understand what this server provides and how to use it.
+  "mcpServerInstructions": "This server provides SDK documentation for Acme Corp...",
+
   // File-pattern overrides. Evaluated top-to-bottom; last match wins.
   // Override metadata merges with root (override keys win).
   // Override strategy replaces root strategy entirely.

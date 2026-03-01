@@ -81,6 +81,15 @@ export function parseManifest(input: unknown): Manifest {
       );
     }
   }
+  if (manifest.mcpServerInstructions) {
+    if (
+      typeof manifest.mcpServerInstructions !== "string" ||
+      !manifest.mcpServerInstructions.trim()
+    ) {
+      throw new Error("manifest.mcpServerInstructions must be a non-empty string");
+    }
+    parsed.mcpServerInstructions = manifest.mcpServerInstructions.trim();
+  }
   if (manifest.overrides) {
     parsed.overrides = parseOverrides(manifest.overrides);
   }

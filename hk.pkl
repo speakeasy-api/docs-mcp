@@ -2,20 +2,48 @@ amends "package://github.com/jdx/hk/releases/download/v1.36.0/hk@1.36.0#/Config.
 import "package://github.com/jdx/hk/releases/download/v1.36.0/hk@1.36.0#/Builtins.pkl"
 
 local linters = new Mapping<String, Step> {
-    ["prettier"] = Builtins.prettier
+  ["pkleval"] = Builtins.pkl
+  ["pklfmt"] = Builtins.pkl_format
+  ["prettier"] = new Step {
+    glob =
+      List(
+        "**/*.js",
+        "**/*.jsx",
+        "**/*.mjs",
+        "**/*.cjs",
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.mts",
+        "**/*.cts",
+        "**/*.css",
+        "**/*.html",
+        "**/*.json",
+        "**/*.json5",
+        "**/*.jsonc",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.markdown",
+        "**/*.markdown.mdx",
+        "**/*.md",
+      )
+    batch = true
+    check = "pnpm prettier --check {{ files }}"
+    check_list_files = "pnpm prettier --list-different {{ files }}"
+    fix = "pnpm prettier --write {{ files }}"
+  }
 }
 
 hooks {
-    ["pre-commit"] {
-        fix = true
-        stash = "git"
-        steps = linters
-    }
-    ["fix"] {
-        fix = true
-        steps = linters
-    }
-    ["check"] {
-        steps = linters
-    }
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps = linters
+  }
+  ["fix"] {
+    fix = true
+    steps = linters
+  }
+  ["check"] {
+    steps = linters
+  }
 }

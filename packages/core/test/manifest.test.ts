@@ -223,7 +223,7 @@ describe("mergeTaxonomyConfigs", () => {
     const manifests: Manifest[] = [
       {
         version: "1",
-        taxonomy: { language: {} },
+        taxonomy: { language: {} as any },
       },
       {
         version: "1",
@@ -302,5 +302,37 @@ describe("mergeTaxonomyConfigs", () => {
         properties: { typescript: { mcp_resource: true } },
       },
     });
+  });
+});
+
+describe("parseManifest mcpServerInstructions", () => {
+  it("parses mcpServerInstructions when present", () => {
+    const manifest = parseManifest({
+      version: "1",
+      mcpServerInstructions: "Use this server to look up SDK docs.",
+    });
+
+    expect(manifest.mcpServerInstructions).toBe("Use this server to look up SDK docs.");
+  });
+
+  it("trims instructions whitespace", () => {
+    const manifest = parseManifest({
+      version: "1",
+      mcpServerInstructions: "  Search for API references.  ",
+    });
+
+    expect(manifest.mcpServerInstructions).toBe("Search for API references.");
+  });
+
+  it("omits mcpServerInstructions when not provided", () => {
+    const manifest = parseManifest({ version: "1" });
+
+    expect(manifest.mcpServerInstructions).toBeUndefined();
+  });
+
+  it("rejects non-string mcpServerInstructions", () => {
+    expect(() => parseManifest({ version: "1", mcpServerInstructions: 123 })).toThrow(
+      /manifest\.mcpServerInstructions must be a non-empty string/,
+    );
   });
 });

@@ -74,6 +74,10 @@ export class McpDocsServer implements ToolProvider {
     }
   }
 
+  getInstructions(): string | undefined {
+    return this.metadata.mcpServerInstructions;
+  }
+
   getTools(): ToolDefinition[] {
     const defaultSearchDescription = `Search the pre-indexed ${this.metadata.corpus_description} — the authoritative, complete reference for this documentation set. Contains API docs, code examples, and guides. Use exact identifiers, method names, or conceptual queries. Apply taxonomy filters to narrow results.`;
 

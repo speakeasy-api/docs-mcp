@@ -57,6 +57,7 @@ export function normalizeMetadata(
   const stats = normalizeStats(metadata.stats);
   const embedding = normalizeEmbedding(metadata.embedding);
   const toolDescriptions = normalizeToolDescriptions(metadata.tool_descriptions);
+  const mcpServerInstructions = normalizeInstructions(metadata.mcpServerInstructions);
 
   return {
     metadata_version: metadataVersion,
@@ -65,6 +66,7 @@ export function normalizeMetadata(
     stats,
     embedding,
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
+    ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
   };
 }
 
@@ -246,6 +248,13 @@ function normalizeToolDescriptions(value: unknown): ToolDescriptions | undefined
   }
 
   return hasAny ? result : undefined;
+}
+
+function normalizeInstructions(value: unknown): string | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  return asNonEmptyString(value, "mcpServerInstructions");
 }
 
 function asTrimmedString(value: unknown): string {

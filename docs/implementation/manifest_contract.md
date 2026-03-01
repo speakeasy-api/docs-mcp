@@ -20,6 +20,7 @@ The manifest is a versioned JSON object that defines baseline rules for its dire
     "max_chunk_size": 8000,
     "min_chunk_size": 200
   },
+  "mcpServerInstructions": "This server provides TypeScript SDK documentation for Acme Corp. Use the search tool to find API references, guides, and code examples.",
   "overrides": [
     {
       "pattern": "models/**/*.md",
@@ -45,6 +46,7 @@ The manifest is a versioned JSON object that defines baseline rules for its dire
   - **`chunk_by`**: (Required within strategy) The heading level at which to split: `"h1"`, `"h2"`, `"h3"`, or `"file"` (no split).
   - **`max_chunk_size`**: (Optional) Character limit. If a single DOM node exceeds this, the indexer applies a fallback split to prevent oversized chunks.
   - **`min_chunk_size`**: (Optional) Character floor. Tiny trailing chunks below this threshold are merged into the preceding chunk.
+- **`mcpServerInstructions`**: (Optional) Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.
 - **`overrides`**: (Optional) An array of objects mapping glob `pattern`s to specific `strategy` and `metadata` overrides.
 
 ## Resolution Rules

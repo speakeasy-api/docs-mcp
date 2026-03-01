@@ -134,6 +134,7 @@ function createSessionServer(
   options: StartHttpServerOptions,
   sessionManager: SessionManager,
 ): { server: Server; transport: StreamableHTTPServerTransport } {
+  const instructions = app.getInstructions();
   const server = new Server(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
@@ -144,6 +145,7 @@ function createSessionServer(
         tools: {},
         resources: {},
       },
+      ...(instructions ? { instructions } : {}),
     },
   );
 
