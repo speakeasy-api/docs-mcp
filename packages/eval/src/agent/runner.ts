@@ -320,7 +320,10 @@ export async function runAgentScenario(
       workspaceDir,
     );
     const hard = assertionResults.filter((r) => !r.assertion.soft);
-    const passed = hard.length > 0 && hard.every((r) => r.passed);
+    const assertionsPassed = hard.length > 0 && hard.every((r) => r.passed);
+    const passed =
+      assertionsPassed &&
+      (!scenario.requiresActivation || activated);
 
     // Collect workspace files written by the agent
     const workspaceFiles = await collectWorkspaceFiles(toolCallTrace, workspaceDir);

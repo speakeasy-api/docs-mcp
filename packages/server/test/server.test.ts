@@ -136,6 +136,97 @@ describe("McpDocsServer", () => {
   });
 });
 
+describe("McpDocsServer instructions", () => {
+  it("returns custom instructions when set in metadata", () => {
+    const metadataWithInstructions = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Speakeasy SDK docs",
+      taxonomy: {},
+      stats: { total_chunks: 1, total_files: 1, indexed_at: "2026-01-01T00:00:00Z" },
+      embedding: null,
+      mcpServerInstructions: "Custom instructions here",
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithInstructions,
+    });
+
+    expect(server.getInstructions()).toBe("Custom instructions here");
+  });
+
+  it("generates default instructions from metadata when not set", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+    });
+
+    const instructions = server.getInstructions();
+    expect(instructions).toContain("Speakeasy SDK docs");
+    expect(instructions).toContain("search_docs");
+    expect(instructions).toContain("get_doc");
+    expect(instructions).toContain("BEFORE writing code");
+    expect(instructions).toContain("language");
+    expect(instructions).toContain("typescript");
+  });
+
+  it("uses prefixed tool names in default instructions", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      toolPrefix: "acme",
+    });
+
+    const instructions = server.getInstructions();
+    expect(instructions).toContain("acme_search_docs");
+    expect(instructions).toContain("acme_get_doc");
+    expect(instructions).not.toContain("`search_docs`");
+    expect(instructions).not.toContain("`get_doc`");
+  });
+
+  it("omits taxonomy hints when taxonomy is empty", () => {
+    const noTaxonomy = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Simple docs",
+      taxonomy: {},
+      stats: { total_chunks: 1, total_files: 1, indexed_at: "2026-01-01T00:00:00Z" },
+      embedding: null,
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: noTaxonomy,
+    });
+
+    const instructions = server.getInstructions();
+    expect(instructions).toContain("Simple docs");
+    expect(instructions).not.toContain("Filter by:");
+  });
+
+  it("truncates long taxonomy value lists", () => {
+    const manyValues = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Big SDK docs",
+      taxonomy: {
+        language: {
+          values: ["go", "java", "python", "ruby", "rust", "typescript"],
+        },
+      },
+      stats: { total_chunks: 1, total_files: 1, indexed_at: "2026-01-01T00:00:00Z" },
+      embedding: null,
+    });
+
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: manyValues,
+    });
+
+    const instructions = server.getInstructions();
+    expect(instructions).toContain("...");
+    expect(instructions).not.toContain("typescript");
+  });
+});
+
 describe("McpDocsServer with toolPrefix", () => {
   it("prefixes tool names when toolPrefix is set", () => {
     const server = new McpDocsServer({

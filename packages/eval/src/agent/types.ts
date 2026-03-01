@@ -26,6 +26,12 @@ export interface AgentScenario {
   description?: string;
   /** Custom tool descriptions for the MCP server tools. */
   toolDescriptions?: { search_docs?: string; get_doc?: string };
+  /**
+   * When true, the scenario fails if assertions pass but the agent never
+   * activated any docs-mcp tools. This catches false positives where the
+   * model guesses correctly from training data without consulting docs.
+   */
+  requiresActivation?: boolean;
   /** Git repo to clone and index docs from. Takes precedence over docsDir. */
   docsSpec?: DocsRepoSpec;
   /** Path to docs directory. Resolved relative to scenario file. CLI auto-builds + caches the index. */
