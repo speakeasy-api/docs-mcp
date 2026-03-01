@@ -219,7 +219,10 @@ program
   .option("--cache-dir <path>", "Directory for .embedding-cache/ (defaults to --out path)")
   .option("--tool-description-search <value>", "Custom description for the search_docs MCP tool")
   .option("--tool-description-get-doc <value>", "Custom description for the get_doc MCP tool")
-  .option("--instructions <value>", "Custom MCP server instructions sent to clients during initialization")
+  .option(
+    "--mcp-server-instructions <value>",
+    "Custom MCP server instructions sent to clients during initialization",
+  )
   .action(
     async (options: {
       docsDir: string;
@@ -237,7 +240,7 @@ program
       cacheDir?: string;
       toolDescriptionSearch?: string;
       toolDescriptionGetDoc?: string;
-      instructions?: string;
+      mcpServerInstructions?: string;
     }) => {
       const docsDir = path.resolve(options.docsDir);
       const outDir = path.resolve(options.out);
@@ -476,11 +479,11 @@ program
       }
 
       // CLI flag takes precedence; otherwise use the first instructions found in any manifest.
-      let instructions = options.instructions;
-      if (!instructions) {
+      let mcpServerInstructions = options.mcpServerInstructions;
+      if (!mcpServerInstructions) {
         for (const manifest of manifestCache.values()) {
-          if (manifest.instructions) {
-            instructions = manifest.instructions;
+          if (manifest.mcpServerInstructions) {
+            mcpServerInstructions = manifest.mcpServerInstructions;
             break;
           }
         }
@@ -495,7 +498,7 @@ program
         sourceCommit,
         taxonomyConfig,
         Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined,
-        instructions,
+        mcpServerInstructions,
       );
       const metadataKeys = Object.keys(metadata.taxonomy);
 
@@ -660,7 +663,7 @@ function buildMetadata(
   sourceCommit: string | null,
   taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>,
   toolDescriptions?: Record<string, string>,
-  instructions?: string,
+  mcpServerInstructions?: string,
 ): {
   metadata_version: string;
   corpus_description: string;
@@ -681,7 +684,7 @@ function buildMetadata(
   };
   embedding: EmbeddingMetadata | null;
   tool_descriptions?: Record<string, string>;
-  instructions?: string;
+  mcpServerInstructions?: string;
 } {
   const taxonomyValues = new Map<string, Set<string>>();
   for (const chunk of chunks) {
@@ -723,7 +726,7 @@ function buildMetadata(
     },
     embedding,
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
-    ...(instructions ? { instructions } : {}),
+    ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
   };
 }
 

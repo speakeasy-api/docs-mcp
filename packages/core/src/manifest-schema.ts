@@ -110,7 +110,7 @@ export const ManifestSchema = z
     taxonomy: ManifestTaxonomyConfigSchema.optional().meta({
       examples: [{ language: { vector_collapse: true } }],
     }),
-    instructions: z
+    mcpServerInstructions: z
       .string()
       .optional()
       .describe(

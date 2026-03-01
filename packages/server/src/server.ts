@@ -75,7 +75,7 @@ export class McpDocsServer implements ToolProvider {
   }
 
   getInstructions(): string | undefined {
-    return this.metadata.instructions;
+    return this.metadata.mcpServerInstructions;
   }
 
   getTools(): ToolDefinition[] {

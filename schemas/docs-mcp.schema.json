@@ -122,7 +122,7 @@
       },
       "description": "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing."
     },
-    "instructions": {
+    "mcpServerInstructions": {
       "description": "Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.",
       "type": "string"
     },

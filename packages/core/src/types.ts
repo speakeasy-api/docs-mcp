@@ -36,7 +36,7 @@ export interface Manifest {
   strategy?: ChunkingStrategy;
   metadata?: Record<string, string>;
   taxonomy?: Record<string, ManifestTaxonomyFieldConfig>;
-  instructions?: string;
+  mcpServerInstructions?: string;
   overrides?: ManifestOverride[];
 }
 
@@ -134,7 +134,7 @@ export interface CorpusMetadata {
   stats: MetadataStats;
   embedding: EmbeddingMetadata | null;
   tool_descriptions?: ToolDescriptions;
-  instructions?: string;
+  mcpServerInstructions?: string;
 }
 
 export interface GetDocRequest {

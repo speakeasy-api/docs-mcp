@@ -223,7 +223,7 @@ describe("mergeTaxonomyConfigs", () => {
     const manifests: Manifest[] = [
       {
         version: "1",
-        taxonomy: { language: {} },
+        taxonomy: { language: {} as any },
       },
       {
         version: "1",
@@ -305,34 +305,34 @@ describe("mergeTaxonomyConfigs", () => {
   });
 });
 
-describe("parseManifest instructions", () => {
-  it("parses instructions when present", () => {
+describe("parseManifest mcpServerInstructions", () => {
+  it("parses mcpServerInstructions when present", () => {
     const manifest = parseManifest({
       version: "1",
-      instructions: "Use this server to look up SDK docs.",
+      mcpServerInstructions: "Use this server to look up SDK docs.",
     });
 
-    expect(manifest.instructions).toBe("Use this server to look up SDK docs.");
+    expect(manifest.mcpServerInstructions).toBe("Use this server to look up SDK docs.");
   });
 
   it("trims instructions whitespace", () => {
     const manifest = parseManifest({
       version: "1",
-      instructions: "  Search for API references.  ",
+      mcpServerInstructions: "  Search for API references.  ",
     });
 
-    expect(manifest.instructions).toBe("Search for API references.");
+    expect(manifest.mcpServerInstructions).toBe("Search for API references.");
   });
 
-  it("omits instructions when not provided", () => {
+  it("omits mcpServerInstructions when not provided", () => {
     const manifest = parseManifest({ version: "1" });
 
-    expect(manifest.instructions).toBeUndefined();
+    expect(manifest.mcpServerInstructions).toBeUndefined();
   });
 
-  it("rejects non-string instructions", () => {
-    expect(() => parseManifest({ version: "1", instructions: 123 })).toThrow(
-      /manifest\.instructions must be a non-empty string/,
+  it("rejects non-string mcpServerInstructions", () => {
+    expect(() => parseManifest({ version: "1", mcpServerInstructions: 123 })).toThrow(
+      /manifest\.mcpServerInstructions must be a non-empty string/,
     );
   });
 });
