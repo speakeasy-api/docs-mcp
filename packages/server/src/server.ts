@@ -74,8 +74,49 @@ export class McpDocsServer implements ToolProvider {
     }
   }
 
-  getInstructions(): string | undefined {
-    return this.metadata.mcpServerInstructions;
+  getInstructions(): string {
+    if (this.metadata.mcpServerInstructions) {
+      return this.metadata.mcpServerInstructions;
+    }
+    return this.buildDefaultInstructions();
+  }
+
+  private buildDefaultInstructions(): string {
+    const desc = this.metadata.corpus_description;
+    const search = this.searchToolName;
+    const getDoc = this.getDocToolName;
+
+    const lines: string[] = [
+      `This server provides documentation for ${desc}.`,
+      "",
+      "## Workflow",
+      `1. When writing code that uses this SDK or API, use \`${search}\` to find relevant documentation BEFORE writing code. Do not guess at API shapes, method signatures, or parameter names.`,
+      `2. When you find a relevant result, use \`${getDoc}\` with the chunk_id to retrieve the full documentation page.`,
+      "3. Only write code after consulting documentation.",
+      "",
+      "## Tool selection",
+      `- \`${search}\`: Search for concepts, methods, endpoints, and guides. Use exact identifiers or conceptual queries.`,
+    ];
+
+    // Add taxonomy filter hints
+    const taxonomyKeys = Object.keys(this.metadata.taxonomy);
+    if (taxonomyKeys.length > 0) {
+      const filterParts = taxonomyKeys.map((key) => {
+        const field = this.metadata.taxonomy[key];
+        const vals = field?.values ?? [];
+        if (vals.length <= 5) {
+          return `\`${key}\` (${vals.join(", ")})`;
+        }
+        return `\`${key}\` (${vals.slice(0, 4).join(", ")}, ...)`;
+      });
+      lines.push(`  Filter by: ${filterParts.join("; ")}`);
+    }
+
+    lines.push(
+      `- \`${getDoc}\`: Retrieve full content of a documentation page by its chunk_id (returned by search results).`,
+    );
+
+    return lines.join("\n");
   }
 
   getTools(): ToolDefinition[] {
