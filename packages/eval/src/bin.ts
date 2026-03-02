@@ -186,9 +186,9 @@ program
   .description("Run agent-based eval scenarios against a docs-mcp server")
   .option(
     "--suite <name>",
-    "Named scenario suite (resolves to fixtures/agent-scenarios/<name>.json)",
+    "Named scenario suite (resolves to fixtures/agent-scenarios/<name>.yaml)",
   )
-  .option("--scenarios <path>", "Path to JSON array of agent scenarios")
+  .option("--scenarios <path>", "Path to YAML/JSON scenario file")
   .option("--prompt <text>", "Ad-hoc single scenario prompt (requires --docs-dir)")
   .option("--include <ids>", "Comma-separated scenario IDs to run (filters loaded scenarios)")
   .option("--docs-dir <path>", "Default docs directory for scenarios that don't specify their own")
@@ -599,12 +599,12 @@ async function loadScenarios(options: {
   if (options.suite) {
     const filePath = await resolveSuiteFile(options.suite);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw, filePath), scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
   }
   if (options.scenarios) {
     const filePath = path.resolve(options.scenarios);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw, filePath), scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
   }
   // --prompt mode
   return {
@@ -621,7 +621,7 @@ async function loadScenarios(options: {
 }
 
 async function resolveSuiteFile(suite: string): Promise<string> {
-  for (const ext of [".yaml", ".yml", ".json"]) {
+  for (const ext of [".yaml", ".yml"]) {
     const candidate = path.join(FIXTURES_DIR, `${suite}${ext}`);
     try {
       await access(candidate);
@@ -630,13 +630,12 @@ async function resolveSuiteFile(suite: string): Promise<string> {
       // try next extension
     }
   }
-  // Fall back to .json for a clear error message
-  return path.join(FIXTURES_DIR, `${suite}.json`);
+  // Fall back to .yaml for a clear error message
+  return path.join(FIXTURES_DIR, `${suite}.yaml`);
 }
 
-function parseScenarioFile(raw: string, filePath?: string): AgentScenario[] {
-  const isYaml = filePath != null && /\.ya?ml$/i.test(filePath);
-  const parsed = isYaml ? (YAML.parse(raw) as unknown) : (JSON.parse(raw) as unknown);
+function parseScenarioFile(raw: string): AgentScenario[] {
+  const parsed = YAML.parse(raw) as unknown;
 
   // Legacy array format — auto-generate ids from names
   if (Array.isArray(parsed)) {

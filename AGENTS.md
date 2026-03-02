@@ -90,7 +90,7 @@ Built-in suites: `acmeauth`, `dub-go`, `dub-python`, `dub-ts`, `mistral-python`,
 
 #### Writing Scenarios
 
-Scenarios are JSON files keyed by scenario ID. Each specifies a prompt, docs source (`docsDir` for local, `docsSpec` for git clone), and assertions (`contains`, `not_contains`, `matches`, `file_contains`, `file_matches`, `script`). The CLI auto-builds indexes and caches them.
+Scenarios are YAML files keyed by scenario ID. Each specifies a prompt, docs source (`docsDir` for local, `docsSpec` for git clone), and assertions (`contains`, `not_contains`, `matches`, `file_contains`, `file_matches`, `script`). The CLI auto-builds indexes and caches them.
 
 #### Results
 
