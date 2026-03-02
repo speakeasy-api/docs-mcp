@@ -69,10 +69,10 @@ End-to-end: spawns an AI agent with docs-mcp tools, runs against a prompt, check
 
 ```bash
 # Built-in suite with local fixture docs
-docs-mcp-eval agent-eval --suite acmeauth --provider claude
+docs-mcp-eval agent-eval --suite acmeauth --provider anthropic
 
 # External SDK docs (cloned via docsSpec in scenario)
-docs-mcp-eval agent-eval --suite dub-ts --provider claude --model claude-sonnet-4-20250514
+docs-mcp-eval agent-eval --suite dub-ts --provider anthropic --model claude-sonnet-4-20250514
 
 # Filter scenarios, run concurrently
 docs-mcp-eval agent-eval --suite dub-ts --include create-link --max-concurrency 3
@@ -84,13 +84,13 @@ Built-in suites: `acmeauth`, `dub-go`, `dub-python`, `dub-ts`, `mistral-python`,
 
 | Provider | Flag | Backend | Auth |
 |----------|------|---------|------|
-| Claude | `--provider claude` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
+| Anthropic | `--provider anthropic` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
 | OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + `codex` on PATH |
 | Auto | `--provider auto` | Detected from env | Whichever key is set |
 
 #### Writing Scenarios
 
-Scenarios are JSON files keyed by scenario ID. Each specifies a prompt, docs source (`docsDir` for local, `docsSpec` for git clone), and assertions (`contains`, `not_contains`, `matches`, `file_contains`, `file_matches`, `script`). The CLI auto-builds indexes and caches them.
+Scenarios are YAML files keyed by scenario ID. Each specifies a prompt, docs source (`docsDir` for local, `docsSpec` for git clone), and assertions (`contains`, `not_contains`, `matches`, `file_contains`, `file_matches`, `script`). The CLI auto-builds indexes and caches them.
 
 #### Results
 

@@ -1,0 +1,114 @@
+_defaults: &defaults
+  description: &description >-
+    AcmeAuth SDK — multi-language authentication client covering API keys, OAuth,
+    JWT, pagination, webhooks, and error handling
+  docsDir: &docsDir "../../../../tests/fixtures/docs"
+
+_ts_defaults: &ts_defaults
+  <<: *defaults
+  setup: &ts_setup "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null"
+
+webhook-events:
+  name: List all webhook event types
+  <<: *defaults
+  category: doc-recall
+  prompt: >-
+    List all the webhook event types that AcmeAuth supports. For each event type, provide the exact
+    event name string and a brief description of when it fires.
+  assertions:
+    - type: contains
+      value: user.created
+    - type: contains
+      value: session.revoked
+    - type: contains
+      value: key.rotated
+    - type: contains
+      value: permission.changed
+
+rate-limit-tiers:
+  name: Rate limits per plan tier
+  <<: *defaults
+  category: doc-recall
+  prompt: >-
+    What are the exact rate limits for each AcmeAuth plan tier? Include requests per minute, burst
+    limits, and the relevant HTTP response headers.
+  assertions:
+    - type: matches
+      pattern: "60"
+    - type: matches
+      pattern: "6[,.]?000"
+    - type: contains
+      value: X-RateLimit-Reset
+
+jwt-claims:
+  name: JWT token structure and JWKS endpoint
+  <<: *defaults
+  category: doc-recall
+  prompt: >-
+    Describe the structure of AcmeAuth JWT tokens. What claims are included, and where can I find
+    the public keys to verify them?
+  assertions:
+    - type: contains
+      value: jwks
+    - type: matches
+      pattern: "\\.well-known"
+    - type: contains
+      value: aud
+    - type: contains
+      value: sub
+
+ts-webhook-sig:
+  name: Verify webhook signature in TypeScript
+  <<: *ts_defaults
+  category: sdk-code
+  prompt: >-
+    Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write code in solution.ts that verifies an
+    incoming webhook's signature. Use the exact function name and header name from the SDK
+    documentation. Add the dependency to package.json. Do not run the program.
+  assertions:
+    - type: file_contains
+      path: solution.ts
+      value: verifyWebhookSignature
+    - type: file_contains
+      path: solution.ts
+      value: x-acmeauth-signature
+    - type: file_matches
+      path: solution.ts
+      pattern: "HMAC|hmac|createHmac"
+
+py-error-classes:
+  name: Handle typed SDK errors in Python
+  <<: *defaults
+  category: sdk-code
+  prompt: >-
+    Using the AcmeAuth Python SDK (`acmeauth`), write code in solution.py that calls the API and
+    handles rate limit errors using the SDK's typed exception classes. Use the exact class names and
+    property names from the documentation.
+  assertions:
+    - type: file_contains
+      path: solution.py
+      value: RateLimitError
+    - type: file_contains
+      path: solution.py
+      value: retry_after
+    - type: file_contains
+      path: solution.py
+      value: AcmeAuthError
+
+retry-backoff:
+  name: Webhook retry schedule
+  <<: *defaults
+  category: doc-recall
+  prompt: >-
+    Describe AcmeAuth's webhook retry policy for failed deliveries. What is the exact timing
+    sequence for retries?
+  assertions:
+    - type: matches
+      pattern: "30.*(second|sec)"
+      flags: i
+    - type: matches
+      pattern: "5.*(minute|min)"
+      flags: i
+    - type: matches
+      pattern: "24.*(hour|hr)"
+      flags: i

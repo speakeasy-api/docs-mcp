@@ -336,6 +336,7 @@ export class CodexAgentProvider implements AgentProvider {
     let totalOutputTokens = 0;
     let totalCachedInputTokens = 0;
     let numTurns = 0;
+    let numTurnsByEvent = 0;
     const errors: string[] = [];
     let lastAnswer = "";
     let toolIdCounter = 0;
@@ -386,6 +387,11 @@ export class CodexAgentProvider implements AgentProvider {
           const itemType = item.type as string | undefined;
 
           if (itemType === "agent_message") {
+            // Each agent_message = one model response = one turn.
+            // This is more reliable than turn.completed events, which
+            // Codex may emit only once for the entire session.
+            numTurns++;
+
             // Codex flattens a `text` field directly onto the item
             if (typeof item.text === "string") {
               lastAnswer = item.text;
@@ -509,7 +515,7 @@ export class CodexAgentProvider implements AgentProvider {
             yield { type: "text", text: `[codex error] ${msg}` };
           }
         } else if (eventType === "turn.completed") {
-          numTurns++;
+          numTurnsByEvent++;
 
           const usage = event.usage as Record<string, number> | undefined;
           if (usage) {
@@ -518,7 +524,7 @@ export class CodexAgentProvider implements AgentProvider {
             totalCachedInputTokens += usage.cached_input_tokens ?? 0;
           }
 
-          // Enforce maxTurns externally
+          // Enforce maxTurns using the more reliable agent_message count
           if (numTurns >= config.maxTurns) {
             child.kill("SIGTERM");
             break;

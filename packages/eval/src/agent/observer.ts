@@ -249,8 +249,16 @@ export class ConsoleObserver implements AgentEvalObserver {
     write(
       `\n${c.bold}${c.cyan}━━━ Scenario ${index + 1}/${total}: ${c.reset}${c.dim}[${scenario.id}]${c.reset} ${c.bold}${c.cyan}${scenario.name} ━━━${c.reset}\n`,
     );
-    if (scenario.category) {
-      write(`${c.dim}Category: ${scenario.category}${c.reset}\n`);
+    const meta: string[] = [];
+    if (scenario.category) meta.push(`Category: ${scenario.category}`);
+    if (scenario.models) {
+      const modelEntries = Object.entries(scenario.models)
+        .map(([p, m]) => `${p}=${m}`)
+        .join(", ");
+      if (modelEntries) meta.push(`Models: ${modelEntries}`);
+    }
+    if (meta.length > 0) {
+      write(`${c.dim}${meta.join(" | ")}${c.reset}\n`);
     }
     write(`${c.white}${wordWrap(scenario.prompt, PANEL_MAX_WIDTH)}${c.reset}\n`);
   }

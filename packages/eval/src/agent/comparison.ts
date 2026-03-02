@@ -53,6 +53,7 @@ export function buildComparison(
         passed: w.passed,
         numTurns: w.numTurns,
         totalCostUsd: w.totalCostUsd,
+        durationMs: w.durationMs,
         mcpToolCalls: w.mcpToolCalls,
         assertionResults: w.assertionResults,
       },
@@ -60,6 +61,7 @@ export function buildComparison(
         passed: wo.passed,
         numTurns: wo.numTurns,
         totalCostUsd: wo.totalCostUsd,
+        durationMs: wo.durationMs,
         assertionResults: wo.assertionResults,
       },
     });
@@ -70,6 +72,7 @@ export function buildComparison(
     avgTurnsDelta: withMcp.summary.avgTurns - withoutMcp.summary.avgTurns,
     avgCostUsdDelta: withMcp.summary.avgCostUsd - withoutMcp.summary.avgCostUsd,
     totalCostUsdDelta: withMcp.summary.totalCostUsd - withoutMcp.summary.totalCostUsd,
+    avgDurationMsDelta: withMcp.summary.avgDurationMs - withoutMcp.summary.avgDurationMs,
   };
 
   const startedAt = withMcp.metadata.startedAt < withoutMcp.metadata.startedAt
@@ -127,6 +130,16 @@ export function formatComparisonReport(comparison: ComparisonOutput): string {
   );
   metricsLines.push(
     formatMetricRow("Total cost", `$${wm.totalCostUsd.toFixed(4)}`, `$${wo.totalCostUsd.toFixed(4)}`, delta.totalCostUsdDelta, "", "lower", true),
+  );
+  metricsLines.push(
+    formatMetricRow(
+      "Avg duration",
+      `${(wm.avgDurationMs / 1000).toFixed(1)}s`,
+      `${(wo.avgDurationMs / 1000).toFixed(1)}s`,
+      delta.avgDurationMsDelta / 1000,
+      "s",
+      "lower",
+    ),
   );
   metricsLines.push(
     `${padRight("MCP calls", 16)}${padRight((wm.avgMcpToolCalls ?? 0).toFixed(1), 12)}${c.dim}—${c.reset}`,

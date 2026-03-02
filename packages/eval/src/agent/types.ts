@@ -1,4 +1,4 @@
-import type { AgentProvider } from "./provider.js";
+import type { AgentProvider, AgentProviderName } from "./provider.js";
 
 export interface DocsRepoSpec {
   /** Git clone URL */
@@ -17,6 +17,8 @@ export interface AgentScenario {
   prompt: string;
   assertions: AgentAssertion[];
   category?: string;
+  /** Override the model per provider (takes precedence over CLI --model). */
+  models?: Partial<Record<AgentProviderName, string>>;
   maxTurns?: number;
   maxBudgetUsd?: number;
   systemPrompt?: string;
@@ -188,4 +190,48 @@ export interface AgentEvalObserver {
   onAgentMessage(scenario: AgentScenario, message: AgentObservedMessage): void;
   onScenarioComplete(scenario: AgentScenario, result: AgentScenarioResult): void;
   onEvalComplete(output: AgentEvalOutput): void;
+}
+
+export interface ScenarioComparisonResult {
+  id: string;
+  name: string;
+  category?: string;
+  outcome: "gained" | "lost" | "both_pass" | "both_fail";
+  withMcp: {
+    passed: boolean;
+    numTurns: number;
+    totalCostUsd: number;
+    durationMs: number;
+    mcpToolCalls: number;
+    assertionResults: AssertionResult[];
+  };
+  withoutMcp: {
+    passed: boolean;
+    numTurns: number;
+    totalCostUsd: number;
+    durationMs: number;
+    assertionResults: AssertionResult[];
+  };
+}
+
+export interface ComparisonSummaryDelta {
+  passRateDelta: number;
+  avgTurnsDelta: number;
+  avgCostUsdDelta: number;
+  totalCostUsdDelta: number;
+  avgDurationMsDelta: number;
+}
+
+export interface ComparisonOutput {
+  withMcp: AgentEvalOutput;
+  withoutMcp: AgentEvalOutput;
+  delta: ComparisonSummaryDelta;
+  scenarios: ScenarioComparisonResult[];
+  metadata: {
+    model: string;
+    suite: string;
+    startedAt: string;
+    completedAt: string;
+    totalDurationMs: number;
+  };
 }

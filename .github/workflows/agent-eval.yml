@@ -1,0 +1,136 @@
+name: Agent Eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Scenario suite to run (e.g. acmeauth, dub-ts, dub-go)"
+        required: true
+        type: choice
+        options:
+          - acmeauth
+          - acmeauth-value-add
+          - dub-go
+          - dub-python
+          - dub-ts
+          - dub-ts-value-add
+          - mistral-python
+          - mistral-ts
+          - pushpress-ts
+      provider:
+        description: "Agent provider"
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - anthropic
+          - openai
+      model:
+        description: "Model override (leave empty for provider default)"
+        required: false
+        type: string
+      include:
+        description: "Comma-separated scenario IDs to run (leave empty for all)"
+        required: false
+        type: string
+      max-concurrency:
+        description: "Max parallel scenarios"
+        required: false
+        type: number
+        default: 3
+      compare:
+        description: "Run A/B comparison (with vs without docs-mcp)"
+        required: false
+        type: boolean
+        default: false
+      debug:
+        description: "Enable verbose agent event logging"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  agent-eval:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493 # v5.0.0
+
+      - name: Setup Mise
+        uses: jdx/mise-action@6d1e696aa24c1aa1bcc1adea0212707c71ab78a8 # v3.6.1
+        with:
+          install: true
+          cache: true
+          env: false
+
+      - name: Prepare GitHub Actions environment
+        run: mise run github
+
+      - name: Cache PNPM
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          key: ${{ env.GH_CACHE_PNPM_KEY }}
+          restore-keys: |
+            ${{ env.GH_CACHE_PNPM_KEY }}
+            ${{ env.GH_CACHE_PNPM_KEY_PARTIAL }}
+          path: |
+            ${{ env.PNPM_STORE_PATH }}
+
+      - name: Cache eval indexes and repos
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          key: agent-eval-cache-${{ inputs.suite }}
+          restore-keys: |
+            agent-eval-cache-${{ inputs.suite }}
+            agent-eval-cache-
+          path: |
+            .cache/indexes
+            .cache/repos
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run agent eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NO_COLOR: "1"
+        run: |
+          args="--suite ${{ inputs.suite }}"
+          args="$args --provider ${{ inputs.provider }}"
+          args="$args --max-concurrency ${{ inputs.max-concurrency }}"
+          args="$args --out results.json"
+
+          if [ -n "${{ inputs.model }}" ]; then
+            args="$args --model ${{ inputs.model }}"
+          fi
+
+          if [ -n "${{ inputs.include }}" ]; then
+            args="$args --include ${{ inputs.include }}"
+          fi
+
+          if [ "${{ inputs.compare }}" = "true" ]; then
+            args="$args --compare"
+          fi
+
+          if [ "${{ inputs.debug }}" = "true" ]; then
+            args="$args --debug"
+          fi
+
+          echo "Running: node packages/eval/dist/bin.js agent-eval $args"
+          node packages/eval/dist/bin.js agent-eval $args
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: agent-eval-${{ inputs.suite }}-${{ github.run_number }}
+          path: |
+            results.json
+            .eval-results/${{ inputs.suite }}/
+          retention-days: 90

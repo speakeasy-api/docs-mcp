@@ -8,11 +8,11 @@ The eval supports multiple agent providers via the `--provider` flag:
 
 | Provider | Flag | Backend | Prerequisites |
 |----------|------|---------|---------------|
-| Claude | `--provider claude` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
+| Anthropic | `--provider anthropic` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
 | OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + [`codex`](https://github.com/openai/codex) CLI on PATH |
 | Auto (default) | `--provider auto` | Detected from environment | Whichever API key is set |
 
-Auto-detection priority: if only `OPENAI_API_KEY` is set, Codex is used; otherwise Claude is used (its CLI handles its own auth). If both keys are set, Claude is used with a warning.
+Auto-detection priority: if only `OPENAI_API_KEY` is set, Codex is used; otherwise Anthropic is used (its CLI handles its own auth). If both keys are set, Anthropic is used with a warning.
 
 The Codex provider spawns `codex exec --json` as a child process and injects MCP server configuration via `-c` CLI flags. It performs a pre-flight check to verify the MCP server starts correctly before running the agent.
 
@@ -242,7 +242,7 @@ docs-mcp-eval agent-eval [options]
 
 | Option                    | Default                          | Description                                            |
 | ------------------------- | -------------------------------- | ------------------------------------------------------ |
-| `--provider <value>`      | `auto`                           | Agent provider: `claude`, `openai`, or `auto`          |
+| `--provider <value>`      | `auto`                           | Agent provider: `anthropic`, `openai`, or `auto`       |
 | `--model <value>`         | _(per-provider default)_         | Model to use (e.g. `claude-sonnet-4-20250514`)         |
 | `--max-turns <n>`         | `15`                             | Default max turns per scenario                         |
 | `--max-budget-usd <n>`    | `0.50`                           | Default max budget per scenario (USD)                  |
@@ -250,13 +250,100 @@ docs-mcp-eval agent-eval [options]
 | `--system-prompt <value>` | —                                | Custom system prompt for the agent                     |
 | `--workspace-dir <path>`  | —                                | Base directory for agent workspaces                    |
 
+### Mode
+
+| Option      | Default | Description                                                             |
+| ----------- | ------- | ----------------------------------------------------------------------- |
+| `--no-mcp`  | —       | Run without docs-mcp server (baseline mode)                             |
+| `--compare` | —       | Run with and without docs-mcp and compare results (mutually exclusive with `--no-mcp`) |
+
 ### Output
 
 | Option         | Default | Description                                  |
 | -------------- | ------- | -------------------------------------------- |
 | `--out <path>` | —       | Output JSON path                             |
 | `--no-save`    | —       | Skip auto-saving results to `.eval-results/` |
-| `--debug`      | `false` | Keep workspaces after run for inspection     |
+| `--debug`      | `false` | Enable verbose agent event logging           |
+
+## Comparison Mode (`--compare`)
+
+The `--compare` flag automates an A/B comparison between an agent with docs-mcp tools and an agent without them. Instead of running two separate commands and mentally diffing the results, a single invocation handles both phases and produces a combined report.
+
+### How it works
+
+1. **Phase 1 (with MCP):** Builds indexes and runs all scenarios with docs-mcp tools available to the agent.
+2. **Phase 2 (baseline):** Runs the same scenarios without any MCP server — the agent relies solely on its training knowledge.
+3. **Comparison:** Pairs results by scenario ID, classifies each as `gained` (FAIL → PASS with MCP), `lost` (PASS → FAIL), `both_pass`, or `both_fail`, and prints a summary table with deltas.
+
+### Usage
+
+```bash
+# Compare with and without docs-mcp on the value-add suite
+docs-mcp-eval agent-eval --compare --suite acmeauth-value-add
+
+# Run a single scenario in comparison mode
+docs-mcp-eval agent-eval --compare --suite acmeauth-value-add --include webhook-events
+
+# Save the full comparison JSON
+docs-mcp-eval agent-eval --compare --suite acmeauth-value-add --out comparison.json
+```
+
+### Output
+
+The comparison report (printed to stderr) includes:
+
+- **Summary table:** Pass rate, avg turns, avg cost, total cost, and MCP calls — With MCP vs No MCP vs Delta
+- **Scenario classification:** Count of gained, lost, both-pass, and both-fail scenarios
+- **Flip details:** For scenarios that changed outcome, which specific assertions flipped between modes
+
+When `--out` is set, the full `ComparisonOutput` JSON is written, containing both run outputs, per-scenario comparison results, and computed deltas.
+
+When `--workspace-dir` is set, phases use isolated subdirectories (`with-mcp/` and `baseline/`) to avoid workspace collisions.
+
+Both phases are auto-saved to `.eval-results/` under `<suite>` and `<suite>-baseline` respectively.
+
+## Value-Add Scenario Suites
+
+Two suites are designed specifically for `--compare` mode. Their scenarios test facts that are **only** findable in documentation — exact method names, class names, parameter names, and API-specific values. An agent without docs-mcp will hallucinate plausible but incorrect values; an agent with docs-mcp should find the exact values via `search_docs` / `get_doc`.
+
+### `acmeauth-value-add` (synthetic docs)
+
+Uses the bundled AcmeAuth test fixtures. No external dependencies or API keys needed.
+
+| Scenario | What it tests | Key doc-dependent values |
+|----------|---------------|--------------------------|
+| `webhook-events` | Exact webhook event type names | `user.created`, `session.revoked`, `key.rotated`, `permission.changed` |
+| `rate-limit-tiers` | Rate limits per plan tier | `60` (free), `6000` (enterprise), `X-RateLimit-Reset` |
+| `jwt-claims` | JWT claims + JWKS endpoint | `aud`, `sub`, `.well-known`, `jwks` |
+| `ts-webhook-sig` | TS SDK function + header name | `verifyWebhookSignature`, `x-acmeauth-signature`, `HMAC` |
+| `py-error-classes` | Python SDK class/property names | `RateLimitError`, `retry_after`, `AcmeAuthError` |
+| `retry-backoff` | Webhook retry timing sequence | `30 seconds`, `5 minutes`, `24 hours` |
+
+### `dub-ts-value-add` (real SDK with typecheck)
+
+Uses the real [Dub TypeScript SDK](https://github.com/dubinc/dub-ts) (`dub` on npm). Clones docs from GitHub and includes `tsc` typecheck assertions (soft) to validate that generated code compiles against real types.
+
+| Scenario | What it tests | Key doc-dependent values |
+|----------|---------------|--------------------------|
+| `bulk-create` | Bulk link creation method name | `createMany` (not `bulkCreate`), `token` (not `apiKey`) |
+| `error-handling` | Typed error classes + import path | `RateLimitExceeded` (not `RateLimitError`), `dub/models/errors`, `statusCode` |
+| `track-sale` | Sale conversion tracking params | `track.sale`, `customerExternalId` (not `customerId`), `amount` |
+| `geo-targeting` | Geo-targeted link creation | `geo` object with country codes (`US`, `GB`, `FR`) as keys |
+| `analytics-timeseries` | Analytics retrieval method + enums | `analytics.retrieve`, `timeseries` groupBy, `30d` interval |
+| `qr-code` | QR code generation method | `qrCodes.get`, `domain` + `key` parameters |
+
+### Running value-add suites
+
+```bash
+# Synthetic docs (fast, no API key for docs)
+mise agent-eval:compare acmeauth-value-add
+
+# Real SDK with typecheck (clones repo, installs npm package)
+mise agent-eval:compare dub-ts-value-add
+
+# Single scenario smoke test
+mise agent-eval:compare dub-ts-value-add -- --include bulk-create --debug
+```
 
 ## Using from Another Repo
 
@@ -411,7 +498,7 @@ When previous results exist in `.eval-results/`, the CLI automatically compares 
 
 | Variable                               | Required | Description                                                                                          |
 | -------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`                    | \*       | API key for the Claude provider (used by `@anthropic-ai/claude-agent-sdk`)                           |
+| `ANTHROPIC_API_KEY`                    | \*       | API key for the Anthropic provider (used by `@anthropic-ai/claude-agent-sdk`)                        |
 | `OPENAI_API_KEY`                       | \*       | API key for the OpenAI Codex provider (also used for embedding-based index builds)                   |
 | SDK-specific keys (e.g. `DUB_API_KEY`) | no       | For `script` assertions guarded by `when_env` — skipped if absent                                    |
 | `NO_COLOR`                             | no       | Disables ANSI color output                                                                           |
