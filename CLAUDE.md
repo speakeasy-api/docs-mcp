@@ -79,11 +79,11 @@ Two evaluation modes:
 docs-mcp-eval run --cases ./eval-cases.json --server-command "node packages/server/dist/bin.js --index-dir ./my-index"
 
 # Agent eval
-docs-mcp-eval agent-eval --suite acmeauth --provider claude
+docs-mcp-eval agent-eval --suite acmeauth --provider anthropic
 docs-mcp-eval agent-eval --suite dub-ts --include create-link,list-links --max-concurrency 3
 ```
 
-Built-in agent eval suites: `acmeauth`, `dub-go`, `dub-python`, `dub-ts`, `mistral-python`, `mistral-ts`, `pushpress-ts`
+Built-in agent eval suites: `acmeauth`, `acmeauth-value-add`, `dub-go`, `dub-python`, `dub-ts`, `dub-ts-value-add`, `mistral-python`, `mistral-ts`, `pushpress-ts`
 
 Results auto-save to `.eval-results/<suite>/` with trend comparison against prior runs.
 
@@ -91,7 +91,7 @@ Results auto-save to `.eval-results/<suite>/` with trend comparison against prio
 
 | Variable | Used By | Description |
 |----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | eval (Claude provider) | Required for `--provider claude` or `--provider auto` |
+| `ANTHROPIC_API_KEY` | eval (Claude provider) | Required for `--provider anthropic` or `--provider auto` |
 | `OPENAI_API_KEY` | eval (Codex provider), CLI (OpenAI embeddings) | Required for `--provider openai` or `--embedding-provider openai` |
 | `NO_COLOR` | eval | Disables ANSI color output |
 

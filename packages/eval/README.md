@@ -36,7 +36,7 @@ Supports multiple agent providers:
 
 | Provider | Flag | Backend | Prerequisites |
 |----------|------|---------|---------------|
-| Claude | `--provider claude` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
+| Anthropic | `--provider anthropic` | `@anthropic-ai/claude-agent-sdk` | `ANTHROPIC_API_KEY` |
 | OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + [`codex`](https://github.com/openai/codex) on PATH |
 | Auto (default) | `--provider auto` | Detected from env | Whichever key is set |
 

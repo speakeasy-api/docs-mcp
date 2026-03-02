@@ -9,3 +9,4 @@ export { ClaudeAgentProvider } from "./provider-claude.js";
 export { CodexAgentProvider } from "./provider-codex.js";
 export { ConsoleObserver, NoopObserver } from "./observer.js";
 export { saveResult, loadPreviousResult, generateTrendSummary } from "./history.js";
+export { buildComparison, formatComparisonReport } from "./comparison.js";

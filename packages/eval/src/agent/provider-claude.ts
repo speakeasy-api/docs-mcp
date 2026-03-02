@@ -6,7 +6,7 @@ import type {
 } from "./provider.js";
 
 export class ClaudeAgentProvider implements AgentProvider {
-  readonly name = "claude" as const;
+  readonly name = "anthropic" as const;
 
   async *run(config: AgentProviderConfig): AsyncGenerator<AgentProviderEvent> {
     if (!config.model) {

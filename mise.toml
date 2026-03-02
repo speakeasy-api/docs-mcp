@@ -70,12 +70,21 @@ run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" $usage_a
 depends = ["build"]
 
 [tasks."agent-eval:debug"]
-description = "Run agent eval with --debug (keeps workspaces)"
+description = "Run agent eval with --debug (verbose agent event logging)"
 usage = '''
 arg "<suite>" help="Named scenario suite"
 arg "[args]" var=#true help="Extra args passed to the eval CLI"
 '''
 run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" --debug $usage_args'
+depends = ["build"]
+
+[tasks."agent-eval:compare"]
+description = "Run agent eval with and without docs-mcp and compare results"
+usage = '''
+arg "<suite>" help="Named scenario suite (e.g. acmeauth-value-add)"
+arg "[args]" var=#true help="Extra args passed to the eval CLI"
+'''
+run = 'node packages/eval/dist/bin.js agent-eval --suite "$usage_suite" --compare $usage_args'
 depends = ["build"]
 
 [tasks."agent-eval:prompt"]

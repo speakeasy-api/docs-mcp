@@ -1,0 +1,174 @@
+{
+  "bulk-create": {
+    "name": "Bulk create links",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates multiple short links in a single API call. Use the SDK's bulk creation method. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.ts", "value": "createMany" },
+      { "type": "file_contains", "path": "solution.ts", "value": "token" },
+      {
+        "type": "script",
+        "command": "grep -q 'dub' package.json",
+        "name": "dub-in-deps"
+      },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  },
+  "error-handling": {
+    "name": "Handle rate limit errors with typed exceptions",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates a link and handles rate limit errors using the SDK's typed error classes. Import the error classes from the correct module path. Print the status code and error message when a rate limit error occurs. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "error-handling",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.ts", "value": "RateLimitExceeded" },
+      { "type": "file_contains", "path": "solution.ts", "value": "dub/models/errors" },
+      { "type": "file_contains", "path": "solution.ts", "value": "statusCode" },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  },
+  "track-sale": {
+    "name": "Track a sale conversion",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that tracks a sale conversion event. Use the correct method and pass all required parameters including customer ID, amount, and currency. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      { "type": "file_contains", "path": "solution.ts", "value": "track.sale" },
+      { "type": "file_contains", "path": "solution.ts", "value": "customerExternalId" },
+      { "type": "file_contains", "path": "solution.ts", "value": "amount" },
+      {
+        "type": "script",
+        "command": "grep -q 'dub' package.json",
+        "name": "dub-in-deps"
+      },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  },
+  "geo-targeting": {
+    "name": "Create a geo-targeted link",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates a short link with geo-targeting so users in different countries are redirected to different URLs. Target at least the US, GB, and FR. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "advanced",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "links\\.create|linksCreate"
+      },
+      { "type": "file_contains", "path": "solution.ts", "value": "geo" },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "\"US\"|'US'"
+      },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  },
+  "analytics-timeseries": {
+    "name": "Retrieve click analytics as timeseries",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that retrieves click analytics data as a timeseries for the last 30 days. Use the correct analytics method and the exact groupBy value for timeseries data. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "sdk-usage",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "analytics\\.retrieve|analyticsRetrieve"
+      },
+      { "type": "file_contains", "path": "solution.ts", "value": "timeseries" },
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "30d"
+      },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  },
+  "qr-code": {
+    "name": "Generate a QR code for a link",
+    "prompt": "Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that generates a QR code for an existing short link. Use the SDK's QR code method with the correct parameters. Install all dependencies first with npm. The DUB_API_KEY environment variable is already set — use process.env.DUB_API_KEY for authentication. Do not run the script.",
+    "description": "Dub TypeScript SDK — API references for links, analytics, domains, and workspaces",
+    "docsSpec": {
+      "url": "https://github.com/dubinc/dub-ts",
+      "ref": "main",
+      "docsConfig": { "version": "1", "strategy": { "chunk_by": "h2" } }
+    },
+    "category": "advanced",
+    "setup": "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null",
+    "assertions": [
+      {
+        "type": "file_matches",
+        "path": "solution.ts",
+        "pattern": "qrCodes\\.get|qrCodesGet"
+      },
+      { "type": "file_contains", "path": "solution.ts", "value": "domain" },
+      { "type": "file_contains", "path": "solution.ts", "value": "key" },
+      {
+        "type": "script",
+        "command": "grep -q 'dub' package.json",
+        "name": "dub-in-deps"
+      },
+      {
+        "type": "script",
+        "command": "npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node --module commonjs --target es2020 solution.ts",
+        "name": "typecheck",
+        "soft": true
+      }
+    ]
+  }
+}

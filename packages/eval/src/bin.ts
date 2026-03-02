@@ -2,17 +2,19 @@
 
 import "dotenv/config";
 
-import { readFile, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
+import YAML from "yaml";
 import { ensureIndex } from "./agent/build-cache.js";
+import { buildComparison, formatComparisonReport } from "./agent/comparison.js";
 import { loadPreviousResult, saveResult, generateTrendSummary } from "./agent/history.js";
 import { ConsoleObserver } from "./agent/observer.js";
 import { ensureRepo } from "./agent/repo-cache.js";
 import { defaultModelForProvider, resolveAgentProvider } from "./agent/provider.js";
 import { runAgentEval } from "./agent/runner.js";
-import type { AgentScenario } from "./agent/types.js";
+import type { AgentEvalConfig, AgentScenario } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
 import {
@@ -205,7 +207,7 @@ program
   .option("--workspace-dir <path>", "Base directory for agent workspaces")
   .option(
     "--provider <value>",
-    "Agent provider: claude, openai, or auto (default: auto)",
+    "Agent provider: anthropic, openai, or auto (default: auto)",
     "auto",
   )
   .option("--model <value>", "Model to use (defaults based on provider)")
@@ -219,6 +221,7 @@ program
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
+  .option("--compare", "Run with and without docs-mcp and compare results")
   .option("--debug", "Enable verbose agent event logging", false)
   .option("--clean-workspace", "Delete workspace directories after run (default: keep)", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
@@ -242,6 +245,7 @@ program
       maxConcurrency: number;
       systemPrompt?: string;
       mcp: boolean;
+      compare?: true;
       debug: boolean;
       cleanWorkspace: boolean;
       save: boolean;
@@ -260,6 +264,16 @@ program
       if (options.prompt && !options.docsDir) {
         console.error("Error: --prompt requires --docs-dir");
         process.exit(1);
+      }
+      if (options.compare && !options.mcp) {
+        console.error("Error: --compare and --no-mcp are mutually exclusive");
+        process.exit(1);
+      }
+
+      // Branch: comparison mode runs both phases
+      if (options.compare) {
+        await runCompare(options);
+        return;
       }
 
       // Load scenarios
@@ -402,6 +416,180 @@ program
 
 void program.parseAsync(process.argv);
 
+async function runCompare(options: {
+  suite?: string;
+  scenarios?: string;
+  prompt?: string;
+  include?: string;
+  docsDir?: string;
+  serverCommand?: string;
+  serverArg: string[];
+  serverCwd?: string;
+  serverEnv: Record<string, string>;
+  workspaceDir?: string;
+  provider: string;
+  model?: string;
+  maxTurns: number;
+  maxBudgetUsd: number;
+  maxConcurrency: number;
+  systemPrompt?: string;
+  debug: boolean;
+  cleanWorkspace: boolean;
+  save: boolean;
+  out?: string;
+}): Promise<void> {
+  const { scenarios: loadedScenarios, scenariosFilePath } = await loadScenarios(options);
+
+  let scenarios = loadedScenarios;
+  if (options.include) {
+    const includeIds = new Set(options.include.split(",").map((s) => s.trim()));
+    scenarios = scenarios.filter((s) => includeIds.has(s.id));
+    if (scenarios.length === 0) {
+      console.error(`Error: no scenarios matched --include "${options.include}"`);
+      process.exit(1);
+    }
+  }
+
+  const baseSuiteName =
+    options.suite ??
+    (options.scenarios
+      ? path.basename(options.scenarios, path.extname(options.scenarios))
+      : "ad-hoc");
+
+  // Resolve agent provider + model (shared across both phases)
+  const explicitProvider = options.provider === "auto" ? undefined : options.provider;
+  const provider = await resolveAgentProvider(explicitProvider);
+  const model = options.model ?? defaultModelForProvider(provider.name);
+  const modelDisplay = model ?? `${provider.name} (default)`;
+
+  // Build indexes (shared — both phases use the same index for MCP phase)
+  const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;
+  const indexCache = new Map<string, string>();
+  const indexDescriptions = new Map<string, string>();
+
+  for (const scenario of scenarios) {
+    let resolvedDocsDir: string | undefined;
+    if (scenario.docsSpec) {
+      resolvedDocsDir = await ensureRepo(scenario.docsSpec);
+    } else if (scenario.docsDir) {
+      const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
+      resolvedDocsDir = path.resolve(base, scenario.docsDir);
+    } else if (defaultDocsDir) {
+      resolvedDocsDir = defaultDocsDir;
+    }
+
+    if (resolvedDocsDir) {
+      const description = scenario.description ?? indexDescriptions.get(resolvedDocsDir);
+      if (scenario.description && !indexDescriptions.has(resolvedDocsDir)) {
+        indexDescriptions.set(resolvedDocsDir, scenario.description);
+      }
+
+      const cacheKey = `${resolvedDocsDir}\0${description ?? ""}\0${JSON.stringify(scenario.toolDescriptions ?? {})}`;
+      let indexDir = indexCache.get(cacheKey);
+      if (!indexDir) {
+        indexDir = await ensureIndex(
+          resolvedDocsDir,
+          CLI_BIN_PATH,
+          undefined,
+          description,
+          scenario.toolDescriptions,
+        );
+        indexCache.set(cacheKey, indexDir);
+      }
+      scenario.indexDir = indexDir;
+    }
+  }
+
+  // Verify server config for MCP phase
+  const allHaveIndex = scenarios.every((s) => s.indexDir);
+  if (!allHaveIndex && !options.serverCommand) {
+    console.error("Error: --server-command is required when scenarios don't specify docsDir");
+    process.exit(1);
+  }
+
+  const server = options.serverCommand
+    ? {
+        command: options.serverCommand,
+        args: options.serverArg,
+        ...(options.serverCwd ? { cwd: path.resolve(options.serverCwd) } : {}),
+        ...(Object.keys(options.serverEnv).length > 0 ? { env: options.serverEnv } : {}),
+      }
+    : undefined;
+
+  // Shared config builder
+  const buildEvalConfig = (noMcp: boolean, suiteName: string): AgentEvalConfig => {
+    // Deep-clone scenarios so the baseline run doesn't see indexDir
+    const clonedScenarios: AgentScenario[] = scenarios.map((s) => {
+      if (!noMcp) return { ...s };
+      const { indexDir: _, ...rest } = s;
+      return rest;
+    });
+
+    const workspaceDir = options.workspaceDir
+      ? path.resolve(options.workspaceDir, noMcp ? "baseline" : "with-mcp")
+      : undefined;
+
+    return {
+      scenarios: clonedScenarios,
+      provider,
+      ...(server && !noMcp ? { server } : {}),
+      ...(workspaceDir ? { workspaceDir } : {}),
+      ...(model ? { model } : {}),
+      maxTurns: options.maxTurns,
+      maxBudgetUsd: options.maxBudgetUsd,
+      maxConcurrency: options.maxConcurrency,
+      ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
+      observer: new ConsoleObserver({
+        model: modelDisplay,
+        suite: suiteName,
+        debug: options.debug,
+      }),
+      debug: options.debug,
+      cleanWorkspace: options.cleanWorkspace,
+      noMcp,
+    };
+  };
+
+  // Phase 1: With MCP
+  process.stderr.write("\n══════════════════════════════════════════════════\n");
+  process.stderr.write("  Phase 1: Running with docs-mcp\n");
+  process.stderr.write("══════════════════════════════════════════════════\n");
+
+  const withMcpSuite = baseSuiteName;
+  const withMcpOutput = await runAgentEval(buildEvalConfig(false, `${withMcpSuite} [with MCP]`));
+
+  if (options.save !== false) {
+    const savedPath = await saveResult(withMcpOutput, withMcpSuite);
+    process.stderr.write(`\nResults saved to ${savedPath}\n`);
+  }
+
+  // Phase 2: Without MCP (baseline)
+  process.stderr.write("\n══════════════════════════════════════════════════\n");
+  process.stderr.write("  Phase 2: Running baseline (no MCP)\n");
+  process.stderr.write("══════════════════════════════════════════════════\n");
+
+  const baselineSuite = `${baseSuiteName}-baseline`;
+  const withoutMcpOutput = await runAgentEval(buildEvalConfig(true, `${baselineSuite} [baseline — no MCP]`));
+
+  if (options.save !== false) {
+    const savedPath = await saveResult(withoutMcpOutput, baselineSuite);
+    process.stderr.write(`\nResults saved to ${savedPath}\n`);
+  }
+
+  // Build + print comparison
+  const comparison = buildComparison(withMcpOutput, withoutMcpOutput, baseSuiteName);
+  const report = formatComparisonReport(comparison);
+  process.stderr.write(`${report}\n`);
+
+  // Write comparison JSON
+  if (options.out) {
+    const serialized = `${JSON.stringify(comparison, null, 2)}\n`;
+    const outPath = path.resolve(options.out);
+    await writeFile(outPath, serialized);
+    process.stderr.write(`Wrote comparison result to ${outPath}\n`);
+  }
+}
+
 async function loadScenarios(options: {
   suite?: string;
   scenarios?: string;
@@ -409,14 +597,14 @@ async function loadScenarios(options: {
   docsDir?: string;
 }): Promise<{ scenarios: AgentScenario[]; scenariosFilePath?: string }> {
   if (options.suite) {
-    const filePath = path.join(FIXTURES_DIR, `${options.suite}.json`);
+    const filePath = await resolveSuiteFile(options.suite);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw, filePath), scenariosFilePath: filePath };
   }
   if (options.scenarios) {
     const filePath = path.resolve(options.scenarios);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
+    return { scenarios: parseScenarioFile(raw, filePath), scenariosFilePath: filePath };
   }
   // --prompt mode
   return {
@@ -432,8 +620,23 @@ async function loadScenarios(options: {
   };
 }
 
-function parseScenarioFile(raw: string): AgentScenario[] {
-  const parsed = JSON.parse(raw);
+async function resolveSuiteFile(suite: string): Promise<string> {
+  for (const ext of [".yaml", ".yml", ".json"]) {
+    const candidate = path.join(FIXTURES_DIR, `${suite}${ext}`);
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // try next extension
+    }
+  }
+  // Fall back to .json for a clear error message
+  return path.join(FIXTURES_DIR, `${suite}.json`);
+}
+
+function parseScenarioFile(raw: string, filePath?: string): AgentScenario[] {
+  const isYaml = filePath != null && /\.ya?ml$/i.test(filePath);
+  const parsed = isYaml ? (YAML.parse(raw) as unknown) : (JSON.parse(raw) as unknown);
 
   // Legacy array format — auto-generate ids from names
   if (Array.isArray(parsed)) {
@@ -443,10 +646,10 @@ function parseScenarioFile(raw: string): AgentScenario[] {
     }));
   }
 
-  // K:V format — key is the scenario id
-  return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>).map(
-    ([id, scenario]) => ({ ...scenario, id }),
-  );
+  // K:V format — key is the scenario id. Strip keys starting with "_" (YAML anchor-only entries).
+  return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>)
+    .filter(([id]) => !id.startsWith("_"))
+    .map(([id, scenario]) => ({ ...scenario, id }));
 }
 
 function slugify(name: string): string {

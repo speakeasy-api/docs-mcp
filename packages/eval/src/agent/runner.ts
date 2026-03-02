@@ -29,8 +29,8 @@ const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.5;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
-// No default system prompt — each provider uses its own native instructions.
-// Scenarios can still override via systemPrompt if needed.
+const DEFAULT_SYSTEM_PROMPT =
+  "Write all output files to the current working directory. Do not create new directories or use absolute paths from documentation examples.";
 
 export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOutput> {
   const observer = config.observer ?? new NoopObserver();
@@ -90,10 +90,13 @@ export async function runAgentScenario(
   provider = config.provider ?? new ClaudeAgentProvider(),
   observer?: AgentEvalObserver,
 ): Promise<AgentScenarioResult> {
-  const model = config.model ?? defaultModelForProvider(provider.name);
+  const model = scenario.models?.[provider.name] ?? config.model ?? defaultModelForProvider(provider.name);
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
-  const systemPrompt = scenario.systemPrompt ?? config.systemPrompt;
+  const customSystemPrompt = scenario.systemPrompt ?? config.systemPrompt;
+  const systemPrompt = customSystemPrompt
+    ? `${DEFAULT_SYSTEM_PROMPT}\n\n${customSystemPrompt}`
+    : DEFAULT_SYSTEM_PROMPT;
 
   const workspaceDir = config.workspaceDir
     ? path.join(config.workspaceDir, scenario.id)
