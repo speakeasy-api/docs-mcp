@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import http from "node:http";
 import { createRequire } from "node:module";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -10,18 +10,14 @@ import {
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
-  type CallToolResult,
   type ListToolsResult,
   type ListResourcesResult,
   type ListResourceTemplatesResult,
-  type ReadResourceResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo, ToolCallContext, ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
-const { version: PKG_VERSION } = require("../package.json") as {
-  version: string;
-};
+const PKG_VERSION = readPackageVersion();
 
 export interface StartHttpServerOptions {
   name?: string;
@@ -35,10 +31,6 @@ export interface StartHttpServerOptions {
   authenticate?: (request: {
     headers: Record<string, string | string[] | undefined>;
   }) => AuthInfo | Promise<AuthInfo>;
-  /** Idle timeout per session in milliseconds. Sessions with no activity are cleaned up. Default: 600_000 (10 min). */
-  sessionTimeoutMs?: number;
-  /** Maximum number of concurrent sessions. New sessions are rejected with 503 when at capacity. Default: 100. */
-  maxSessions?: number;
 }
 
 export interface HttpServerHandle {
@@ -47,95 +39,52 @@ export interface HttpServerHandle {
 }
 
 interface SessionEntry {
-  server: Server;
+  server: McpServer;
   transport: StreamableHTTPServerTransport;
-  lastActivity: number;
-  timer: ReturnType<typeof setTimeout>;
 }
 
-/**
- * Manages MCP sessions with idle-timeout eviction and a max-sessions cap.
- */
 class SessionManager {
+  private static readonly MAX_SESSIONS = 10_000;
   private sessions = new Map<string, SessionEntry>();
-  private readonly timeoutMs: number;
-  private readonly maxSessions: number;
 
-  constructor(timeoutMs: number, maxSessions: number) {
-    this.timeoutMs = timeoutMs;
-    this.maxSessions = maxSessions;
-  }
-
-  get size(): number {
-    return this.sessions.size;
-  }
-
-  get isFull(): boolean {
-    return this.sessions.size >= this.maxSessions;
-  }
-
-  add(sessionId: string, server: Server, transport: StreamableHTTPServerTransport): void {
-    const timer = setTimeout(() => this.evict(sessionId), this.timeoutMs);
+  add(sessionId: string, server: McpServer, transport: StreamableHTTPServerTransport): void {
+    if (this.sessions.size >= SessionManager.MAX_SESSIONS) {
+      const oldest = this.sessions.keys().next().value;
+      if (oldest) this.evict(oldest);
+    }
     this.sessions.set(sessionId, {
       server,
       transport,
-      lastActivity: Date.now(),
-      timer,
     });
   }
 
   get(sessionId: string): SessionEntry | undefined {
-    const entry = this.sessions.get(sessionId);
-    if (entry) {
-      entry.lastActivity = Date.now();
-      clearTimeout(entry.timer);
-      entry.timer = setTimeout(() => this.evict(sessionId), this.timeoutMs);
-    }
-    return entry;
-  }
-
-  peek(sessionId: string): SessionEntry | undefined {
     return this.sessions.get(sessionId);
   }
 
-  remove(sessionId: string): void {
-    const entry = this.sessions.get(sessionId);
-    if (entry) {
-      clearTimeout(entry.timer);
-      this.sessions.delete(sessionId);
-    }
-  }
-
   closeAll(): void {
-    for (const [id, entry] of this.sessions) {
-      clearTimeout(entry.timer);
-      entry.transport.close();
-      entry.server.close();
-      this.sessions.delete(id);
+    for (const [id] of this.sessions) {
+      this.evict(id);
     }
   }
 
-  private evict(sessionId: string): void {
+  evict(sessionId: string): void {
     const entry = this.sessions.get(sessionId);
     if (entry) {
       this.sessions.delete(sessionId);
       entry.transport.close();
-      entry.server.close();
+      entry.server.close().catch(() => {});
     }
   }
 }
 
-/**
- * Create a new MCP Server + StreamableHTTPServerTransport for a new session.
- * The transport uses session IDs so subsequent requests can be routed back.
- */
-function createSessionServer(
+function createMcpServer(
   app: ToolProvider,
   options: StartHttpServerOptions,
-  sessionManager: SessionManager,
-): { server: Server; transport: StreamableHTTPServerTransport } {
+  includeClientInfo = true,
+): McpServer {
   const instructions = app.getInstructions();
-  const server = new Server(
+  const server = new McpServer(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
       version: options.version ?? PKG_VERSION,
@@ -149,16 +98,16 @@ function createSessionServer(
     },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
+  server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools = app.getTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"],
+      inputSchema: tool.inputSchema,
     }));
     return { tools } satisfies ListToolsResult;
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const context: ToolCallContext = { signal: extra.signal };
     if (extra.authInfo) {
       context.authInfo = extra.authInfo;
@@ -166,15 +115,16 @@ function createSessionServer(
     if (extra.requestInfo?.headers) {
       context.headers = extra.requestInfo.headers;
     }
-    const clientVersion = server.getClientVersion();
-    if (clientVersion) {
-      context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
+    if (includeClientInfo) {
+      const clientVersion = server.server.getClientVersion();
+      if (clientVersion) {
+        context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
+      }
     }
-    const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
-    return result as CallToolResult;
+    return app.callTool(request.params.name, request.params.arguments ?? {}, context);
   });
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const resources = await app.getResources();
     return {
       resources: resources.map((r) => ({
@@ -186,14 +136,24 @@ function createSessionServer(
     } satisfies ListResourcesResult;
   });
 
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
     return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
   });
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const result = await app.readResource(request.params.uri);
-    return result as ReadResourceResult;
+    return result;
   });
+
+  return server;
+}
+
+function createSessionServer(
+  app: ToolProvider,
+  options: StartHttpServerOptions,
+  sessionManager: SessionManager,
+): { server: McpServer; transport: StreamableHTTPServerTransport } {
+  const server = createMcpServer(app, options);
 
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
@@ -201,7 +161,7 @@ function createSessionServer(
       sessionManager.add(sid, server, transport);
     },
     onsessionclosed: (sid: string) => {
-      sessionManager.remove(sid);
+      sessionManager.evict(sid);
     },
   });
 
@@ -213,10 +173,7 @@ export async function startHttpServer(
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const port = options.port ?? 20310;
-  const sessionManager = new SessionManager(
-    options.sessionTimeoutMs ?? 600_000,
-    options.maxSessions ?? 100,
-  );
+  const sessionManager = new SessionManager();
 
   const httpServer = http.createServer(async (req, res) => {
     try {
@@ -268,7 +225,6 @@ async function handleRequest(
   options: StartHttpServerOptions,
   sessionManager: SessionManager,
 ): Promise<void> {
-  // Only the pathname matters; the base URL is arbitrary.
   const url = new URL(req.url ?? "/", "http://localhost");
 
   if (url.pathname !== "/mcp") {
@@ -300,7 +256,7 @@ async function handleRequest(
   if (options.authenticate) {
     try {
       const authInfo = await options.authenticate({ headers: req.headers });
-      (req as http.IncomingMessage & { auth?: AuthInfo }).auth = authInfo;
+      Object.assign(req, { auth: authInfo });
     } catch (error) {
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(
@@ -314,43 +270,30 @@ async function handleRequest(
     }
   }
 
-  // DELETE requests are forwarded to existing sessions for clean shutdown.
+  // MCP states clients should send DELETE requests for clean shutdown.
   if (req.method === "DELETE") {
-    const sessionId = req.headers["mcp-session-id"] as string | undefined;
+    const sessionId = getHeaderValue(req.headers["mcp-session-id"]);
     if (!sessionId) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Missing mcp-session-id header" },
-          id: null,
-        }),
-      );
+      // Idempotent
+      res.writeHead(204);
+      res.end();
       return;
     }
-    const entry = sessionManager.peek(sessionId);
+    const entry = sessionManager.get(sessionId);
     if (!entry) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Session not found" },
-          id: null,
-        }),
-      );
+      res.writeHead(204);
+      res.end();
       return;
     }
     await entry.transport.handleRequest(req, res);
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      sessionManager.remove(sessionId);
+      sessionManager.evict(sessionId);
     }
     return;
   }
 
-  // POST requests — route to existing session or create a new one.
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  const sessionId = getHeaderValue(req.headers["mcp-session-id"]);
 
-  // Parse JSON body before handing off to the transport
   let parsed: unknown;
   try {
     const body = await readBody(req);
@@ -368,33 +311,12 @@ async function handleRequest(
   }
 
   if (sessionId) {
-    // Existing session — look up and forward.
     const entry = sessionManager.get(sessionId);
-    if (!entry) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Session not found or expired" },
-          id: null,
-        }),
-      );
+    if (entry) {
+      await entry.transport.handleRequest(req, res, parsed);
       return;
     }
-    await entry.transport.handleRequest(req, res, parsed);
-    return;
-  }
-
-  // New session — enforce max sessions cap.
-  if (sessionManager.isFull) {
-    res.writeHead(503, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        jsonrpc: "2.0",
-        error: { code: -32000, message: "Too many active sessions" },
-        id: null,
-      }),
-    );
+    await handleWithStatelessServer(req, res, parsed, app, options);
     return;
   }
 
@@ -415,7 +337,26 @@ async function handleRequest(
       );
     }
     transport.close();
-    server.close();
+    void server.close();
+  }
+}
+
+async function handleWithStatelessServer(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  parsed: unknown,
+  app: ToolProvider,
+  options: StartHttpServerOptions,
+): Promise<void> {
+  const server = createMcpServer(app, options, false);
+  const transport = new StreamableHTTPServerTransport();
+
+  try {
+    await server.connect(transport as unknown as Transport);
+    await transport.handleRequest(req, res, parsed);
+  } finally {
+    transport.close();
+    void server.close();
   }
 }
 
@@ -476,4 +417,13 @@ function readBody(req: http.IncomingMessage): Promise<string> {
     req.on("end", () => resolve(Buffer.concat(chunks).toString()));
     req.on("error", reject);
   });
+}
+
+function getHeaderValue(header: string | string[] | undefined): string | undefined {
+  return typeof header === "string" ? header : undefined;
+}
+
+function readPackageVersion(): string {
+  const pkg = require("../package.json");
+  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
 }

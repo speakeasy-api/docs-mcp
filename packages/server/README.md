@@ -105,7 +105,8 @@ await startHttpServer(server, {
 ```
 
 Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
-`clientInfo`, and an abort `signal`.
+`clientInfo` (best-effort; may be missing in stateless/degraded handling), and
+an abort `signal`.
 
 ## Option Reference
 

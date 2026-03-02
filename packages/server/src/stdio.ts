@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
@@ -7,18 +7,14 @@ import {
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
-  type CallToolResult,
   type ListResourcesResult,
   type ListResourceTemplatesResult,
   type ListToolsResult,
-  type ReadResourceResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolCallContext, ToolProvider } from "./types.js";
 
 const require = createRequire(import.meta.url);
-const { version: PKG_VERSION } = require("../package.json") as {
-  version: string;
-};
+const PKG_VERSION = readPackageVersion();
 
 export interface StartStdioServerOptions {
   name?: string;
@@ -30,7 +26,7 @@ export async function startStdioServer(
   options: StartStdioServerOptions = {},
 ): Promise<void> {
   const instructions = app.getInstructions();
-  const server = new Server(
+  const server = new McpServer(
     {
       name: options.name ?? "@speakeasy-api/docs-mcp-server",
       version: options.version ?? PKG_VERSION,
@@ -44,27 +40,27 @@ export async function startStdioServer(
     },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
+  server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     const tools = app.getTools().map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: tool.inputSchema as ListToolsResult["tools"][number]["inputSchema"],
+      inputSchema: tool.inputSchema,
     }));
 
     return { tools } satisfies ListToolsResult;
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const context: ToolCallContext = { signal: extra.signal };
-    const clientVersion = server.getClientVersion();
+    const clientVersion = server.server.getClientVersion();
     if (clientVersion) {
       context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
     }
     const result = await app.callTool(request.params.name, request.params.arguments ?? {}, context);
-    return result as CallToolResult;
+    return result;
   });
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const resources = await app.getResources();
     return {
       resources: resources.map((r) => ({
@@ -76,15 +72,20 @@ export async function startStdioServer(
     } satisfies ListResourcesResult;
   });
 
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
     return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
   });
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const result = await app.readResource(request.params.uri);
-    return result as ReadResourceResult;
+    return result;
   });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+}
+
+function readPackageVersion(): string {
+  const pkg = require("../package.json");
+  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
 }

@@ -1,7 +1,10 @@
 import type { CorpusMetadata } from "@speakeasy-api/docs-mcp-core";
+import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 
-export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, unknown> {
-  const properties: Record<string, unknown> = {
+type ToolInputSchema = ListToolsResult["tools"][number]["inputSchema"];
+
+export function buildSearchDocsSchema(metadata: CorpusMetadata): ToolInputSchema {
+  const properties: Record<string, object> = {
     query: {
       type: "string",
       description:
@@ -37,7 +40,7 @@ export function buildSearchDocsSchema(metadata: CorpusMetadata): Record<string, 
   };
 }
 
-export function buildGetDocSchema(): Record<string, unknown> {
+export function buildGetDocSchema(): ToolInputSchema {
   return {
     type: "object",
     additionalProperties: false,

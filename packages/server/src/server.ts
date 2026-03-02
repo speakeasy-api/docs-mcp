@@ -228,25 +228,20 @@ function parseSearchRequest(
   metadata: CorpusMetadata,
   rrfWeights?: RrfWeights,
 ): SearchRequest {
-  if (!args || typeof args !== "object") {
-    throw new Error("search_docs input must be an object");
-  }
-
-  const input = args as Record<string, unknown>;
+  const input = expectRecord(args, "search_docs input must be an object");
   const taxonomyKeys = Object.keys(metadata.taxonomy);
   assertAllowedKeys(input, ["query", "limit", "cursor", ...taxonomyKeys]);
   const query = expectString(input.query, "query");
 
   let limit = 10;
   if (input.limit !== undefined) {
-    if (!Number.isInteger(input.limit)) {
+    if (typeof input.limit !== "number" || !Number.isInteger(input.limit)) {
       throw new Error("limit must be an integer");
     }
-    const parsedLimit = input.limit as number;
-    if (parsedLimit < 1 || parsedLimit > 50) {
+    if (input.limit < 1 || input.limit > 50) {
       throw new Error("limit must be between 1 and 50");
     }
-    limit = parsedLimit;
+    limit = input.limit;
   }
 
   const cursor = input.cursor === undefined ? undefined : expectString(input.cursor, "cursor");
@@ -288,24 +283,19 @@ function parseSearchRequest(
 }
 
 function parseGetDocRequest(args: unknown): GetDocRequest {
-  if (!args || typeof args !== "object") {
-    throw new Error("get_doc input must be an object");
-  }
-
-  const input = args as Record<string, unknown>;
+  const input = expectRecord(args, "get_doc input must be an object");
   assertAllowedKeys(input, ["chunk_id", "context"]);
   const chunkId = expectString(input.chunk_id, "chunk_id");
 
   let context = 0;
   if (input.context !== undefined) {
-    if (!Number.isInteger(input.context)) {
+    if (typeof input.context !== "number" || !Number.isInteger(input.context)) {
       throw new Error("context must be an integer");
     }
-    const parsedContext = input.context as number;
-    if (parsedContext < 0 || parsedContext > 5) {
+    if (input.context < 0 || input.context > 5) {
       throw new Error("context must be between 0 and 5");
     }
-    context = parsedContext;
+    context = input.context;
   }
 
   return {
@@ -319,6 +309,13 @@ function expectString(value: unknown, fieldName: string): string {
     throw new Error(`${fieldName} must be a non-empty string`);
   }
   return value.trim();
+}
+
+function expectRecord(value: unknown, errorMessage: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(errorMessage);
+  }
+  return value as Record<string, unknown>;
 }
 
 function assertAllowedKeys(input: Record<string, unknown>, allowedKeys: string[]): void {

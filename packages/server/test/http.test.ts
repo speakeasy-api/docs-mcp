@@ -360,46 +360,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
 });
 
 describe("HTTP session management", () => {
-  it("rejects new sessions when maxSessions is reached", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0, maxSessions: 1 });
-
-    try {
-      const addr = handle.httpServer.address();
-      const port = typeof addr === "object" && addr ? addr.port : handle.port;
-      const url = new URL(`http://localhost:${port}/mcp`);
-
-      // First client — should succeed.
-      const transport1 = new StreamableHTTPClientTransport(url);
-      const client1 = new Client({ name: "client-1", version: "0.1.0" });
-      await client1.connect(transport1);
-
-      // Second client — should be rejected with 503.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-03-26",
-            capabilities: {},
-            clientInfo: { name: "client-2", version: "0.1.0" },
-          },
-          id: 1,
-        }),
-      });
-      expect(res.status).toBe(503);
-      const body = await res.json();
-      expect(body.error.message).toMatch(/Too many active sessions/);
-
-      await client1.close();
-    } finally {
-      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
-    }
-  });
-
-  it("returns 404 for unknown session ID", async () => {
+  it("falls back to stateless for unknown session ID", async () => {
     const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
     const handle = await startHttpServer(app, { port: 0 });
 
@@ -411,6 +372,7 @@ describe("HTTP session management", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
           "mcp-session-id": "nonexistent-session-id",
         },
         body: JSON.stringify({
@@ -420,62 +382,26 @@ describe("HTTP session management", () => {
           id: 1,
         }),
       });
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body.error.message).toMatch(/Session not found/);
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+      expect(lines.length).toBeGreaterThan(0);
+      const body = JSON.parse(lines[0].slice(6));
+      expect(body.result.tools.length).toBeGreaterThan(0);
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }
   });
 
-  it("evicts sessions after idle timeout", async () => {
+  it("cleans up session after client sends DELETE via terminateSession", async () => {
     const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0, sessionTimeoutMs: 100 });
+    const handle = await startHttpServer(app, { port: 0 });
 
     try {
       const addr = handle.httpServer.address();
       const port = typeof addr === "object" && addr ? addr.port : handle.port;
       const url = new URL(`http://localhost:${port}/mcp`);
 
-      // Create a session via the SDK client.
-      const transport = new StreamableHTTPClientTransport(url);
-      const client = new Client({ name: "timeout-client", version: "0.1.0" });
-      await client.connect(transport);
-
-      // Tool call should work immediately.
-      const result = await client.callTool({ name: "search_docs", arguments: { query: "retry" } });
-      expect(result.isError).not.toBe(true);
-
-      // Wait for idle timeout to expire.
-      await new Promise((r) => setTimeout(r, 200));
-
-      // The session should have been evicted — next call should fail.
-      await expect(
-        client.callTool({ name: "search_docs", arguments: { query: "retry" } }),
-      ).rejects.toThrow();
-
-      // A new client should still be able to connect (session slot freed).
-      const transport2 = new StreamableHTTPClientTransport(url);
-      const client2 = new Client({ name: "new-client", version: "0.1.0" });
-      await client2.connect(transport2);
-      const result2 = await client2.callTool({ name: "search_docs", arguments: { query: "retry" } });
-      expect(result2.isError).not.toBe(true);
-      await client2.close();
-    } finally {
-      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
-    }
-  });
-
-  it("frees session slot after client sends DELETE via terminateSession", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0, maxSessions: 1 });
-
-    try {
-      const addr = handle.httpServer.address();
-      const port = typeof addr === "object" && addr ? addr.port : handle.port;
-      const url = new URL(`http://localhost:${port}/mcp`);
-
-      // Fill the single session slot.
       const transport1 = new StreamableHTTPClientTransport(url);
       const client1 = new Client({ name: "client-1", version: "0.1.0" });
       await client1.connect(transport1);
@@ -484,7 +410,7 @@ describe("HTTP session management", () => {
       await transport1.terminateSession();
       await client1.close();
 
-      // A new client should now be able to connect.
+      // A new client should be able to connect.
       const transport2 = new StreamableHTTPClientTransport(url);
       const client2 = new Client({ name: "client-2", version: "0.1.0" });
       await client2.connect(transport2);
@@ -498,7 +424,7 @@ describe("HTTP session management", () => {
     }
   });
 
-  it("DELETE with missing session ID returns 400", async () => {
+  it("DELETE with missing session ID is idempotent", async () => {
     const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
     const handle = await startHttpServer(app, { port: 0 });
 
@@ -507,15 +433,13 @@ describe("HTTP session management", () => {
       const port = typeof addr === "object" && addr ? addr.port : handle.port;
 
       const res = await fetch(`http://localhost:${port}/mcp`, { method: "DELETE" });
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error.message).toMatch(/Missing mcp-session-id/);
+      expect(res.status).toBe(204);
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }
   });
 
-  it("DELETE with unknown session ID returns 404", async () => {
+  it("DELETE with unknown session ID is idempotent", async () => {
     const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
     const handle = await startHttpServer(app, { port: 0 });
 
@@ -527,9 +451,170 @@ describe("HTTP session management", () => {
         method: "DELETE",
         headers: { "mcp-session-id": "bogus-id" },
       });
-      expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(body.error.message).toMatch(/Session not found/);
+      expect(res.status).toBe(204);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+});
+
+describe("HTTP built-in request retry consistency", () => {
+  function builtInRequests(): Record<string, unknown>[] {
+    return [
+      {
+        jsonrpc: "2.0",
+        method: "tools/list",
+        params: {},
+        id: 101,
+      },
+      {
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "search_docs", arguments: { query: "retry" } },
+        id: 102,
+      },
+      {
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "get_doc", arguments: { chunk_id: "guides/ts.md#retry" } },
+        id: 103,
+      },
+    ];
+  }
+
+  async function postMcpRequest(
+    url: string,
+    request: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<{ status: number; rawBody: string; body?: Record<string, unknown> }> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    };
+    if (sessionId) {
+      headers["mcp-session-id"] = sessionId;
+    }
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(request),
+    });
+
+    const text = await res.text();
+    const dataLine = text
+      .split("\n")
+      .find((line) => line.startsWith("data: ") && line.slice(6).trim().length > 0);
+
+    let parsed: Record<string, unknown> | undefined;
+    const payload = dataLine ? dataLine.slice(6) : text;
+    if (payload.trim().length > 0) {
+      const json = JSON.parse(payload);
+      if (json && typeof json === "object" && !Array.isArray(json)) {
+        parsed = Object.fromEntries(Object.entries(json));
+      }
+    }
+
+    return {
+      status: res.status,
+      rawBody: text,
+      ...(parsed ? { body: parsed } : {}),
+    };
+  }
+
+  async function createStaleSessionId(url: URL): Promise<string> {
+    const transport = new StreamableHTTPClientTransport(url);
+    const client = new Client({ name: "retry-test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    const sessionId = transport.sessionId;
+    expect(sessionId).toBeDefined();
+    if (!sessionId) {
+      throw new Error("Expected sessionId after initialize");
+    }
+
+    await transport.terminateSession();
+    await client.close();
+    return sessionId;
+  }
+
+  it("returns same responses for repeated requests with active session", async () => {
+    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url);
+      const client = new Client({ name: "retry-test-client", version: "0.1.0" });
+      await client.connect(transport);
+
+      const sessionId = transport.sessionId;
+      expect(sessionId).toBeDefined();
+      if (!sessionId) {
+        throw new Error("Expected sessionId after initialize");
+      }
+
+      for (const request of builtInRequests()) {
+        const first = await postMcpRequest(url.toString(), request, sessionId);
+        const second = await postMcpRequest(url.toString(), request, sessionId);
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(first.body).toBeDefined();
+        expect(second.body).toBeDefined();
+        expect(second.body).toEqual(first.body);
+      }
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("returns same responses for repeated requests without session header", async () => {
+    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = `http://localhost:${port}/mcp`;
+
+      for (const request of builtInRequests()) {
+        const first = await postMcpRequest(url, request);
+        const second = await postMcpRequest(url, request);
+        expect(second.status).toBe(first.status);
+        expect(second.rawBody).toBe(first.rawBody);
+        if (first.body || second.body) {
+          expect(second.body).toEqual(first.body);
+        }
+      }
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("returns same responses for repeated requests with stale session header", async () => {
+    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+      const staleSessionId = await createStaleSessionId(url);
+
+      for (const request of builtInRequests()) {
+        const first = await postMcpRequest(url.toString(), request, staleSessionId);
+        const second = await postMcpRequest(url.toString(), request, staleSessionId);
+        expect(second.status).toBe(first.status);
+        expect(second.rawBody).toBe(first.rawBody);
+        if (first.body || second.body) {
+          expect(second.body).toEqual(first.body);
+        }
+      }
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }

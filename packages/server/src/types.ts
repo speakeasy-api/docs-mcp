@@ -1,4 +1,10 @@
 export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+export type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ReadResourceResult,
+  ListToolsResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
 export interface ToolCallContext {
@@ -6,7 +12,7 @@ export interface ToolCallContext {
   authInfo?: AuthInfo;
   /** HTTP request headers (HTTP transport only). */
   headers?: Record<string, string | string[] | undefined>;
-  /** Client name/version from MCP init handshake. Available after the init handshake completes. */
+  /** Client name/version from MCP init handshake. Best-effort and may be absent in stateless/degraded handling. */
   clientInfo?: { name: string; version: string };
   /** Abort signal for request cancellation. */
   signal: AbortSignal;
@@ -15,17 +21,7 @@ export interface ToolCallContext {
 export interface ToolDefinition {
   name: string;
   description: string;
-  inputSchema: Record<string, unknown>;
-}
-
-export interface TextContent {
-  type: "text";
-  text: string;
-}
-
-export interface CallToolResult {
-  content: TextContent[];
-  isError: boolean;
+  inputSchema: ListToolsResult["tools"][number]["inputSchema"];
 }
 
 export interface ToolProvider {
@@ -39,7 +35,7 @@ export interface ToolProvider {
 export interface CustomTool {
   name: string;
   description: string;
-  inputSchema: Record<string, unknown>;
+  inputSchema: ListToolsResult["tools"][number]["inputSchema"];
   handler: (args: unknown, context: ToolCallContext) => Promise<CallToolResult>;
 }
 
@@ -54,8 +50,4 @@ export interface ResourceContent {
   uri: string;
   mimeType?: string;
   text: string;
-}
-
-export interface ReadResourceResult {
-  contents: ResourceContent[];
 }
