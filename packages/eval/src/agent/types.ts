@@ -34,6 +34,10 @@ export interface AgentScenario {
   docsDir?: string;
   /** Resolved index directory path. Set at runtime by the CLI after building the index. */
   indexDir?: string;
+  /** Map of repo-relative source paths to workspace-relative dest paths. Symlinked into agent workspace before setup. */
+  links?: Record<string, string>;
+  /** Resolved links with absolute source paths. Set at runtime by the CLI. */
+  resolvedLinks?: Record<string, string>;
 }
 
 export type AgentAssertion =

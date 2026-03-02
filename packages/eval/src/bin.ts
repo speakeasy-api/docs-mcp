@@ -291,6 +291,20 @@ program
 
       const noMcp = !options.mcp;
 
+      // Resolve links → set resolvedLinks on each scenario
+      {
+        const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
+        for (const scenario of scenarios) {
+          if (scenario.links && Object.keys(scenario.links).length > 0) {
+            const resolved: Record<string, string> = {};
+            for (const [src, dest] of Object.entries(scenario.links)) {
+              resolved[dest] = path.resolve(base, src);
+            }
+            scenario.resolvedLinks = resolved;
+          }
+        }
+      }
+
       // Resolve docsDir → build indexes → set indexDir on each scenario (skip in no-mcp mode)
       let server:
         | {
@@ -461,6 +475,20 @@ async function runCompare(options: {
   const provider = await resolveAgentProvider(explicitProvider);
   const model = options.model ?? defaultModelForProvider(provider.name);
   const modelDisplay = model ?? `${provider.name} (default)`;
+
+  // Resolve links → set resolvedLinks on each scenario
+  {
+    const base = scenariosFilePath ? path.dirname(scenariosFilePath) : process.cwd();
+    for (const scenario of scenarios) {
+      if (scenario.links && Object.keys(scenario.links).length > 0) {
+        const resolved: Record<string, string> = {};
+        for (const [src, dest] of Object.entries(scenario.links)) {
+          resolved[dest] = path.resolve(base, src);
+        }
+        scenario.resolvedLinks = resolved;
+      }
+    }
+  }
 
   // Build indexes (shared — both phases use the same index for MCP phase)
   const defaultDocsDir = options.docsDir ? path.resolve(options.docsDir) : undefined;

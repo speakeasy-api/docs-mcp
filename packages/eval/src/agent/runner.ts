@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -106,6 +106,20 @@ export async function runAgentScenario(
     await mkdir(workspaceDir, { recursive: true });
 
     const errors: string[] = [];
+
+    // Create symlinks for scenario links (before setup so setup can use them)
+    if (scenario.resolvedLinks) {
+      for (const [dest, src] of Object.entries(scenario.resolvedLinks)) {
+        const linkPath = path.join(workspaceDir, dest);
+        await mkdir(path.dirname(linkPath), { recursive: true });
+        try {
+          await symlink(src, linkPath);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`Link warning: failed to symlink ${src} → ${dest}: ${msg}`);
+        }
+      }
+    }
 
     if (scenario.setup) {
       try {
