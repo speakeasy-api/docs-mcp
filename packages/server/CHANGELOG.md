@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.10.0
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes

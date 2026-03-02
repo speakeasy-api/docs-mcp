@@ -1,5 +1,15 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.10.0
+
+### Minor Changes
+
+- ce7cdb8: Add `links` field to agent scenarios for symlinking repo directories into agent workspaces
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes
