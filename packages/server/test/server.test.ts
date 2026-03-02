@@ -51,6 +51,30 @@ const metadata = normalizeMetadata({
 });
 
 describe("McpDocsServer", () => {
+  it("includes conceptual query guidance when vector search is available", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      vectorSearchAvailable: true,
+    });
+
+    const tools = server.getTools();
+    const search = tools.find((tool) => tool.name === "search_docs");
+    expect(search?.description).toContain("conceptual queries");
+  });
+
+  it("omits conceptual query guidance when vector search is unavailable", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      vectorSearchAvailable: false,
+    });
+
+    const tools = server.getTools();
+    const search = tools.find((tool) => tool.name === "search_docs");
+    expect(search?.description).not.toContain("conceptual queries");
+  });
+
   it("builds dynamic schema with injected taxonomy enums", () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
