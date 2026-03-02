@@ -14,13 +14,11 @@ _tsc: &tsc
     npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node
     --module commonjs --target es2020 solution.ts
   name: typecheck
-  soft: true
 
 _pyright: &pyright
   type: script
   command: uvx pyright solution.py
   name: typecheck
-  soft: true
 
 ts-init:
   name: Initialize the TypeScript client

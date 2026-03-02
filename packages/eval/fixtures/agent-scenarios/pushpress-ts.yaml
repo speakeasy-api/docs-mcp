@@ -16,7 +16,6 @@ _tsc: &tsc
     npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node
     --module commonjs --target es2020 solution.ts
   name: typecheck
-  soft: true
 
 list-members:
   name: List PushPress members

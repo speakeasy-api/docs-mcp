@@ -14,7 +14,6 @@ _pyright: &pyright
   type: script
   command: uvx pyright solution.py
   name: typecheck
-  soft: true
 
 chat-completion:
   name: Create a Mistral chat completion

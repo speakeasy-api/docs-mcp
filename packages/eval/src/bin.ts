@@ -635,7 +635,7 @@ async function resolveSuiteFile(suite: string): Promise<string> {
 }
 
 function parseScenarioFile(raw: string): AgentScenario[] {
-  const parsed = YAML.parse(raw) as unknown;
+  const parsed = YAML.parse(raw, { merge: true }) as unknown;
 
   // Legacy array format — auto-generate ids from names
   if (Array.isArray(parsed)) {

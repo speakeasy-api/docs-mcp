@@ -13,7 +13,6 @@ _pyright: &pyright
   type: script
   command: uvx pyright solution.py
   name: typecheck
-  soft: true
 
 create-link:
   name: Create a Dub short link

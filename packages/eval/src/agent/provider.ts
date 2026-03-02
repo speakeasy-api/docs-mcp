@@ -82,7 +82,7 @@ export interface AgentProvider {
 // --- Factory ---
 
 const DEFAULT_MODELS: Record<AgentProviderName, string | undefined> = {
-  anthropic: "claude-sonnet-4-20250514",
+  anthropic: "claude-opus-4-20250514",
   openai: undefined, // let codex CLI pick its own default
 };
 

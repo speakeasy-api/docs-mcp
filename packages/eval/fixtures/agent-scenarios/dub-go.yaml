@@ -30,7 +30,6 @@ create-link:
     - type: script
       command: "go build -o /dev/null solution.go"
       name: typecheck
-      soft: true
     - type: script
       command: "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'short\\|link\\|url\\|dub'"
       name: runs-successfully
@@ -58,7 +57,6 @@ list-analytics:
     - type: script
       command: "go build -o /dev/null solution.go"
       name: typecheck
-      soft: true
     - type: script
       command: "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'click\\|analytics\\|count'"
       name: runs-successfully
@@ -86,7 +84,6 @@ upsert-link:
     - type: script
       command: "go build -o /dev/null solution.go"
       name: typecheck
-      soft: true
     - type: script
       command: "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|upsert'"
       name: runs-successfully
@@ -114,7 +111,6 @@ get-link:
     - type: script
       command: "go build -o /dev/null solution.go"
       name: typecheck
-      soft: true
     - type: script
       command: "output=$(go run solution.go 2>&1) && echo \"$output\" | grep -qi 'link\\|url\\|id'"
       name: runs-successfully
