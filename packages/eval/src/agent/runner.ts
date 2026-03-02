@@ -229,8 +229,8 @@ export async function runAgentScenario(
 
             observer?.onAgentMessage(scenario, {
               type: "assistant_text",
-              summary:
-                event.text.slice(0, 150) + (event.text.length > 150 ? "..." : ""),
+              summary: event.text,
+              fullText: event.text,
               timestampMs: nowMs,
             });
             break;
