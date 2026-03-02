@@ -1,5 +1,15 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.9.0
+
+### Minor Changes
+
+- ab58343: Add YAML scenario support, rename provider "claude" to "anthropic", and replace per-scenario `model` with provider-keyed `models`
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes
