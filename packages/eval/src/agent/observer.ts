@@ -45,29 +45,27 @@ function toolColor(name: string): string {
 
 // ── Box-drawing helpers ────────────────────────────────────────────────
 
+/** Max visible width for panel boxes. */
+const PANEL_MAX_WIDTH = 100;
+
 function panel(content: string, title?: string, border = c.dim): string {
-  const lines = content.split("\n");
+  // Pre-wrap long lines so content fits the panel instead of being truncated
+  const wrappedContent = wordWrap(content, PANEL_MAX_WIDTH - 4);
+  const lines = wrappedContent.split("\n");
   const maxLen = Math.max(
     ...lines.map(stripAnsi).map((l) => l.length),
     title ? stripAnsi(title).length + 4 : 0,
   );
-  const width = Math.min(maxLen + 2, 80);
+  const width = Math.min(maxLen + 2, PANEL_MAX_WIDTH);
 
   const top = title
     ? `${border}╭─ ${c.reset}${title}${border} ${"─".repeat(Math.max(0, width - stripAnsi(title).length - 4))}╮${c.reset}`
     : `${border}╭${"─".repeat(width)}╯${c.reset}`;
   const bot = `${border}╰${"─".repeat(width)}╯${c.reset}`;
 
-  const innerWidth = width - 2; // usable chars between "│ " and " │"
   const body = lines.map((line) => {
-    const visible = stripAnsi(line);
-    let display = line;
-    if (visible.length > innerWidth) {
-      // Truncate to innerWidth - 1 chars + ellipsis
-      display = truncateAnsi(line, innerWidth - 1) + "…";
-    }
-    const pad = Math.max(1, width - stripAnsi(display).length);
-    return `${border}│${c.reset} ${display}${" ".repeat(pad - 1)}${border}│${c.reset}`;
+    const pad = Math.max(1, width - stripAnsi(line).length);
+    return `${border}│${c.reset} ${line}${" ".repeat(pad - 1)}${border}│${c.reset}`;
   });
 
   return [top, ...body, bot].join("\n");
@@ -251,7 +249,7 @@ export class ConsoleObserver implements AgentEvalObserver {
     if (scenario.category) {
       write(`${c.dim}Category: ${scenario.category}${c.reset}\n`);
     }
-    write(`${c.white}${scenario.prompt}${c.reset}\n`);
+    write(`${c.white}${wordWrap(scenario.prompt, PANEL_MAX_WIDTH)}${c.reset}\n`);
   }
 
   onAgentMessage(_scenario: AgentScenario, message: AgentObservedMessage): void {
@@ -259,12 +257,20 @@ export class ConsoleObserver implements AgentEvalObserver {
     const debug = this.opts.debug;
 
     switch (message.type) {
-      case "system_init":
-        write(`${ts} ${c.blue}▶ ${message.summary}${c.reset}\n`);
+      case "system_init": {
+        const initPrefix = `${ts} ${c.blue}▶ `;
+        const initPrefixLen = stripAnsi(initPrefix).length;
+        const initWrapped = wordWrap(message.summary, Math.max(40, PANEL_MAX_WIDTH - initPrefixLen));
+        const initLines = initWrapped.split("\n");
+        write(`${initPrefix}${initLines[0]}${c.reset}\n`);
+        for (let i = 1; i < initLines.length; i++) {
+          write(`${" ".repeat(initPrefixLen)}${c.blue}${initLines[i]}${c.reset}\n`);
+        }
         if (message.workspaceDir) {
           write(`${ts} ${c.cyan}${c.bold}  workspace: ${message.workspaceDir}${c.reset}\n`);
         }
         break;
+      }
 
       case "assistant_text": {
         // Show full assistant text with word wrapping
@@ -317,9 +323,17 @@ export class ConsoleObserver implements AgentEvalObserver {
         break;
       }
 
-      case "result":
-        write(`${ts} ${c.bold}■ ${message.summary}${c.reset}\n`);
+      case "result": {
+        const resPrefix = `${ts} ${c.bold}■ `;
+        const resPrefixLen = stripAnsi(resPrefix).length;
+        const resWrapped = wordWrap(message.summary, Math.max(40, PANEL_MAX_WIDTH - resPrefixLen));
+        const resLines = resWrapped.split("\n");
+        write(`${resPrefix}${resLines[0]}${c.reset}\n`);
+        for (let i = 1; i < resLines.length; i++) {
+          write(`${" ".repeat(resPrefixLen)}${c.bold}${resLines[i]}${c.reset}\n`);
+        }
         break;
+      }
     }
   }
 
@@ -340,14 +354,25 @@ export class ConsoleObserver implements AgentEvalObserver {
     write(`\n${parts.join(` ${c.dim}|${c.reset} `)}\n`);
 
     // Assertion details
+    const assertIndent = 4; // "  ✓ " prefix width
     for (const ar of result.assertionResults) {
       const icon = ar.passed ? `${c.green}✓` : ar.assertion.soft ? `${c.yellow}⚠` : `${c.red}✗`;
-      write(`  ${icon} ${ar.message}${c.reset}\n`);
+      const wrapped = wordWrap(ar.message, PANEL_MAX_WIDTH - assertIndent);
+      const msgLines = wrapped.split("\n");
+      write(`  ${icon} ${msgLines[0]}${c.reset}\n`);
+      for (let i = 1; i < msgLines.length; i++) {
+        write(`${" ".repeat(assertIndent)}${msgLines[i]}${c.reset}\n`);
+      }
     }
 
     if (result.errors?.length) {
       for (const e of result.errors) {
-        write(`  ${c.red}⚠ ${e}${c.reset}\n`);
+        const wrapped = wordWrap(e, PANEL_MAX_WIDTH - assertIndent);
+        const errLines = wrapped.split("\n");
+        write(`  ${c.red}⚠ ${errLines[0]}${c.reset}\n`);
+        for (let i = 1; i < errLines.length; i++) {
+          write(`${" ".repeat(assertIndent)}${c.red}${errLines[i]}${c.reset}\n`);
+        }
       }
     }
 
