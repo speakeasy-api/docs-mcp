@@ -1,18 +1,17 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   LanceDbSearchEngine,
   createEmbeddingProvider,
   getCollapseKeys,
   normalizeMetadata,
-  type CorpusMetadata,
   type EmbeddingMetadata,
   type EmbeddingProvider,
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "./server.js";
-import type { CustomTool } from "./types.js";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -57,6 +56,16 @@ const MetadataDocumentSchema = z
   })
   .passthrough();
 
+type ToolInputSchema = ListToolsResult["tools"][number]["inputSchema"];
+
+const ToolInputSchemaSchema: z.ZodType<ToolInputSchema> = z
+  .object({
+    type: z.literal("object"),
+    properties: z.record(z.string(), z.object({}).passthrough()).optional(),
+    required: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
 const CustomToolSchema = z.object({
   name: z
     .string()
@@ -65,12 +74,7 @@ const CustomToolSchema = z.object({
       "tool name must match MCP spec: alphanumeric/dash/underscore, 1-64 chars",
     ),
   description: z.string().min(1),
-  inputSchema: z
-    .record(z.string(), z.unknown())
-    .refine(
-      (s) => s.type === "object",
-      "inputSchema.type must be 'object' (required by MCP tool listing)",
-    ),
+  inputSchema: ToolInputSchemaSchema,
   handler: z.function({ input: z.tuple([z.unknown(), z.any()]), output: z.promise(z.any()) }),
 });
 
@@ -158,16 +162,14 @@ export async function createDocsServer(
   }
 
   const metadataRaw = await readFile(metadataPath, "utf8");
-  let metadataDocument: Record<string, unknown>;
+  let metadataDocument: z.output<typeof MetadataDocumentSchema>;
   try {
     metadataDocument = MetadataDocumentSchema.parse(JSON.parse(metadataRaw));
   } catch (error) {
     const detail = error instanceof z.ZodError ? z.prettifyError(error) : String(error);
     throw new Error(`Invalid metadata.json at '${metadataPath}':\n${detail}`, { cause: error });
   }
-  const metadata = normalizeMetadata(
-    metadataDocument as unknown as CorpusMetadata,
-  ) as CorpusMetadata;
+  const metadata = normalizeMetadata(metadataDocument);
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
@@ -209,7 +211,7 @@ export async function createDocsServer(
     vectorSearchAvailable:
       queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
     ...(options.toolPrefix ? { toolPrefix: options.toolPrefix } : {}),
-    ...(options.customTools.length > 0 ? { customTools: options.customTools as CustomTool[] } : {}),
+    ...(options.customTools.length > 0 ? { customTools: options.customTools } : {}),
   });
 }
 

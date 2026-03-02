@@ -500,4 +500,67 @@ describe("HTTP authentication", () => {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }
   });
+
+  it("context.clientInfo is omitted when stale session falls back to stateless HTTP handling", async () => {
+    let receivedClientInfo: { name: string; version: string } | undefined;
+
+    const app = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata,
+      customTools: [{
+        name: "client_info_degraded_check",
+        description: "Checks degraded clientInfo",
+        inputSchema: { type: "object", properties: {} },
+        handler: async (_args, ctx) => {
+          receivedClientInfo = ctx.clientInfo;
+          return {
+            content: [{ type: "text" as const, text: ctx.clientInfo ? "present" : "missing" }],
+            isError: false
+          };
+        }
+      }]
+    });
+
+    const handle = await startHttpServer(app, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      // Create a real session first, then terminate it so we can reuse a stale session ID.
+      const transport = new StreamableHTTPClientTransport(url);
+      const client = new Client({ name: "test-client", version: "0.1.0" });
+      await client.connect(transport);
+      const staleSessionId = transport.sessionId;
+      expect(staleSessionId).toBeDefined();
+      await transport.terminateSession();
+      await client.close();
+
+      const res = await fetch(`${url}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "mcp-session-id": staleSessionId!,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "tools/call",
+          params: { name: "client_info_degraded_check", arguments: {} },
+          id: 123,
+        }),
+      });
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+      expect(lines.length).toBeGreaterThan(0);
+      const body = JSON.parse(lines[0].slice(6));
+      expect(body.result.isError).not.toBe(true);
+      expect(body.result.content[0].text).toBe("missing");
+      expect(receivedClientInfo).toBeUndefined();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
 });

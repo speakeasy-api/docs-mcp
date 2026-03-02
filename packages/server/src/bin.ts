@@ -7,9 +7,7 @@ import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
 
 const require = createRequire(import.meta.url);
-const { version: SERVER_VERSION } = require("../package.json") as {
-  version: string;
-};
+const SERVER_VERSION = readPackageVersion();
 
 interface ServerCliOptions {
   indexDir: string;
@@ -78,6 +76,11 @@ program
       });
     }
   });
+
+function readPackageVersion(): string {
+  const pkg = require("../package.json");
+  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
+}
 
 void program.parseAsync(process.argv);
 
