@@ -58,9 +58,12 @@ function panel(content: string, title?: string, border = c.dim): string {
   );
   const width = Math.min(maxLen + 2, PANEL_MAX_WIDTH);
 
+  // Top border: "╭─ TITLE ───╮" or "╭───────╮"
+  // Total visible = 3 + title_len + 1 + dashes + 1 = width + 2
+  //   → dashes = width - title_len - 3
   const top = title
-    ? `${border}╭─ ${c.reset}${title}${border} ${"─".repeat(Math.max(0, width - stripAnsi(title).length - 4))}╮${c.reset}`
-    : `${border}╭${"─".repeat(width)}╯${c.reset}`;
+    ? `${border}╭─ ${c.reset}${title}${border} ${"─".repeat(Math.max(0, width - stripAnsi(title).length - 3))}╮${c.reset}`
+    : `${border}╭${"─".repeat(width)}╮${c.reset}`;
   const bot = `${border}╰${"─".repeat(width)}╯${c.reset}`;
 
   const body = lines.map((line) => {
