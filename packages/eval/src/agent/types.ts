@@ -201,6 +201,7 @@ export interface ScenarioComparisonResult {
     passed: boolean;
     numTurns: number;
     totalCostUsd: number;
+    durationMs: number;
     mcpToolCalls: number;
     assertionResults: AssertionResult[];
   };
@@ -208,6 +209,7 @@ export interface ScenarioComparisonResult {
     passed: boolean;
     numTurns: number;
     totalCostUsd: number;
+    durationMs: number;
     assertionResults: AssertionResult[];
   };
 }
@@ -217,6 +219,7 @@ export interface ComparisonSummaryDelta {
   avgTurnsDelta: number;
   avgCostUsdDelta: number;
   totalCostUsdDelta: number;
+  avgDurationMsDelta: number;
 }
 
 export interface ComparisonOutput {
