@@ -116,6 +116,30 @@ function indent(text: string, spaces: number): string {
     .join("\n");
 }
 
+/** Word-wrap plain text to a given column width, preserving existing newlines. */
+function wordWrap(text: string, width: number): string {
+  const result: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    if (stripAnsi(paragraph).length <= width) {
+      result.push(paragraph);
+      continue;
+    }
+    const words = paragraph.split(/\s+/);
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (stripAnsi(candidate).length > width && line) {
+        result.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    }
+    if (line) result.push(line);
+  }
+  return result.join("\n");
+}
+
 function formatToolResult(raw: string): string {
   try {
     const parsed = JSON.parse(raw);
@@ -242,10 +266,22 @@ export class ConsoleObserver implements AgentEvalObserver {
         }
         break;
 
-      case "assistant_text":
-        // Always show assistant text (abbreviated in non-debug)
-        write(`${ts} ${c.green}◆${c.reset} ${message.summary}\n`);
+      case "assistant_text": {
+        // Show full assistant text with word wrapping
+        const text = message.fullText ?? message.summary;
+        const prefix = `${ts} ${c.green}◆${c.reset} `;
+        const prefixLen = stripAnsi(prefix).length;
+        const wrapped = wordWrap(text, Math.max(40, 100 - prefixLen));
+        const lines = wrapped.split("\n");
+        write(`${prefix}${lines[0]}\n`);
+        if (lines.length > 1) {
+          const contPad = " ".repeat(prefixLen);
+          for (let i = 1; i < lines.length; i++) {
+            write(`${contPad}${lines[i]}\n`);
+          }
+        }
         break;
+      }
 
       case "tool_call": {
         const toolName = message.toolName ?? message.summary.split("(")[0] ?? message.summary;
@@ -344,8 +380,10 @@ export class ConsoleObserver implements AgentEvalObserver {
     // ── Scenario results table ──────────────────────────────────────
     write(`\n${c.bold}${c.cyan}━━━ Results ━━━${c.reset}\n\n`);
 
-    const nameW = Math.max(8, ...results.map((r) => r.id.length));
-    const header = `  ${padRight("Scenario", nameW)}  Result    MCP  Turns  Cost      Duration`;
+    const nameW = Math.max(10, ...results.map((r) => r.id.length));
+    const costW = Math.max(10, ...results.map((r) => `$${r.totalCostUsd.toFixed(4)}`.length));
+    const durW = Math.max(10, ...results.map((r) => `${(r.durationMs / 1000).toFixed(1)}s`.length));
+    const header = `  ${padRight("Scenario", nameW)}  Result    MCP  Turns  ${padRight("Cost", costW)}  Duration`;
     const sep = `  ${"─".repeat(stripAnsi(header).length - 2)}`;
 
     write(`${c.bold}${header}${c.reset}\n`);
@@ -359,7 +397,7 @@ export class ConsoleObserver implements AgentEvalObserver {
       const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
 
       write(
-        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, 8)}  ${dur}\n`,
+        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, costW)}  ${padRight(dur, durW)}\n`,
       );
     }
 

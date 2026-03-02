@@ -174,6 +174,8 @@ export interface AgentEvalOutput {
 export interface AgentObservedMessage {
   type: "system_init" | "assistant_text" | "tool_call" | "tool_result" | "result";
   summary: string;
+  /** Full un-truncated text for assistant_text messages. */
+  fullText?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolResultPreview?: string;
