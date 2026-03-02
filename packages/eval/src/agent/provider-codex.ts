@@ -386,17 +386,15 @@ export class CodexAgentProvider implements AgentProvider {
           const itemType = item.type as string | undefined;
 
           if (itemType === "agent_message") {
-            // Extract text from content blocks
-            const content = item.content as
-              | Array<Record<string, unknown>>
-              | undefined;
-            if (content) {
-              for (const block of content) {
-                if (block.type === "text" && typeof block.text === "string") {
-                  lastAnswer = block.text;
-                  yield { type: "text", text: block.text };
-                }
-              }
+            // Codex flattens a `text` field directly onto the item
+            if (typeof item.text === "string") {
+              lastAnswer = item.text;
+              yield { type: "text", text: item.text };
+            }
+          } else if (itemType === "reasoning") {
+            // Agent reasoning summary — surface as text for visibility
+            if (typeof item.text === "string") {
+              yield { type: "text", text: item.text };
             }
           } else if (itemType === "mcp_tool_call") {
             // Codex MCP events use separate "server" and "tool" fields.
@@ -454,7 +452,8 @@ export class CodexAgentProvider implements AgentProvider {
               args: { query },
             };
             yield { type: "tool_result", id: toolId, result: "(web search result)" };
-          } else if (itemType === "file_changes") {
+          } else if (itemType === "file_change") {
+            // Codex emits "file_change" (singular) with changes: [{path, kind}]
             const changes = item.changes as
               | Array<Record<string, unknown>>
               | undefined;
@@ -462,18 +461,9 @@ export class CodexAgentProvider implements AgentProvider {
               for (const change of changes) {
                 const toolId = `codex-tool-${++toolIdCounter}`;
                 const filePath =
-                  typeof change.file === "string" ? change.file : "unknown";
-                const changeType = change.type as string | undefined;
-                const toolName =
-                  changeType === "create" || changeType === "full_rewrite"
-                    ? "Write"
-                    : "Edit";
-                const content =
-                  typeof change.content === "string"
-                    ? change.content
-                    : typeof change.patch === "string"
-                      ? change.patch
-                      : JSON.stringify(change);
+                  typeof change.path === "string" ? change.path : "unknown";
+                const changeKind = change.kind as string | undefined;
+                const toolName = changeKind === "add" ? "Write" : "Edit";
 
                 yield {
                   type: "tool_call",
@@ -481,9 +471,42 @@ export class CodexAgentProvider implements AgentProvider {
                   name: toolName,
                   args: { file_path: filePath },
                 };
-                yield { type: "tool_result", id: toolId, result: content };
+                yield { type: "tool_result", id: toolId, result: `(${changeKind ?? "update"}: ${filePath})` };
               }
             }
+          } else if (itemType === "collab_tool_call") {
+            // Multi-agent collaboration tool call
+            const toolId = `codex-tool-${++toolIdCounter}`;
+            const collabTool =
+              typeof item.tool === "string" ? item.tool : "collab";
+            yield {
+              type: "tool_call",
+              id: toolId,
+              name: `CollabTool:${collabTool}`,
+              args: {
+                sender_thread_id: item.sender_thread_id,
+                receiver_thread_ids: item.receiver_thread_ids,
+              },
+            };
+            yield {
+              type: "tool_result",
+              id: toolId,
+              result: typeof item.status === "string" ? item.status : "completed",
+            };
+          } else if (itemType === "todo_list") {
+            // Agent's running plan — emit as text for observability
+            const items = item.items as Array<Record<string, unknown>> | undefined;
+            if (items) {
+              const plan = items
+                .map((t) => `${t.completed ? "[x]" : "[ ]"} ${t.text}`)
+                .join("\n");
+              yield { type: "text", text: `[plan]\n${plan}` };
+            }
+          } else if (itemType === "error") {
+            // Non-fatal error surfaced as an item
+            const msg = typeof item.message === "string" ? item.message : JSON.stringify(item);
+            errors.push(msg);
+            yield { type: "text", text: `[codex error] ${msg}` };
           }
         } else if (eventType === "turn.completed") {
           numTurns++;
@@ -501,11 +524,14 @@ export class CodexAgentProvider implements AgentProvider {
             break;
           }
         } else if (eventType === "turn.failed" || eventType === "error") {
+          // "error" events have { message: "..." }
+          // "turn.failed" events have { error: { message: "..." } }
+          const errorObj = event.error as Record<string, unknown> | undefined;
           const msg =
             typeof event.message === "string"
               ? event.message
-              : typeof event.error === "string"
-                ? event.error
+              : typeof errorObj?.message === "string"
+                ? errorObj.message
                 : JSON.stringify(event);
           errors.push(msg);
 
@@ -597,10 +623,13 @@ function summarizeEvent(event: Record<string, unknown>): string {
   if (type === "item.completed" && item) {
     const itemType = item.type as string;
     if (itemType === "agent_message") {
-      const content = item.content as Array<Record<string, unknown>> | undefined;
-      const text = content?.find((b) => b.type === "text")?.text;
-      const preview = typeof text === "string" ? text.slice(0, 100) : "";
-      return `item.completed/agent_message: "${preview}${typeof text === "string" && text.length > 100 ? "…" : ""}"`;
+      const text = typeof item.text === "string" ? item.text : "";
+      const preview = text.slice(0, 100);
+      return `item.completed/agent_message: "${preview}${text.length > 100 ? "…" : ""}"`;
+    }
+    if (itemType === "reasoning") {
+      const text = typeof item.text === "string" ? item.text : "";
+      return `item.completed/reasoning: "${text.slice(0, 100)}${text.length > 100 ? "…" : ""}"`;
     }
     if (itemType === "mcp_tool_call") {
       return `item.completed/mcp_tool_call: server=${item.server} tool=${item.tool} status=${item.status}`;
@@ -614,10 +643,17 @@ function summarizeEvent(event: Record<string, unknown>): string {
       const query = typeof item.query === "string" ? item.query.slice(0, 80) : "";
       return `item.completed/web_search: "${query}"`;
     }
-    if (itemType === "file_changes") {
+    if (itemType === "file_change") {
       const changes = item.changes as Array<Record<string, unknown>> | undefined;
-      const files = changes?.map((ch) => `${ch.type}:${ch.file}`).join(", ") ?? "";
-      return `item.completed/file_changes: [${files}]`;
+      const files = changes?.map((ch) => `${ch.kind}:${ch.path}`).join(", ") ?? "";
+      return `item.completed/file_change: [${files}]`;
+    }
+    if (itemType === "collab_tool_call") {
+      return `item.completed/collab_tool_call: tool=${item.tool} status=${item.status}`;
+    }
+    if (itemType === "todo_list") {
+      const items = item.items as Array<Record<string, unknown>> | undefined;
+      return `item.completed/todo_list: ${items?.length ?? 0} items`;
     }
     return `item.completed/${itemType}`;
   }
