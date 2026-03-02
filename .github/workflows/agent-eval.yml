@@ -92,6 +92,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Codex CLI
+        if: inputs.provider == 'openai' || inputs.provider == 'auto'
+        run: npm install -g @openai/codex
+
       - name: Build
         run: pnpm build
 
