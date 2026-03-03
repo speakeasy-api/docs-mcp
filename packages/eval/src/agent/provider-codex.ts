@@ -293,6 +293,13 @@ export class CodexAgentProvider implements AgentProvider {
       const toolList = mcpVerifiedTools.map((t) => `- ${t}`).join("\n");
       parts.push(`You have the following documentation tools available via MCP:\n${toolList}\n\nUse these tools to look up API signatures and usage examples — they provide authoritative, pre-indexed SDK documentation that is faster and more reliable than reading source code or searching the web.`);
     }
+    // When tools are restricted (docs-only mode), instruct the model to avoid
+    // filesystem browsing. Codex CLI has no native tool restriction, so this is
+    // a soft constraint via instructions.
+    if (config.tools && config.tools.length > 0) {
+      const allowed = config.tools.join(", ");
+      parts.push(`IMPORTANT: You may only use the following built-in tools: ${allowed}. Do NOT use Read, Glob, Grep, or any other file-browsing tools. All information must come from the documentation MCP tools listed above.`);
+    }
     if (parts.length > 0) {
       args.push("-c", `instructions="${escapeToml(parts.join("\n\n"))}"`);
     }
