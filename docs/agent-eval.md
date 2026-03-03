@@ -60,8 +60,8 @@ docs-mcp-eval agent-eval --suite acmeauth --include ts-init
 | `assertions`       | `AgentAssertion[]`           | yes      | —       | Array of assertions to evaluate against the agent's output                                             |
 | `category`         | `string`                     | no       | —       | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`)                       |
 | `models`           | `Record<provider, string>`   | no       | —       | Per-provider model overrides (takes precedence over CLI `--model`). Keys: `anthropic`, `openai`        |
-| `maxTurns`         | `number`                     | no       | `15`    | Max agent conversation turns for this scenario                                                         |
-| `maxBudgetUsd`     | `number`                     | no       | `2.00`  | Max dollar spend for this scenario                                                                     |
+| `maxTurns`         | `number`                     | no       | `100`   | Max agent conversation turns for this scenario                                                         |
+| `maxBudgetUsd`     | `number`                     | no       | `4.00`  | Max dollar spend for this scenario                                                                     |
 | `systemPrompt`     | `string`                     | no       | —       | System prompt given to the agent                                                                       |
 | `setup`            | `string`                     | no       | —       | Shell command run in the workspace directory before the agent starts                                   |
 | `description`      | `string`                     | no       | —       | Corpus description for the docs index; flows into MCP tool descriptions                               |
@@ -353,8 +353,8 @@ docs-mcp-eval agent-eval [options]
 | ------------------------- | -------------------------------- | ------------------------------------------------------ |
 | `--provider <value>`      | `auto`                           | Agent provider: `anthropic`, `openai`, or `auto`       |
 | `--model <value>`         | _(per-provider default)_         | Model to use (Anthropic default: `claude-opus-4-20250514`) |
-| `--max-turns <n>`         | `15`                             | Default max turns per scenario                         |
-| `--max-budget-usd <n>`    | `2.00`                           | Default max budget per scenario (USD)                  |
+| `--max-turns <n>`         | `100`                            | Default max turns per scenario                         |
+| `--max-budget-usd <n>`    | `4.00`                           | Default max budget per scenario (USD)                  |
 | `--max-concurrency <n>`   | `1`                              | Max concurrent scenarios                               |
 | `--system-prompt <value>` | —                                | Custom system prompt for the agent                     |
 | `--workspace-dir <path>`  | —                                | Base directory for agent workspaces                    |

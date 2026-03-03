@@ -211,12 +211,12 @@ program
     "auto",
   )
   .option("--model <value>", "Model to use (defaults based on provider)")
-  .option("--max-turns <number>", "Default max turns per scenario", parseIntOption, 15)
+  .option("--max-turns <number>", "Default max turns per scenario", parseIntOption, 100)
   .option(
     "--max-budget-usd <number>",
     "Default max budget per scenario in USD",
     parseFloatOption,
-    2.0,
+    4.0,
   )
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
