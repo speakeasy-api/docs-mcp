@@ -5,6 +5,7 @@ import type {
   AgentObservedMessage,
   AgentScenario,
   AgentScenarioResult,
+  FeedbackToolConfig,
 } from "./types.js";
 
 const useColor = !process.env.NO_COLOR && (process.stderr.isTTY ?? false);
@@ -242,6 +243,7 @@ export interface ConsoleObserverOptions {
   model?: string;
   suite?: string;
   debug?: boolean;
+  feedbackToolConfig?: FeedbackToolConfig;
 }
 
 // ── Console observer (Rich-style) ──────────────────────────────────────
@@ -389,7 +391,16 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${c.dim}${(result.durationMs / 1000).toFixed(1)}s${c.reset}`,
     ];
     if (result.feedbackResult) {
-      parts.push(`${c.cyan}judge: ${result.feedbackResult.confidenceScore}${c.reset}`);
+      const cfg = this.opts.feedbackToolConfig;
+      const headlineField = cfg?.headlineField ?? cfg?.metrics[0]?.field;
+      const headlineLabel =
+        cfg?.metrics.find((m) => m.field === headlineField)?.label ?? "judge";
+      const headlineValue = headlineField
+        ? result.feedbackResult.scores[headlineField]
+        : undefined;
+      if (headlineValue !== undefined) {
+        parts.push(`${c.cyan}${headlineLabel}: ${headlineValue}${c.reset}`);
+      }
     }
     write(`\n${parts.join(` ${c.dim}|${c.reset} `)}\n`);
 
@@ -515,11 +526,16 @@ function formatCacheTokens(avgRead: number, avgCreate: number): string {
 }
 
 function formatFeedbackLine(s: import("./types.js").AgentEvalSummary): string {
-  if (s.avgConfidenceScore === undefined) return "";
-  const conf = s.avgConfidenceScore.toFixed(0);
-  const rel = s.avgDocsRelevance?.toFixed(0) ?? "—";
-  const util = s.avgDocsUtilization?.toFixed(0) ?? "—";
-  return `${padRight("Feedback score", 16)}${conf} ${c.dim}(relevance: ${rel}, utilization: ${util})${c.reset}`;
+  if (!s.feedbackMetrics) return "";
+  const entries = Object.entries(s.feedbackMetrics);
+  if (entries.length === 0) return "";
+  const [, firstVal] = entries[0]!;
+  const rest = entries
+    .slice(1)
+    .map(([k, v]) => `${k}: ${v.toFixed(0)}`)
+    .join(", ");
+  const detail = rest ? ` ${c.dim}(${rest})${c.reset}` : "";
+  return `${padRight("Feedback", 16)}${firstVal.toFixed(0)}${detail}`;
 }
 
 function formatMcpCallsLine(s: import("./types.js").AgentEvalSummary): string {

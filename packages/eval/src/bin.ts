@@ -14,7 +14,7 @@ import { ConsoleObserver } from "./agent/observer.js";
 import { ensureRepo } from "./agent/repo-cache.js";
 import { defaultModelForProvider, resolveAgentProvider } from "./agent/provider.js";
 import { runAgentEval } from "./agent/runner.js";
-import type { AgentEvalConfig, AgentScenario } from "./agent/types.js";
+import type { AgentEvalConfig, AgentScenario, FeedbackToolConfig } from "./agent/types.js";
 import { generateBenchmarkMarkdown, parseEmbeddingSpec, runBenchmark } from "./benchmark.js";
 import { generateDeltaMarkdown, toDeltaCases } from "./delta.js";
 import {
@@ -279,7 +279,9 @@ program
       }
 
       // Load scenarios
-      let { scenarios, scenariosFilePath } = await loadScenarios(options);
+      const loaded = await loadScenarios(options);
+      let { scenarios } = loaded;
+      const { scenariosFilePath, config: suiteConfig } = loaded;
 
       // Filter by --include
       if (options.include) {
@@ -386,10 +388,13 @@ program
           : "ad-hoc");
       const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
 
+      const feedbackToolConfig = suiteConfig?.feedbackToolConfig;
+
       const observer = new ConsoleObserver({
         model: model ?? `${provider.name} (default)`,
         suite: suiteName,
         debug: options.debug,
+        ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
       });
 
       const output = await runAgentEval({
@@ -407,6 +412,7 @@ program
         judge: options.judge,
         cleanWorkspace: options.cleanWorkspace,
         noMcp,
+        ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
       });
 
       // Auto-persist + trend comparison
@@ -456,9 +462,10 @@ async function runCompare(options: {
   save: boolean;
   out?: string;
 }): Promise<void> {
-  const { scenarios: loadedScenarios, scenariosFilePath } = await loadScenarios(options);
+  const loaded = await loadScenarios(options);
+  const { scenariosFilePath, config: suiteConfig } = loaded;
 
-  let scenarios = loadedScenarios;
+  let scenarios = loaded.scenarios;
   if (options.include) {
     const includeIds = new Set(options.include.split(",").map((s) => s.trim()));
     scenarios = scenarios.filter((s) => includeIds.has(s.id));
@@ -548,6 +555,8 @@ async function runCompare(options: {
       }
     : undefined;
 
+  const feedbackToolConfig = suiteConfig?.feedbackToolConfig;
+
   // Shared config builder
   const buildEvalConfig = (noMcp: boolean, suiteName: string): AgentEvalConfig => {
     // Deep-clone scenarios so the baseline run doesn't see indexDir
@@ -575,11 +584,13 @@ async function runCompare(options: {
         model: modelDisplay,
         suite: suiteName,
         debug: options.debug,
+        ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
       }),
       debug: options.debug,
       judge: options.judge,
       cleanWorkspace: options.cleanWorkspace,
       noMcp,
+      ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
     };
   };
 
@@ -623,21 +634,33 @@ async function runCompare(options: {
   }
 }
 
+interface SuiteConfig {
+  feedbackToolConfig?: FeedbackToolConfig;
+}
+
+interface LoadedSuite {
+  scenarios: AgentScenario[];
+  scenariosFilePath?: string;
+  config?: SuiteConfig;
+}
+
 async function loadScenarios(options: {
   suite?: string;
   scenarios?: string;
   prompt?: string;
   docsDir?: string;
-}): Promise<{ scenarios: AgentScenario[]; scenariosFilePath?: string }> {
+}): Promise<LoadedSuite> {
   if (options.suite) {
     const filePath = await resolveSuiteFile(options.suite);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
+    const result = parseScenarioFile(raw);
+    return { scenarios: result.scenarios, scenariosFilePath: filePath, ...(result.config !== undefined ? { config: result.config } : {}) };
   }
   if (options.scenarios) {
     const filePath = path.resolve(options.scenarios);
     const raw = await readFile(filePath, "utf8");
-    return { scenarios: parseScenarioFile(raw), scenariosFilePath: filePath };
+    const result = parseScenarioFile(raw);
+    return { scenarios: result.scenarios, scenariosFilePath: filePath, ...(result.config !== undefined ? { config: result.config } : {}) };
   }
   // --prompt mode
   return {
@@ -667,21 +690,66 @@ async function resolveSuiteFile(suite: string): Promise<string> {
   return path.join(FIXTURES_DIR, `${suite}.yaml`);
 }
 
-function parseScenarioFile(raw: string): AgentScenario[] {
+interface ParsedSuiteFile {
+  scenarios: AgentScenario[];
+  config?: SuiteConfig;
+}
+
+function parseScenarioFile(raw: string): ParsedSuiteFile {
   const parsed = YAML.parse(raw, { merge: true }) as unknown;
 
   // Legacy array format — auto-generate ids from names
   if (Array.isArray(parsed)) {
-    return (parsed as AgentScenario[]).map((s) => ({
-      ...s,
-      id: s.id ?? slugify(s.name),
-    }));
+    return {
+      scenarios: (parsed as AgentScenario[]).map((s) => ({
+        ...s,
+        id: s.id ?? slugify(s.name),
+      })),
+    };
+  }
+
+  const record = parsed as Record<string, unknown>;
+
+  // Extract suite-level config from _config key
+  let config: SuiteConfig | undefined;
+  if (record._config && typeof record._config === "object" && !Array.isArray(record._config)) {
+    const rawConfig = record._config as Record<string, unknown>;
+    if (rawConfig.feedback_tool && typeof rawConfig.feedback_tool === "object") {
+      config = {
+        feedbackToolConfig: parseFeedbackToolYaml(
+          rawConfig.feedback_tool as Record<string, unknown>,
+        ),
+      };
+    }
   }
 
   // K:V format — key is the scenario id. Strip keys starting with "_" (YAML anchor-only entries).
-  return Object.entries(parsed as Record<string, Omit<AgentScenario, "id">>)
+  const scenarios = Object.entries(record)
     .filter(([id]) => !id.startsWith("_"))
-    .map(([id, scenario]) => ({ ...scenario, id }));
+    .map(([id, scenario]) => ({ ...(scenario as Omit<AgentScenario, "id">), id }));
+
+  return { scenarios, ...(config !== undefined ? { config } : {}) };
+}
+
+/** Convert snake_case YAML feedback_tool config to FeedbackToolConfig. */
+function parseFeedbackToolYaml(raw: Record<string, unknown>): FeedbackToolConfig {
+  const metrics = Array.isArray(raw.metrics)
+    ? (raw.metrics as Array<Record<string, unknown>>).map((m) => ({
+        field: String(m.field),
+        label: String(m.label),
+        direction: (m.direction === "lower" ? "lower" : "higher") as "higher" | "lower",
+      }))
+    : [];
+
+  return {
+    name: String(raw.name),
+    description: String(raw.description),
+    instruction: String(raw.instruction),
+    inputSchema: raw.input_schema as FeedbackToolConfig["inputSchema"],
+    metrics,
+    ...(typeof raw.reasoning_field === "string" ? { reasoningField: raw.reasoning_field } : {}),
+    ...(typeof raw.headline_field === "string" ? { headlineField: raw.headline_field } : {}),
+  };
 }
 
 function slugify(name: string): string {

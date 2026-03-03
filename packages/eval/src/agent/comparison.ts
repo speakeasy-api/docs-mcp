@@ -73,9 +73,19 @@ export function buildComparison(
     avgCostUsdDelta: withMcp.summary.avgCostUsd - withoutMcp.summary.avgCostUsd,
     totalCostUsdDelta: withMcp.summary.totalCostUsd - withoutMcp.summary.totalCostUsd,
     avgDurationMsDelta: withMcp.summary.avgDurationMs - withoutMcp.summary.avgDurationMs,
-    ...(withMcp.summary.avgConfidenceScore !== undefined && withoutMcp.summary.avgConfidenceScore !== undefined
-      ? { avgConfidenceScoreDelta: withMcp.summary.avgConfidenceScore - withoutMcp.summary.avgConfidenceScore }
-      : {}),
+    ...(() => {
+      const wm = withMcp.summary.feedbackMetrics;
+      const wo = withoutMcp.summary.feedbackMetrics;
+      if (!wm) return {};
+      const deltas: Record<string, number> = {};
+      for (const [key, val] of Object.entries(wm)) {
+        const woVal = wo?.[key];
+        if (woVal !== undefined) {
+          deltas[key] = val - woVal;
+        }
+      }
+      return Object.keys(deltas).length > 0 ? { feedbackMetricDeltas: deltas } : {};
+    })(),
   };
 
   const startedAt = withMcp.metadata.startedAt < withoutMcp.metadata.startedAt
@@ -148,17 +158,20 @@ export function formatComparisonReport(comparison: ComparisonOutput): string {
     `${padRight("MCP calls", 16)}${padRight((wm.avgMcpToolCalls ?? 0).toFixed(1), 12)}${c.dim}—${c.reset}`,
   );
 
-  if (wm.avgConfidenceScore !== undefined) {
-    const withFb = wm.avgConfidenceScore.toFixed(0);
-    const woFb = wo.avgConfidenceScore !== undefined ? wo.avgConfidenceScore.toFixed(0) : "—";
-    if (delta.avgConfidenceScoreDelta !== undefined) {
-      metricsLines.push(
-        formatMetricRow("Feedback score", withFb, woFb, delta.avgConfidenceScoreDelta, "", "higher"),
-      );
-    } else {
-      metricsLines.push(
-        `${padRight("Feedback score", 16)}${padRight(withFb, 12)}${woFb}`,
-      );
+  if (wm.feedbackMetrics) {
+    for (const [key, val] of Object.entries(wm.feedbackMetrics)) {
+      const withFb = val.toFixed(0);
+      const woFb = wo.feedbackMetrics?.[key]?.toFixed(0) ?? "—";
+      const metricDelta = delta.feedbackMetricDeltas?.[key];
+      if (metricDelta !== undefined) {
+        metricsLines.push(
+          formatMetricRow(`Feedback: ${key}`, withFb, woFb, metricDelta, "", "higher"),
+        );
+      } else {
+        metricsLines.push(
+          `${padRight(`Feedback: ${key}`, 16)}${padRight(withFb, 12)}${woFb}`,
+        );
+      }
     }
   }
 

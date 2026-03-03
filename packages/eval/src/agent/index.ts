@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./feedback.js";
 export * from "./provider.js";
 export * from "./assertions.js";
 export * from "./build-cache.js";

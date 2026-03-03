@@ -6,6 +6,7 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { evaluateAssertions } from "./assertions.js";
+import { DEFAULT_FEEDBACK_TOOL_CONFIG, parseFeedbackResult } from "./feedback.js";
 import { computeAgentEvalSummary } from "./metrics.js";
 import { NoopObserver } from "./observer.js";
 import { defaultModelForProvider } from "./provider.js";
@@ -14,9 +15,10 @@ import type {
   AgentEvalConfig,
   AgentEvalObserver,
   AgentEvalOutput,
+  FeedbackResult,
+  FeedbackToolConfig,
   AgentScenario,
   AgentScenarioResult,
-  FeedbackResult,
   ToolCallRecord,
   WorkspaceFile,
 } from "./types.js";
@@ -29,7 +31,6 @@ const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dis
 const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.5;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
-const FEEDBACK_TOOL = "mcp__docs-mcp__docs_feedback";
 
 const DEFAULT_SYSTEM_PROMPT =
   "Write all output files to the current working directory. Do not create new directories or use absolute paths from documentation examples.";
@@ -96,9 +97,16 @@ export async function runAgentScenario(
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
   const judge = config.judge !== false;
+  const feedbackConfig: FeedbackToolConfig | undefined =
+    judge && !config.noMcp
+      ? (config.feedbackToolConfig ?? DEFAULT_FEEDBACK_TOOL_CONFIG)
+      : undefined;
+  const feedbackToolFqn = feedbackConfig
+    ? `mcp__docs-mcp__${feedbackConfig.name}`
+    : undefined;
   const customSystemPrompt = scenario.systemPrompt ?? config.systemPrompt;
-  const feedbackInstruction = judge && !config.noMcp
-    ? "\n\nAfter completing the task, call the docs_feedback tool to report how useful the documentation was."
+  const feedbackInstruction = feedbackConfig
+    ? `\n\n${feedbackConfig.instruction}`
     : "";
   const systemPrompt = customSystemPrompt
     ? `${DEFAULT_SYSTEM_PROMPT}\n\n${customSystemPrompt}${feedbackInstruction}`
@@ -177,7 +185,16 @@ export async function runAgentScenario(
 
       if (scenario.indexDir) {
         const serverArgs = [SERVER_BIN_PATH, "--index-dir", scenario.indexDir];
-        if (judge) serverArgs.push("--feedback-tool");
+        if (feedbackConfig) {
+          const toolDefs = [
+            {
+              name: feedbackConfig.name,
+              description: feedbackConfig.description,
+              inputSchema: feedbackConfig.inputSchema,
+            },
+          ];
+          serverArgs.push("--custom-tools-json", JSON.stringify(toolDefs));
+        }
         mcpServerConfig = {
           command: "node",
           args: serverArgs,
@@ -362,10 +379,10 @@ export async function runAgentScenario(
 
     // Extract feedback from tool trace
     let feedbackResult: FeedbackResult | undefined;
-    if (judge) {
-      const feedbackCall = toolCallTrace.find((t) => t.name === FEEDBACK_TOOL);
+    if (feedbackConfig && feedbackToolFqn) {
+      const feedbackCall = toolCallTrace.find((t) => t.name === feedbackToolFqn);
       if (feedbackCall) {
-        feedbackResult = parseFeedbackArgs(feedbackCall.args);
+        feedbackResult = parseFeedbackResult(feedbackCall.args, feedbackConfig);
       }
     }
 
@@ -443,23 +460,6 @@ const EXT_LANG: Record<string, string> = {
   sql: "sql",
 };
 
-function parseFeedbackArgs(args: Record<string, unknown>): FeedbackResult | undefined {
-  const confidence = Number(args.confidence_score);
-  const relevance = Number(args.docs_relevance);
-  const utilization = Number(args.docs_utilization);
-  const reasoning = typeof args.reasoning === "string" ? args.reasoning : "";
-
-  if (!Number.isFinite(confidence) || !Number.isFinite(relevance) || !Number.isFinite(utilization)) {
-    return undefined;
-  }
-
-  return {
-    confidenceScore: Math.max(0, Math.min(100, Math.round(confidence))),
-    docsRelevance: Math.max(0, Math.min(100, Math.round(relevance))),
-    docsUtilization: Math.max(0, Math.min(100, Math.round(utilization))),
-    reasoning,
-  };
-}
 
 async function collectWorkspaceFiles(
   trace: ToolCallRecord[],

@@ -66,11 +66,39 @@ export interface AssertionResult {
   message: string;
 }
 
+/** Declarative metric field specification within a feedback tool. */
+export interface FeedbackMetricSpec {
+  /** JSON property name in the tool's inputSchema */
+  field: string;
+  /** Human-readable label for display */
+  label: string;
+  /** Whether higher or lower values are better — controls trend arrows */
+  direction: "higher" | "lower";
+}
+
+/** Fully describes a configurable feedback tool. */
+export interface FeedbackToolConfig {
+  /** MCP tool name (registered as-is on the server) */
+  name: string;
+  /** Tool description shown to the agent */
+  description: string;
+  /** Instruction text appended to the system prompt telling the agent to call this tool */
+  instruction: string;
+  /** JSON Schema for the tool's input */
+  inputSchema: { type: "object"; properties: Record<string, unknown>; required?: string[] };
+  /** Which fields are numeric metrics to aggregate */
+  metrics: FeedbackMetricSpec[];
+  /** Which field contains free-text reasoning (stored but not aggregated) */
+  reasoningField?: string;
+  /** Which metric field to show in the observer's one-liner per scenario (defaults to first metric) */
+  headlineField?: string;
+}
+
 export interface FeedbackResult {
-  confidenceScore: number;
-  docsRelevance: number;
-  docsUtilization: number;
-  reasoning: string;
+  /** Metric values keyed by FeedbackMetricSpec.field */
+  scores: Record<string, number>;
+  /** Free-text reasoning extracted from reasoningField */
+  reasoning?: string;
 }
 
 export interface WorkspaceFile {
@@ -146,9 +174,8 @@ export interface AgentEvalSummary {
   avgMcpToolCalls: number;
   mcpToolUsageDistribution: Record<string, number>;
   toolUsageDistribution: Record<string, number>;
-  avgConfidenceScore?: number;
-  avgDocsRelevance?: number;
-  avgDocsUtilization?: number;
+  /** Aggregated feedback metrics keyed by FeedbackMetricSpec.field */
+  feedbackMetrics?: Record<string, number>;
   categoryBreakdown: AgentCategoryBreakdown[];
 }
 
@@ -177,6 +204,8 @@ export interface AgentEvalConfig {
   cleanWorkspace?: boolean;
   /** Enable feedback tool for agent self-reported confidence scoring. Default: true. */
   judge?: boolean;
+  /** Custom feedback tool configuration. When absent and judge=true, uses the built-in default. */
+  feedbackToolConfig?: FeedbackToolConfig;
 }
 
 export interface AgentEvalOutput {
@@ -237,7 +266,7 @@ export interface ComparisonSummaryDelta {
   avgCostUsdDelta: number;
   totalCostUsdDelta: number;
   avgDurationMsDelta: number;
-  avgConfidenceScoreDelta?: number;
+  feedbackMetricDeltas?: Record<string, number>;
 }
 
 export interface ComparisonOutput {

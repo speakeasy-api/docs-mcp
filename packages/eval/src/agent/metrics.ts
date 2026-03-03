@@ -1,4 +1,4 @@
-import type { AgentCategoryBreakdown, AgentEvalSummary, AgentScenarioResult, FeedbackResult } from "./types.js";
+import type { AgentCategoryBreakdown, AgentEvalSummary, AgentScenarioResult } from "./types.js";
 
 export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEvalSummary {
   const n = results.length;
@@ -29,18 +29,26 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     }
   }
 
-  const feedbackResults = results
-    .map((r) => r.feedbackResult)
-    .filter((f): f is FeedbackResult => f !== undefined);
+  const feedbackScores = results
+    .map((r) => r.feedbackResult?.scores)
+    .filter((s): s is Record<string, number> => s !== undefined);
 
-  const feedbackFields =
-    feedbackResults.length > 0
-      ? {
-          avgConfidenceScore: round(avg(feedbackResults.map((f) => f.confidenceScore))),
-          avgDocsRelevance: round(avg(feedbackResults.map((f) => f.docsRelevance))),
-          avgDocsUtilization: round(avg(feedbackResults.map((f) => f.docsUtilization))),
-        }
-      : {};
+  const feedbackMetrics: Record<string, number> | undefined =
+    feedbackScores.length > 0
+      ? (() => {
+          const allKeys = new Set(feedbackScores.flatMap((s) => Object.keys(s)));
+          const agg: Record<string, number> = {};
+          for (const key of allKeys) {
+            const values = feedbackScores
+              .map((s) => s[key])
+              .filter((v): v is number => v !== undefined);
+            if (values.length > 0) {
+              agg[key] = round(avg(values));
+            }
+          }
+          return agg;
+        })()
+      : undefined;
 
   return {
     totalScenarios: n,
@@ -59,7 +67,7 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     avgMcpToolCalls: round(avg(mcpCalls)),
     mcpToolUsageDistribution,
     toolUsageDistribution,
-    ...feedbackFields,
+    ...(feedbackMetrics !== undefined ? { feedbackMetrics } : {}),
     categoryBreakdown: computeCategoryBreakdown(results),
   };
 }
