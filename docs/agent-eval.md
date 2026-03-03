@@ -12,29 +12,36 @@ The eval supports multiple agent providers via the `--provider` flag:
 | OpenAI Codex | `--provider openai` | `codex exec --json` (CLI spawn) | `OPENAI_API_KEY` + [`codex`](https://github.com/openai/codex) CLI on PATH |
 | Auto (default) | `--provider auto` | Detected from environment | Whichever API key is set |
 
-Auto-detection priority: if only `OPENAI_API_KEY` is set, Codex is used; otherwise Anthropic is used (its CLI handles its own auth). If both keys are set, Anthropic is used with a warning.
+Auto-detection priority: if only `OPENAI_API_KEY` is set, Codex is used; otherwise Anthropic is used (its CLI handles its own auth, or via `CLAUDE_CODE_USE_BEDROCK` / `CLAUDE_CODE_USE_VERTEX`). If both keys are set, Anthropic is used with a warning.
 
 The Codex provider spawns `codex exec --json` as a child process and injects MCP server configuration via `-c` CLI flags. It performs a pre-flight check to verify the MCP server starts correctly before running the agent.
 
 ## Scenario Format
 
-A scenario file is a JSON object keyed by scenario ID. Each key is a short, stable identifier used for `--include` filtering and result matching:
+Scenario files are YAML (or JSON, which is valid YAML). The file is an object keyed by scenario ID. Each key is a short, stable identifier used for `--include` filtering and result matching. Keys starting with `_` are ignored (useful for YAML anchors and shared defaults).
 
-```json
-{
-  "ts-init": {
-    "name": "Initialize the TypeScript client",
-    "prompt": "Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in solution.ts that initializes the AcmeAuth client with an API key from the environment and fetches a user by ID.",
-    "description": "AcmeAuth SDK — multi-language authentication client",
-    "docsDir": "./docs",
-    "category": "sdk-usage",
-    "setup": "npm init -y --silent 2>/dev/null",
-    "assertions": [
-      { "type": "file_contains", "path": "solution.ts", "value": "AcmeAuth" },
-      { "type": "file_contains", "path": "solution.ts", "value": "apiKey" }
-    ]
-  }
-}
+```yaml
+_defaults: &defaults
+  description: &description >-
+    AcmeAuth SDK — multi-language authentication client
+  docsDir: &docsDir "../../my-docs"
+
+ts-init:
+  name: Initialize the TypeScript client
+  <<: *defaults
+  prompt: >-
+    Using the AcmeAuth TypeScript SDK (`@acmeauth/sdk`), write a script in
+    solution.ts that initializes the AcmeAuth client with an API key from the
+    environment and fetches a user by ID.
+  category: sdk-usage
+  setup: "npm init -y --silent 2>/dev/null"
+  assertions:
+    - type: file_contains
+      path: solution.ts
+      value: AcmeAuth
+    - type: file_contains
+      path: solution.ts
+      value: apiKey
 ```
 
 Run a specific scenario by ID:
@@ -45,22 +52,54 @@ docs-mcp-eval agent-eval --suite acmeauth --include ts-init
 
 ### Field Reference
 
-| Field          | Type               | Required | Default | Description                                                                      |
-| -------------- | ------------------ | -------- | ------- | -------------------------------------------------------------------------------- |
-| _(object key)_ | `string`           | yes      | —       | Scenario ID — short, stable identifier used for `--include` and result matching  |
-| `name`         | `string`           | yes      | —       | Human-readable scenario name, shown in output tables                             |
-| `prompt`       | `string`           | yes      | —       | The user prompt sent to the Claude agent                                         |
-| `assertions`   | `AgentAssertion[]` | yes      | —       | Array of assertions to evaluate against the agent's output                       |
-| `category`     | `string`           | no       | —       | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`) |
-| `maxTurns`     | `number`           | no       | `15`    | Max agent conversation turns for this scenario                                   |
-| `maxBudgetUsd` | `number`           | no       | `0.50`  | Max dollar spend for this scenario                                               |
-| `systemPrompt` | `string`           | no       | —       | System prompt given to the agent                                                 |
-| `setup`        | `string`           | no       | —       | Shell command run in the workspace directory before the agent starts             |
-| `description`  | `string`           | no       | —       | Corpus description for the docs index; flows into MCP tool descriptions          |
-| `docsSpec`     | `DocsRepoSpec`     | no       | —       | Git repo to clone and index docs from (takes precedence over `docsDir`)          |
-| `docsDir`      | `string`           | no       | —       | Path to a local docs directory, resolved relative to the scenario file           |
+| Field              | Type                         | Required | Default | Description                                                                                            |
+| ------------------ | ---------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| _(object key)_     | `string`                     | yes      | —       | Scenario ID — short, stable identifier used for `--include` and result matching                        |
+| `name`             | `string`                     | yes      | —       | Human-readable scenario name, shown in output tables                                                   |
+| `prompt`           | `string`                     | yes      | —       | The user prompt sent to the agent                                                                      |
+| `assertions`       | `AgentAssertion[]`           | yes      | —       | Array of assertions to evaluate against the agent's output                                             |
+| `category`         | `string`                     | no       | —       | Grouping tag for per-category breakdown (e.g. `"sdk-usage"`, `"error-handling"`)                       |
+| `models`           | `Record<provider, string>`   | no       | —       | Per-provider model overrides (takes precedence over CLI `--model`). Keys: `anthropic`, `openai`        |
+| `maxTurns`         | `number`                     | no       | `15`    | Max agent conversation turns for this scenario                                                         |
+| `maxBudgetUsd`     | `number`                     | no       | `0.50`  | Max dollar spend for this scenario                                                                     |
+| `systemPrompt`     | `string`                     | no       | —       | System prompt given to the agent                                                                       |
+| `setup`            | `string`                     | no       | —       | Shell command run in the workspace directory before the agent starts                                   |
+| `description`      | `string`                     | no       | —       | Corpus description for the docs index; flows into MCP tool descriptions                               |
+| `toolDescriptions` | `{ search_docs?, get_doc? }` | no       | —       | Custom tool descriptions for the MCP server tools (overrides description-derived defaults)             |
+| `docsSpec`         | `DocsRepoSpec`               | no       | —       | Git repo to clone and index docs from (takes precedence over `docsDir`)                                |
+| `docsDir`          | `string`                     | no       | —       | Path to a local docs directory, resolved relative to the scenario file                                 |
+| `links`            | `Record<string, string>`     | no       | —       | Map of source paths (relative to scenario file) to workspace dest paths. Symlinked before `setup` runs |
 
 A scenario **passes** only if it has at least one hard assertion and all hard assertions pass. Soft assertions (`"soft": true`) are still evaluated and displayed in output, but their results do not affect pass/fail.
+
+### Per-Provider Model Overrides
+
+The `models` field lets a scenario use different models depending on which provider is active. This takes precedence over the CLI `--model` flag:
+
+```yaml
+my-scenario:
+  name: Test with specific models
+  models:
+    anthropic: claude-sonnet-4-20250514
+    openai: o3-mini
+  prompt: "..."
+  assertions: [...]
+```
+
+### Workspace Links
+
+The `links` field symlinks files from the repo into the agent workspace before `setup` runs. Source paths are relative to the scenario file; destination paths are relative to the workspace:
+
+```yaml
+my-scenario:
+  name: Test with local SDK
+  links:
+    ../../packages/my-sdk/dist: node_modules/my-sdk
+    ../fixtures/tsconfig.json: tsconfig.json
+  setup: "npm init -y --silent 2>/dev/null"
+  prompt: "..."
+  assertions: [...]
+```
 
 ## Docs Sources
 
@@ -70,29 +109,25 @@ Each scenario needs a documentation corpus. There are two ways to specify one:
 
 Point to a local docs directory. The path is resolved relative to the scenario file's location.
 
-```json
-{
-  "docsDir": "../../my-docs"
-}
+```yaml
+docsDir: "../../my-docs"
 ```
 
 ### `docsSpec` — Clone from Git
 
 Clone a repository and index a subdirectory within it. Useful for evaluating against external SDK documentation.
 
-```json
-{
-  "docsSpec": {
-    "url": "https://github.com/org/sdk-docs.git",
-    "ref": "main",
-    "docsPath": "docs/typescript",
-    "docsConfig": {
-      "version": "1",
-      "strategy": { "chunk_by": "h2" },
-      "metadata": { "language": "typescript" }
-    }
-  }
-}
+```yaml
+docsSpec:
+  url: https://github.com/org/sdk-docs.git
+  ref: main
+  docsPath: docs/typescript
+  docsConfig:
+    version: "1"
+    strategy:
+      chunk_by: h2
+    metadata:
+      language: typescript
 ```
 
 | Field        | Type     | Required | Default  | Description                                                                              |
@@ -218,8 +253,8 @@ docs-mcp-eval agent-eval [options]
 
 | Option               | Description                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--suite <name>`     | Named scenario suite bundled with the eval package (resolves to `fixtures/agent-scenarios/<name>.json`) |
-| `--scenarios <path>` | Path to a scenario JSON file (object keyed by ID, or legacy array)                                      |
+| `--suite <name>`     | Named scenario suite bundled with the eval package (resolves to `fixtures/agent-scenarios/<name>.yaml`) |
+| `--scenarios <path>` | Path to a YAML/JSON scenario file (object keyed by ID, or legacy array)                                 |
 | `--prompt <text>`    | Ad-hoc single scenario prompt (requires `--docs-dir`). Creates a one-off scenario with empty assertions |
 
 ### Filtering
@@ -243,7 +278,7 @@ docs-mcp-eval agent-eval [options]
 | Option                    | Default                          | Description                                            |
 | ------------------------- | -------------------------------- | ------------------------------------------------------ |
 | `--provider <value>`      | `auto`                           | Agent provider: `anthropic`, `openai`, or `auto`       |
-| `--model <value>`         | _(per-provider default)_         | Model to use (e.g. `claude-sonnet-4-20250514`)         |
+| `--model <value>`         | _(per-provider default)_         | Model to use (Anthropic default: `claude-opus-4-20250514`) |
 | `--max-turns <n>`         | `15`                             | Default max turns per scenario                         |
 | `--max-budget-usd <n>`    | `0.50`                           | Default max budget per scenario (USD)                  |
 | `--max-concurrency <n>`   | `1`                              | Max concurrent scenarios                               |
@@ -259,11 +294,12 @@ docs-mcp-eval agent-eval [options]
 
 ### Output
 
-| Option         | Default | Description                                  |
-| -------------- | ------- | -------------------------------------------- |
-| `--out <path>` | —       | Output JSON path                             |
-| `--no-save`    | —       | Skip auto-saving results to `.eval-results/` |
-| `--debug`      | `false` | Enable verbose agent event logging           |
+| Option              | Default | Description                                      |
+| ------------------- | ------- | ------------------------------------------------ |
+| `--out <path>`      | —       | Output JSON path                                 |
+| `--no-save`         | —       | Skip auto-saving results to `.eval-results/`     |
+| `--debug`           | `false` | Enable verbose agent event logging               |
+| `--clean-workspace` | `false` | Delete workspace directories after run           |
 
 ## Comparison Mode (`--compare`)
 
@@ -352,16 +388,16 @@ The eval framework works in two main contexts:
 1. **Testing your own SDK docs quality** — point scenarios at your documentation to measure how well an AI agent can use them to complete tasks.
 2. **Evaluating docs-mcp against any OSS project** — clone any project's docs via `docsSpec` to benchmark search and retrieval quality.
 
-The only thing you need in a consumer repo is a scenario JSON file. Invoke the eval via npx:
+The only thing you need in a consumer repo is a scenario YAML file. Invoke the eval via npx:
 
 ```bash
 # With Claude (default)
 npx @speakeasy-api/docs-mcp-eval agent-eval \
-  --scenarios ./agent-scenarios.json
+  --scenarios ./agent-scenarios.yaml
 
 # With OpenAI Codex
 npx @speakeasy-api/docs-mcp-eval agent-eval \
-  --scenarios ./agent-scenarios.json \
+  --scenarios ./agent-scenarios.yaml \
   --provider openai
 ```
 
@@ -369,19 +405,17 @@ npx @speakeasy-api/docs-mcp-eval agent-eval \
 
 Scenarios can use `docsSpec` to clone docs from any git repo, so no local docs checkout is needed:
 
-```json
-{
-  "sdk-init": {
-    "name": "SDK init",
-    "prompt": "Initialize the SDK client...",
-    "docsSpec": {
-      "url": "https://github.com/org/sdk-docs.git",
-      "ref": "v2.0",
-      "docsPath": "docs"
-    },
-    "assertions": [{ "type": "contains", "value": "Client" }]
-  }
-}
+```yaml
+sdk-init:
+  name: SDK init
+  prompt: "Initialize the SDK client..."
+  docsSpec:
+    url: https://github.com/org/sdk-docs.git
+    ref: v2.0
+    docsPath: docs
+  assertions:
+    - type: contains
+      value: Client
 ```
 
 This works with any project that has markdown documentation — not just SDKs. For example, you could evaluate how well docs-mcp serves framework guides, API references, or operational runbooks.
@@ -392,7 +426,7 @@ Or point to a local docs directory with `--docs-dir`:
 
 ```bash
 npx @speakeasy-api/docs-mcp-eval agent-eval \
-  --scenarios ./agent-scenarios.json \
+  --scenarios ./agent-scenarios.yaml \
   --docs-dir ./my-docs
 ```
 
@@ -404,7 +438,7 @@ The `--out` flag produces a self-contained JSON artifact suitable for CI compari
 
 ```bash
 npx @speakeasy-api/docs-mcp-eval agent-eval \
-  --scenarios ./agent-scenarios.json \
+  --scenarios ./agent-scenarios.yaml \
   --out eval-results.json
 ```
 
@@ -450,6 +484,8 @@ Results are saved as JSON (auto-saved to `.eval-results/<suite>/` by default, or
     "medianDurationMs": 42000,
     "avgInputTokens": 12000,
     "avgOutputTokens": 3500,
+    "avgCacheReadInputTokens": 8000,
+    "avgCacheCreationInputTokens": 4000,
     "toolUsageDistribution": {
       "mcp__docs-mcp__search_docs": 35,
       "mcp__docs-mcp__get_doc": 22
@@ -485,6 +521,7 @@ Each scenario result includes:
 - `passed` — did all assertions pass?
 - `assertionResults` — per-assertion pass/fail with messages
 - `numTurns`, `totalCostUsd`, `durationMs` — performance metrics
+- `inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens` — token usage
 - `toolsCalled` — tool name → call count map
 - `toolCallTrace` — ordered list of tool invocations with args, results, and timing
 - `finalAnswer` — the agent's last text response
@@ -499,11 +536,13 @@ When previous results exist in `.eval-results/`, the CLI automatically compares 
 | Variable                               | Required | Description                                                                                          |
 | -------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------- |
 | `ANTHROPIC_API_KEY`                    | \*       | API key for the Anthropic provider (used by `@anthropic-ai/claude-agent-sdk`)                        |
+| `CLAUDE_CODE_USE_BEDROCK`             | \*       | Use AWS Bedrock as the Anthropic backend (alternative to `ANTHROPIC_API_KEY`)                         |
+| `CLAUDE_CODE_USE_VERTEX`              | \*       | Use Google Vertex as the Anthropic backend (alternative to `ANTHROPIC_API_KEY`)                       |
 | `OPENAI_API_KEY`                       | \*       | API key for the OpenAI Codex provider (also used for embedding-based index builds)                   |
 | SDK-specific keys (e.g. `DUB_API_KEY`) | no       | For `script` assertions guarded by `when_env` — skipped if absent                                    |
 | `NO_COLOR`                             | no       | Disables ANSI color output                                                                           |
 
-\* At least one provider API key is required. With `--provider auto`, the eval detects which provider to use based on which key is set.
+\* At least one provider credential is required. With `--provider auto`, the eval detects which provider to use based on which key/variable is set.
 
 ### OpenAI Codex Prerequisites
 
