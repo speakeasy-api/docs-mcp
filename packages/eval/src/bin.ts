@@ -211,13 +211,8 @@ program
     "auto",
   )
   .option("--model <value>", "Model to use (defaults based on provider)")
-  .option("--max-turns <number>", "Default max turns per scenario", parseIntOption, 100)
-  .option(
-    "--max-budget-usd <number>",
-    "Default max budget per scenario in USD",
-    parseFloatOption,
-    5.0,
-  )
+  .option("--max-turns <number>", "Default max turns per scenario", parseIntOption)
+  .option("--max-budget-usd <number>", "Default max budget per scenario in USD", parseFloatOption)
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
