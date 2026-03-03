@@ -73,6 +73,9 @@ export function buildComparison(
     avgCostUsdDelta: withMcp.summary.avgCostUsd - withoutMcp.summary.avgCostUsd,
     totalCostUsdDelta: withMcp.summary.totalCostUsd - withoutMcp.summary.totalCostUsd,
     avgDurationMsDelta: withMcp.summary.avgDurationMs - withoutMcp.summary.avgDurationMs,
+    ...(withMcp.summary.avgConfidenceScore !== undefined && withoutMcp.summary.avgConfidenceScore !== undefined
+      ? { avgConfidenceScoreDelta: withMcp.summary.avgConfidenceScore - withoutMcp.summary.avgConfidenceScore }
+      : {}),
   };
 
   const startedAt = withMcp.metadata.startedAt < withoutMcp.metadata.startedAt
@@ -144,6 +147,20 @@ export function formatComparisonReport(comparison: ComparisonOutput): string {
   metricsLines.push(
     `${padRight("MCP calls", 16)}${padRight((wm.avgMcpToolCalls ?? 0).toFixed(1), 12)}${c.dim}—${c.reset}`,
   );
+
+  if (wm.avgConfidenceScore !== undefined) {
+    const withFb = wm.avgConfidenceScore.toFixed(0);
+    const woFb = wo.avgConfidenceScore !== undefined ? wo.avgConfidenceScore.toFixed(0) : "—";
+    if (delta.avgConfidenceScoreDelta !== undefined) {
+      metricsLines.push(
+        formatMetricRow("Feedback score", withFb, woFb, delta.avgConfidenceScoreDelta, "", "higher"),
+      );
+    } else {
+      metricsLines.push(
+        `${padRight("Feedback score", 16)}${padRight(withFb, 12)}${woFb}`,
+      );
+    }
+  }
 
   lines.push("");
   lines.push(panel(metricsLines.join("\n"), `${c.cyan}Metrics${c.reset}`));

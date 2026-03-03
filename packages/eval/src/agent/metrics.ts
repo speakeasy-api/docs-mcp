@@ -1,4 +1,4 @@
-import type { AgentCategoryBreakdown, AgentEvalSummary, AgentScenarioResult } from "./types.js";
+import type { AgentCategoryBreakdown, AgentEvalSummary, AgentScenarioResult, FeedbackResult } from "./types.js";
 
 export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEvalSummary {
   const n = results.length;
@@ -29,6 +29,19 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     }
   }
 
+  const feedbackResults = results
+    .map((r) => r.feedbackResult)
+    .filter((f): f is FeedbackResult => f !== undefined);
+
+  const feedbackFields =
+    feedbackResults.length > 0
+      ? {
+          avgConfidenceScore: round(avg(feedbackResults.map((f) => f.confidenceScore))),
+          avgDocsRelevance: round(avg(feedbackResults.map((f) => f.docsRelevance))),
+          avgDocsUtilization: round(avg(feedbackResults.map((f) => f.docsUtilization))),
+        }
+      : {};
+
   return {
     totalScenarios: n,
     activationRate: round(activated / n),
@@ -46,6 +59,7 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     avgMcpToolCalls: round(avg(mcpCalls)),
     mcpToolUsageDistribution,
     toolUsageDistribution,
+    ...feedbackFields,
     categoryBreakdown: computeCategoryBreakdown(results),
   };
 }
