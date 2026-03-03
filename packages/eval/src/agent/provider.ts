@@ -68,6 +68,8 @@ export interface AgentProviderConfig {
   maxBudgetUsd: number;
   mcpServers?: Record<string, AgentProviderMcpServer>;
   allowedTools?: string[];
+  /** Restrict available built-in tools (not just auto-approved). */
+  tools?: string[];
   env: Record<string, string>;
   debug?: boolean;
 }

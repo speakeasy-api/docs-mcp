@@ -219,6 +219,7 @@ program
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
+  .option("--docs-only", "Restrict agent to docs-mcp + workspace writes (no filesystem browsing)", false)
   .option("--debug", "Enable verbose agent event logging", false)
   .option("--clean-workspace", "Delete workspace directories after run (default: keep)", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
@@ -242,6 +243,7 @@ program
       maxConcurrency: number;
       systemPrompt?: string;
       mcp: boolean;
+      docsOnly: boolean;
       debug: boolean;
       cleanWorkspace: boolean;
       save: boolean;
@@ -354,7 +356,11 @@ program
         (options.scenarios
           ? path.basename(options.scenarios, path.extname(options.scenarios))
           : "ad-hoc");
-      const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
+      const suiteName = noMcp
+        ? `${baseSuiteName}-baseline`
+        : options.docsOnly
+          ? `${baseSuiteName}-docs-only`
+          : baseSuiteName;
 
       const observer = new ConsoleObserver({
         model: model ?? `${provider.name} (default)`,
@@ -376,6 +382,7 @@ program
         debug: options.debug,
         cleanWorkspace: options.cleanWorkspace,
         noMcp,
+        docsOnly: options.docsOnly,
       });
 
       // Auto-persist + trend comparison

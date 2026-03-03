@@ -156,6 +156,8 @@ export interface AgentEvalConfig {
   debug?: boolean;
   /** Run without docs-mcp server (baseline mode). The agent gets no MCP tools. */
   noMcp?: boolean;
+  /** Restrict agent to docs-mcp tools + workspace writes only (no filesystem browsing). */
+  docsOnly?: boolean;
   /** Delete workspace directories after run. Default: false (preserve). */
   cleanWorkspace?: boolean;
 }

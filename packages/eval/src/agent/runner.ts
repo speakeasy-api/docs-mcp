@@ -173,9 +173,16 @@ export async function runAgentScenario(
       mcpServers = { "docs-mcp": mcpServerConfig };
     }
 
-    const allowedTools = mcpServers
-      ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"]
-      : ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
+    const allowedTools = config.docsOnly
+      ? ["Write", "Edit", "Bash", "mcp__docs-mcp__*"]
+      : mcpServers
+        ? ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__docs-mcp__*"]
+        : ["Read", "Write", "Edit", "Bash", "Glob", "Grep"];
+
+    // In docs-only mode, remove Read/Glob/Grep entirely from the agent's toolkit
+    const tools = config.docsOnly
+      ? ["Write", "Edit", "Bash"]
+      : undefined;
 
     try {
       for await (const event of provider.run({
@@ -187,6 +194,7 @@ export async function runAgentScenario(
         maxBudgetUsd,
         ...(mcpServers ? { mcpServers } : {}),
         allowedTools,
+        ...(tools ? { tools } : {}),
         env: process.env as Record<string, string>,
         ...(config.debug != null ? { debug: config.debug } : {}),
       })) {

@@ -19,6 +19,7 @@ export class ClaudeAgentProvider implements AgentProvider {
         model: config.model,
         ...(config.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
         ...(config.allowedTools ? { allowedTools: config.allowedTools } : {}),
+        ...(config.tools ? { tools: config.tools } : {}),
         ...(config.mcpServers ? { mcpServers: config.mcpServers } : {}),
         maxTurns: config.maxTurns,
         maxBudgetUsd: config.maxBudgetUsd,
