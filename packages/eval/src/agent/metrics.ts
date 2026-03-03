@@ -6,8 +6,10 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
     return emptySummary();
   }
 
+  const nonSkipped = results.filter((r) => !r.skipped);
   const activated = results.filter((r) => r.activated).length;
-  const passed = results.filter((r) => r.passed).length;
+  const passed = nonSkipped.filter((r) => r.passed).length;
+  const skipped = results.filter((r) => r.skipped).length;
 
   const turns = results.map((r) => r.numTurns);
   const costs = results.map((r) => r.totalCostUsd);
@@ -53,7 +55,7 @@ export function computeAgentEvalSummary(results: AgentScenarioResult[]): AgentEv
   return {
     totalScenarios: n,
     activationRate: round(activated / n),
-    passRate: round(passed / n),
+    passRate: nonSkipped.length > 0 ? round(passed / nonSkipped.length) : 0,
     avgTurns: round(avg(turns)),
     medianTurns: median(turns),
     avgCostUsd: round(avg(costs)),
@@ -87,11 +89,15 @@ function computeCategoryBreakdown(results: AgentScenarioResult[]): AgentCategory
   const breakdown: AgentCategoryBreakdown[] = [];
   for (const [category, group] of groups) {
     const n = group.length;
+    const nonSkippedGroup = group.filter((r) => !r.skipped);
     breakdown.push({
       category,
       scenarioCount: n,
       activationRate: round(group.filter((r) => r.activated).length / n),
-      passRate: round(group.filter((r) => r.passed).length / n),
+      passRate:
+        nonSkippedGroup.length > 0
+          ? round(nonSkippedGroup.filter((r) => r.passed).length / nonSkippedGroup.length)
+          : 0,
       avgTurns: round(avg(group.map((r) => r.numTurns))),
       avgCostUsd: round(avg(group.map((r) => r.totalCostUsd))),
     });

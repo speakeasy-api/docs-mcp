@@ -82,7 +82,7 @@ export interface AgentProvider {
 // --- Factory ---
 
 const DEFAULT_MODELS: Record<AgentProviderName, string | undefined> = {
-  anthropic: "claude-opus-4-20250514",
+  anthropic: "claude-opus-4-6",
   openai: undefined, // let codex CLI pick its own default
 };
 
@@ -94,9 +94,7 @@ export function defaultModelForProvider(name: AgentProviderName): string | undef
   return DEFAULT_MODELS[name];
 }
 
-export async function resolveAgentProvider(
-  explicit?: string,
-): Promise<AgentProvider> {
+export async function resolveAgentProvider(explicit?: string): Promise<AgentProvider> {
   if (explicit === "anthropic") {
     const { ClaudeAgentProvider } = await import("./provider-claude.js");
     return new ClaudeAgentProvider();

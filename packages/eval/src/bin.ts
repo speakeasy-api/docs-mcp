@@ -216,7 +216,7 @@ program
     "--max-budget-usd <number>",
     "Default max budget per scenario in USD",
     parseFloatOption,
-    4.0,
+    5.0,
   )
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
@@ -241,8 +241,8 @@ program
       workspaceDir?: string;
       provider: string;
       model?: string;
-      maxTurns: number;
-      maxBudgetUsd: number;
+      maxTurns?: number;
+      maxBudgetUsd?: number;
       maxConcurrency: number;
       systemPrompt?: string;
       mcp: boolean;
@@ -389,6 +389,7 @@ program
       const suiteName = noMcp ? `${baseSuiteName}-baseline` : baseSuiteName;
 
       const feedbackToolConfig = suiteConfig?.feedbackToolConfig;
+      const effectiveSystemPrompt = options.systemPrompt ?? suiteConfig?.systemPrompt;
 
       const observer = new ConsoleObserver({
         model: model ?? `${provider.name} (default)`,
@@ -404,10 +405,10 @@ program
         ...(server ? { server } : {}),
         ...(options.workspaceDir ? { workspaceDir: path.resolve(options.workspaceDir) } : {}),
         ...(model ? { model } : {}),
-        maxTurns: options.maxTurns,
-        maxBudgetUsd: options.maxBudgetUsd,
+        ...(options.maxTurns != null ? { maxTurns: options.maxTurns } : {}),
+        ...(options.maxBudgetUsd != null ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
         maxConcurrency: options.maxConcurrency,
-        ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
+        ...(effectiveSystemPrompt ? { systemPrompt: effectiveSystemPrompt } : {}),
         observer,
         debug: options.debug,
         judge: options.judge,
@@ -453,8 +454,8 @@ async function runCompare(options: {
   workspaceDir?: string;
   provider: string;
   model?: string;
-  maxTurns: number;
-  maxBudgetUsd: number;
+  maxTurns?: number;
+  maxBudgetUsd?: number;
   maxConcurrency: number;
   systemPrompt?: string;
   judge: boolean;
@@ -557,6 +558,7 @@ async function runCompare(options: {
     : undefined;
 
   const feedbackToolConfig = suiteConfig?.feedbackToolConfig;
+  const effectiveSystemPrompt = options.systemPrompt ?? suiteConfig?.systemPrompt;
 
   // Shared config builder
   const buildEvalConfig = (noMcp: boolean, suiteName: string): AgentEvalConfig => {
@@ -577,10 +579,10 @@ async function runCompare(options: {
       ...(server && !noMcp ? { server } : {}),
       ...(workspaceDir ? { workspaceDir } : {}),
       ...(model ? { model } : {}),
-      maxTurns: options.maxTurns,
-      maxBudgetUsd: options.maxBudgetUsd,
+      ...(options.maxTurns != null ? { maxTurns: options.maxTurns } : {}),
+      ...(options.maxBudgetUsd != null ? { maxBudgetUsd: options.maxBudgetUsd } : {}),
       maxConcurrency: options.maxConcurrency,
-      ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
+      ...(effectiveSystemPrompt ? { systemPrompt: effectiveSystemPrompt } : {}),
       observer: new ConsoleObserver({
         model: modelDisplay,
         suite: suiteName,
@@ -615,7 +617,9 @@ async function runCompare(options: {
   process.stderr.write("══════════════════════════════════════════════════\n");
 
   const baselineSuite = `${baseSuiteName}-baseline`;
-  const withoutMcpOutput = await runAgentEval(buildEvalConfig(true, `${baselineSuite} [baseline — no MCP]`));
+  const withoutMcpOutput = await runAgentEval(
+    buildEvalConfig(true, `${baselineSuite} [baseline — no MCP]`),
+  );
 
   if (options.save !== false) {
     const savedPath = await saveResult(withoutMcpOutput, baselineSuite);
@@ -638,6 +642,7 @@ async function runCompare(options: {
 
 interface SuiteConfig {
   feedbackToolConfig?: FeedbackToolConfig;
+  systemPrompt?: string;
 }
 
 interface LoadedSuite {
@@ -656,13 +661,21 @@ async function loadScenarios(options: {
     const filePath = await resolveSuiteFile(options.suite);
     const raw = await readFile(filePath, "utf8");
     const result = parseScenarioFile(raw);
-    return { scenarios: result.scenarios, scenariosFilePath: filePath, ...(result.config !== undefined ? { config: result.config } : {}) };
+    return {
+      scenarios: result.scenarios,
+      scenariosFilePath: filePath,
+      ...(result.config !== undefined ? { config: result.config } : {}),
+    };
   }
   if (options.scenarios) {
     const filePath = path.resolve(options.scenarios);
     const raw = await readFile(filePath, "utf8");
     const result = parseScenarioFile(raw);
-    return { scenarios: result.scenarios, scenariosFilePath: filePath, ...(result.config !== undefined ? { config: result.config } : {}) };
+    return {
+      scenarios: result.scenarios,
+      scenariosFilePath: filePath,
+      ...(result.config !== undefined ? { config: result.config } : {}),
+    };
   }
   // --prompt mode
   return {
@@ -718,9 +731,16 @@ function parseScenarioFile(raw: string): ParsedSuiteFile {
     const rawConfig = record._config as Record<string, unknown>;
     if (rawConfig.feedback_tool && typeof rawConfig.feedback_tool === "object") {
       config = {
+        ...(config ?? {}),
         feedbackToolConfig: parseFeedbackToolYaml(
           rawConfig.feedback_tool as Record<string, unknown>,
         ),
+      };
+    }
+    if (typeof rawConfig.system_prompt === "string") {
+      config = {
+        ...(config ?? {}),
+        systemPrompt: rawConfig.system_prompt,
       };
     }
   }
