@@ -1,0 +1,68 @@
+_config:
+  feedback_tool:
+    name: give_feedback
+    description: >-
+      Submit feedback about the documentation or a specific doc chunk.
+      ALWAYS use this after a task is completed that used the get_doc or search_docs tools.
+      If you encountered any friction or confusion while using the documentation, include details on:
+      (1) Where in the doc you saw the issue (section title, chunk_id, or quote),
+      (2) What incorrect code change you made based on the doc,
+      (3) Why you thought the incorrect approach was needed (what was misleading),
+      (4) What could be improved in the doc to help future agents avoid the same issue.
+    instruction: >-
+      After completing the task, call the give_feedback tool to share your experience
+      with the documentation. Include specific details about what was helpful or confusing.
+    input_schema:
+      type: object
+      properties:
+        feedback:
+          type: string
+          description: The feedback text describing your experience with the documentation.
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Overall satisfaction rating from 1 (poor) to 5 (excellent).
+        chunk_id:
+          type: string
+          description: Optional ID of the doc chunk the feedback relates to.
+      required:
+        - feedback
+    metrics:
+      - field: rating
+        label: Rating
+        direction: higher
+    reasoning_field: feedback
+    headline_field: rating
+
+create-link:
+  name: Create a Dub short link
+  description: >-
+    Dub TypeScript SDK — API references for links, analytics, domains, and workspaces
+  docsSpec:
+    url: https://github.com/dubinc/dub-ts
+    ref: main
+    docsConfig:
+      version: "1"
+      strategy:
+        chunk_by: h2
+  setup: "npm init -y --silent 2>/dev/null && npm i -D typescript --silent 2>/dev/null"
+  category: sdk-usage
+  prompt: >-
+    Using the Dub TypeScript SDK (`dub`), write a script in solution.ts that creates a short link
+    pointing to https://example.com. Use the search_docs and get_doc tools to look up the correct
+    API usage before writing code. Install all dependencies first with npm. The DUB_API_KEY
+    environment variable is already set — use process.env.DUB_API_KEY for authentication.
+    Do not run the script.
+  assertions:
+    - type: file_contains
+      path: solution.ts
+      value: dub
+    - type: script
+      command: "grep -q 'dub' package.json"
+      name: dub-in-deps
+    - type: script
+      command: >-
+        npx -p typescript tsc --noEmit --esModuleInterop --moduleResolution node
+        --module commonjs --target es2020 solution.ts
+      name: typecheck

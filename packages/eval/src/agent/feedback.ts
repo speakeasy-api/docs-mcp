@@ -48,7 +48,8 @@ export const DEFAULT_FEEDBACK_TOOL_CONFIG: FeedbackToolConfig = {
 
 /**
  * Extract a FeedbackResult from raw tool call args using the given config.
- * Returns undefined if any declared metric field is missing or non-numeric.
+ * Skips metric fields that are missing or non-numeric rather than failing entirely.
+ * Returns undefined only if the tool call yielded no extractable data at all.
  */
 export function parseFeedbackResult(
   args: Record<string, unknown>,
@@ -57,16 +58,26 @@ export function parseFeedbackResult(
   const scores: Record<string, number> = {};
   for (const metric of config.metrics) {
     const raw = Number(args[metric.field]);
-    if (!Number.isFinite(raw)) return undefined;
-    scores[metric.field] = raw;
-  }
-
-  const result: FeedbackResult = { scores };
-  if (config.reasoningField !== undefined) {
-    const reasoning = args[config.reasoningField];
-    if (typeof reasoning === "string") {
-      result.reasoning = reasoning;
+    if (Number.isFinite(raw)) {
+      scores[metric.field] = raw;
     }
   }
-  return result;
+
+  let reasoning: string | undefined;
+  if (config.reasoningField !== undefined) {
+    const val = args[config.reasoningField];
+    if (typeof val === "string") {
+      reasoning = val;
+    }
+  }
+
+  // Return undefined only if we extracted nothing at all
+  if (Object.keys(scores).length === 0 && reasoning === undefined) {
+    return undefined;
+  }
+
+  return {
+    scores,
+    ...(reasoning !== undefined ? { reasoning } : {}),
+  };
 }

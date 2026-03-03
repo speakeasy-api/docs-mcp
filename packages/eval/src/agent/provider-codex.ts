@@ -11,25 +11,26 @@ import type {
 } from "./provider.js";
 
 // Known OpenAI model pricing (USD per 1M tokens).
+// Source: https://developers.openai.com/api/docs/pricing/ (last verified 2026-03-03)
 // Codex CLI does not expose cost metadata — this table must be maintained manually.
 // When a model is missing, cost is reported as 0 with a stderr warning.
-const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
+const OPENAI_PRICING: Record<string, { input: number; cachedInput: number; output: number }> = {
   // GPT-5 Codex family (agentic coding models)
-  "gpt-5.3-codex": { input: 2.0, output: 8.0 },
-  "gpt-5.2-codex": { input: 2.0, output: 8.0 },
-  "gpt-5.1-codex": { input: 2.0, output: 8.0 },
-  "gpt-5.1-codex-max": { input: 5.0, output: 20.0 },
-  "gpt-5-codex": { input: 2.0, output: 8.0 },
-  "gpt-5.1-codex-mini": { input: 0.3, output: 1.2 },
-  "gpt-5-codex-mini": { input: 0.3, output: 1.2 },
+  "gpt-5.3-codex": { input: 1.75, cachedInput: 0.175, output: 14.0 },
+  "gpt-5.2-codex": { input: 1.75, cachedInput: 0.175, output: 14.0 },
+  "gpt-5.1-codex": { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  "gpt-5.1-codex-max": { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  "gpt-5-codex": { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  "gpt-5.1-codex-mini": { input: 0.25, cachedInput: 0.025, output: 2.0 },
+  "gpt-5-codex-mini": { input: 0.25, cachedInput: 0.025, output: 2.0 },
   // GPT-5 base
-  "gpt-5.2": { input: 2.0, output: 8.0 },
-  "gpt-5.1": { input: 2.0, output: 8.0 },
-  "gpt-5": { input: 2.0, output: 8.0 },
-  // Legacy reasoning models
-  "o4-mini": { input: 1.1, output: 4.4 },
-  "o3": { input: 10.0, output: 40.0 },
-  "codex-mini-latest": { input: 1.5, output: 6.0 },
+  "gpt-5.2": { input: 1.75, cachedInput: 0.175, output: 14.0 },
+  "gpt-5.1": { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  "gpt-5": { input: 1.25, cachedInput: 0.125, output: 10.0 },
+  // Reasoning models
+  "o4-mini": { input: 1.1, cachedInput: 0.275, output: 4.4 },
+  "o3": { input: 2.0, cachedInput: 0.5, output: 8.0 },
+  "codex-mini-latest": { input: 1.5, cachedInput: 0.375, output: 6.0 },
 };
 
 const warnedModels = new Set<string>();
@@ -38,6 +39,7 @@ function estimateCost(
   model: string | undefined,
   inputTokens: number,
   outputTokens: number,
+  cachedInputTokens: number,
 ): number {
   if (!model) {
     if (!warnedModels.has("(default)")) {
@@ -58,8 +60,12 @@ function estimateCost(
     }
     return 0;
   }
+  // OpenAI reports input_tokens as the total (including cached).
+  // Cached tokens are billed at a lower rate.
+  const uncachedInputTokens = inputTokens - cachedInputTokens;
   return (
-    (inputTokens / 1_000_000) * pricing.input +
+    (uncachedInputTokens / 1_000_000) * pricing.input +
+    (cachedInputTokens / 1_000_000) * pricing.cachedInput +
     (outputTokens / 1_000_000) * pricing.output
   );
 }
@@ -526,6 +532,9 @@ export class CodexAgentProvider implements AgentProvider {
 
           // Enforce maxTurns using the more reliable agent_message count
           if (numTurns >= config.maxTurns) {
+            errors.push(
+              `Max turns limit reached (${numTurns}/${config.maxTurns})`,
+            );
             child.kill("SIGTERM");
             break;
           }
@@ -586,6 +595,7 @@ export class CodexAgentProvider implements AgentProvider {
       resolvedModel,
       totalInputTokens,
       totalOutputTokens,
+      totalCachedInputTokens,
     );
 
     const usage: RunUsage = {

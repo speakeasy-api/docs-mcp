@@ -83,7 +83,7 @@ docs-mcp-eval agent-eval --suite acmeauth --provider anthropic
 docs-mcp-eval agent-eval --suite dub-ts --include create-link,list-links --max-concurrency 3
 ```
 
-Built-in agent eval suites: `acmeauth`, `acmeauth-value-add`, `dub-go`, `dub-python`, `dub-ts`, `dub-ts-value-add`, `mistral-python`, `mistral-ts`, `pushpress-ts`
+Built-in agent eval suites: `acmeauth`, `acmeauth-value-add`, `dub-go`, `dub-python`, `dub-ts`, `dub-ts-feedback`, `dub-ts-value-add`, `mistral-python`, `mistral-ts`, `pushpress-ts`
 
 Results auto-save to `.eval-results/<suite>/` with trend comparison against prior runs.
 

@@ -6,6 +6,48 @@ import type { AgentEvalOutput } from "./types.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_RESULTS_DIR = path.resolve(__dirname, "..", "..", ".eval-results");
 
+// ── ANSI color support (mirrors observer.ts) ──────────────────────────
+
+const useColor = !process.env.NO_COLOR && (process.stderr.isTTY ?? false);
+
+const k = {
+  reset: useColor ? "\x1b[0m" : "",
+  bold: useColor ? "\x1b[1m" : "",
+  dim: useColor ? "\x1b[2m" : "",
+  green: useColor ? "\x1b[32m" : "",
+  red: useColor ? "\x1b[31m" : "",
+  yellow: useColor ? "\x1b[33m" : "",
+  cyan: useColor ? "\x1b[36m" : "",
+};
+
+const PANEL_MAX_WIDTH = 100;
+
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function panel(content: string, title?: string, border = k.dim): string {
+  const contentLines = content.split("\n");
+  const maxLen = Math.max(
+    ...contentLines.map(stripAnsi).map((l) => l.length),
+    title ? stripAnsi(title).length + 4 : 0,
+  );
+  const width = Math.min(maxLen + 2, PANEL_MAX_WIDTH);
+
+  const top = title
+    ? `${border}╭─ ${k.reset}${title}${border} ${"─".repeat(Math.max(0, width - stripAnsi(title).length - 3))}╮${k.reset}`
+    : `${border}╭${"─".repeat(width)}╮${k.reset}`;
+  const bot = `${border}╰${"─".repeat(width)}╯${k.reset}`;
+
+  const body = contentLines.map((line) => {
+    const pad = Math.max(1, width - stripAnsi(line).length);
+    return `${border}│${k.reset} ${line}${" ".repeat(pad - 1)}${border}│${k.reset}`;
+  });
+
+  return [top, ...body, bot].join("\n");
+}
+
 /**
  * Save an eval result to disk under `<resultsDir>/<suiteName>/<timestamp>.json`.
  * Returns the absolute path of the saved file.
@@ -60,117 +102,72 @@ export function generateTrendSummary(current: AgentEvalOutput, previous: AgentEv
   const curr = current.summary;
   const prevDate = previous.metadata.startedAt;
 
-  const lines: string[] = [];
-  lines.push(`\n\u2501\u2501\u2501 Trend vs Previous Run (${prevDate}) \u2501\u2501\u2501`);
-  lines.push("  Metric          Previous  Current   Delta");
-  lines.push(
-    "  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+  // ── Metrics table ──────────────────────────────────────────────────
+  const metricsLines: string[] = [];
+  metricsLines.push(
+    `${k.bold}${padRight("Metric", 16)}${padRight("Previous", 12)}${padRight("Current", 12)}Delta${k.reset}`,
+  );
+  metricsLines.push(`${k.dim}${"─".repeat(56)}${k.reset}`);
+
+  metricsLines.push(
+    formatTrendRow("Pass rate", `${(prev.passRate * 100).toFixed(1)}%`, `${(curr.passRate * 100).toFixed(1)}%`, (curr.passRate - prev.passRate) * 100, "%", "higher"),
+  );
+  metricsLines.push(
+    formatTrendRow("Activation", `${(prev.activationRate * 100).toFixed(1)}%`, `${(curr.activationRate * 100).toFixed(1)}%`, (curr.activationRate - prev.activationRate) * 100, "%", "higher"),
+  );
+  metricsLines.push(
+    formatTrendRow("Avg turns", prev.avgTurns.toFixed(1), curr.avgTurns.toFixed(1), curr.avgTurns - prev.avgTurns, "", "lower"),
+  );
+  metricsLines.push(
+    formatTrendRow("Avg cost", `$${prev.avgCostUsd.toFixed(4)}`, `$${curr.avgCostUsd.toFixed(4)}`, curr.avgCostUsd - prev.avgCostUsd, "", "lower", true),
+  );
+  metricsLines.push(
+    formatTrendRow("Total cost", `$${prev.totalCostUsd.toFixed(4)}`, `$${curr.totalCostUsd.toFixed(4)}`, curr.totalCostUsd - prev.totalCostUsd, "", "lower", true),
   );
 
-  // Pass rate — higher is better
-  lines.push(
-    formatTrendRow(
-      "Pass rate",
-      `${(prev.passRate * 100).toFixed(1)}%`,
-      `${(curr.passRate * 100).toFixed(1)}%`,
-      (curr.passRate - prev.passRate) * 100,
-      "%",
-      "higher",
-    ),
-  );
-
-  // Activation — higher is better
-  lines.push(
-    formatTrendRow(
-      "Activation",
-      `${(prev.activationRate * 100).toFixed(1)}%`,
-      `${(curr.activationRate * 100).toFixed(1)}%`,
-      (curr.activationRate - prev.activationRate) * 100,
-      "%",
-      "higher",
-    ),
-  );
-
-  // Avg turns — lower is better
-  lines.push(
-    formatTrendRow(
-      "Avg turns",
-      prev.avgTurns.toFixed(1),
-      curr.avgTurns.toFixed(1),
-      curr.avgTurns - prev.avgTurns,
-      "",
-      "lower",
-    ),
-  );
-
-  // Avg cost — lower is better
-  lines.push(
-    formatTrendRow(
-      "Avg cost",
-      `$${prev.avgCostUsd.toFixed(4)}`,
-      `$${curr.avgCostUsd.toFixed(4)}`,
-      curr.avgCostUsd - prev.avgCostUsd,
-      "",
-      "lower",
-      true,
-    ),
-  );
-
-  // Total cost — lower is better
-  lines.push(
-    formatTrendRow(
-      "Total cost",
-      `$${prev.totalCostUsd.toFixed(4)}`,
-      `$${curr.totalCostUsd.toFixed(4)}`,
-      curr.totalCostUsd - prev.totalCostUsd,
-      "",
-      "lower",
-      true,
-    ),
-  );
-
-  // Avg MCP calls — informational (higher may be fine)
   const prevMcp = prev.avgMcpToolCalls ?? 0;
   const currMcp = curr.avgMcpToolCalls ?? 0;
-  lines.push(
-    formatTrendRow(
-      "MCP calls",
-      prevMcp.toFixed(1),
-      currMcp.toFixed(1),
-      currMcp - prevMcp,
-      "",
-      "higher",
-    ),
+  metricsLines.push(
+    formatTrendRow("MCP calls", prevMcp.toFixed(1), currMcp.toFixed(1), currMcp - prevMcp, "", "higher"),
   );
 
-  // Cache tokens — informational
   const prevCacheRead = prev.avgCacheReadInputTokens ?? 0;
   const currCacheRead = curr.avgCacheReadInputTokens ?? 0;
-  lines.push(
-    formatTrendRow(
-      "Cache read",
-      Math.round(prevCacheRead).toString(),
-      Math.round(currCacheRead).toString(),
-      currCacheRead - prevCacheRead,
-      "",
-      "higher",
-    ),
+  metricsLines.push(
+    formatTrendRow("Cache read", Math.round(prevCacheRead).toString(), Math.round(currCacheRead).toString(), currCacheRead - prevCacheRead, "", "higher"),
   );
 
   const prevCacheCreate = prev.avgCacheCreationInputTokens ?? 0;
   const currCacheCreate = curr.avgCacheCreationInputTokens ?? 0;
-  lines.push(
-    formatTrendRow(
-      "Cache create",
-      Math.round(prevCacheCreate).toString(),
-      Math.round(currCacheCreate).toString(),
-      currCacheCreate - prevCacheCreate,
-      "",
-      "lower",
-    ),
+  metricsLines.push(
+    formatTrendRow("Cache create", Math.round(prevCacheCreate).toString(), Math.round(currCacheCreate).toString(), currCacheCreate - prevCacheCreate, "", "lower"),
   );
 
-  // Per-scenario regressions and improvements
+  // Feedback metrics
+  if (curr.feedbackMetrics) {
+    for (const [field, val] of Object.entries(curr.feedbackMetrics)) {
+      const prevVal = prev.feedbackMetrics?.[field];
+      const prevStr = prevVal !== undefined ? prevVal.toFixed(1) : `${k.dim}—${k.reset}`;
+      const delta = prevVal !== undefined ? val - prevVal : 0;
+      const hasDelta = prevVal !== undefined;
+      if (hasDelta) {
+        metricsLines.push(formatTrendRow(`Feedback: ${field}`, prevStr, val.toFixed(1), delta, "", "higher"));
+      } else {
+        metricsLines.push(`${padRight(`Feedback: ${field}`, 16)}${padRight(prevStr, 12)}${val.toFixed(1)}`);
+      }
+    }
+  }
+
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(
+    `${k.bold}${k.cyan}━━━ Trend vs Previous Run ━━━${k.reset}`,
+  );
+  lines.push(`${k.dim}Previous: ${prevDate}${k.reset}`);
+  lines.push("");
+  lines.push(panel(metricsLines.join("\n"), `${k.cyan}Metrics${k.reset}`));
+
+  // ── Per-scenario regressions and improvements ─────────────────────
   const regressions: string[] = [];
   const improvements: string[] = [];
 
@@ -179,22 +176,24 @@ export function generateTrendSummary(current: AgentEvalOutput, previous: AgentEv
     const prev_r = prevById.get(curr_r.id ?? curr_r.name);
     if (!prev_r) continue;
     if (prev_r.passed && !curr_r.passed) {
-      regressions.push(`    \u2717 ${curr_r.id} \u2014 was PASS, now FAIL`);
+      regressions.push(`${k.red}✗${k.reset} ${k.bold}${curr_r.id}${k.reset} ${k.dim}— was PASS, now FAIL${k.reset}`);
     } else if (!prev_r.passed && curr_r.passed) {
-      improvements.push(`    \u2713 ${curr_r.id} \u2014 was FAIL, now PASS`);
+      improvements.push(`${k.green}✓${k.reset} ${k.bold}${curr_r.id}${k.reset} ${k.dim}— was FAIL, now PASS${k.reset}`);
     }
-  }
-
-  if (regressions.length > 0) {
-    lines.push("");
-    lines.push("  Regressions:");
-    lines.push(...regressions);
   }
 
   if (improvements.length > 0) {
     lines.push("");
-    lines.push("  Improvements:");
-    lines.push(...improvements);
+    lines.push(panel(improvements.join("\n"), `${k.green}Improvements${k.reset}`, k.green));
+  }
+
+  if (regressions.length > 0) {
+    lines.push("");
+    lines.push(panel(regressions.join("\n"), `${k.red}Regressions${k.reset}`, k.red));
+  }
+
+  if (improvements.length === 0 && regressions.length === 0) {
+    lines.push(`\n  ${k.dim}No scenario status changes${k.reset}`);
   }
 
   lines.push("");
@@ -221,14 +220,16 @@ function formatTrendRow(
   let arrow = "";
   if (Math.abs(delta) > 0.001) {
     const isImprovement = betterDirection === "higher" ? delta > 0 : delta < 0;
-    arrow = isImprovement ? " \u25B2" : " \u25BC";
+    const arrowColor = isImprovement ? k.green : k.red;
+    arrow = ` ${arrowColor}${isImprovement ? "▲" : "▼"}${k.reset}`;
   }
 
-  return `  ${padRight(label, 16)}${padRight(prevStr, 10)}${padRight(currStr, 10)}${deltaStr}${arrow}`;
+  return `${padRight(label, 16)}${padRight(prevStr, 12)}${padRight(currStr, 12)}${deltaStr}${arrow}`;
 }
 
 function padRight(str: string, width: number): string {
-  return str.length >= width ? str : str + " ".repeat(width - str.length);
+  const visible = stripAnsi(str).length;
+  return visible >= width ? str : str + " ".repeat(width - visible);
 }
 
 function sanitizeSuiteName(name: string): string {

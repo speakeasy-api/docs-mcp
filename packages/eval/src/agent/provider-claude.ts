@@ -79,30 +79,69 @@ export class ClaudeAgentProvider implements AgentProvider {
         }
       }
 
-      if (message.type === "user" && message.tool_use_result != null) {
-        const toolResult = message.tool_use_result as Record<string, unknown>;
-        const toolUseId =
-          typeof toolResult.tool_use_id === "string"
-            ? toolResult.tool_use_id
-            : undefined;
+      if (message.type === "user") {
+        const msg = message as Record<string, unknown>;
 
-        if (toolUseId) {
+        // Primary path: the SDK sets tool_use_result + parent_tool_use_id
+        if (msg.tool_use_result != null && typeof msg.parent_tool_use_id === "string") {
           yield {
             type: "tool_result",
-            id: toolUseId,
-            result: extractToolResultText(toolResult),
+            id: msg.parent_tool_use_id,
+            result: extractToolResultText(
+              msg.tool_use_result as Record<string, unknown>,
+            ),
           };
+        } else {
+          // Fallback: extract tool_result blocks from the raw API message content
+          const apiMsg = msg.message as { content?: unknown } | undefined;
+          const content = apiMsg?.content;
+          if (Array.isArray(content)) {
+            for (const block of content as Array<Record<string, unknown>>) {
+              if (
+                block.type === "tool_result" &&
+                typeof block.tool_use_id === "string"
+              ) {
+                yield {
+                  type: "tool_result",
+                  id: block.tool_use_id,
+                  result: extractToolResultText(
+                  { content: block.content } as Record<string, unknown>,
+                ),
+                };
+              }
+            }
+          }
         }
       }
 
       if (message.type === "result") {
         const resultUsage = message.usage as Record<string, number>;
+        const isSuccess = message.subtype === "success";
+        const errors: string[] = isSuccess ? [] : [...message.errors];
+
+        // When the SDK reports an error with no details, synthesize a
+        // human-readable reason from the subtype so callers always get
+        // at least one actionable error string.
+        if (!isSuccess && errors.length === 0) {
+          const subtype = message.subtype as string;
+          if (subtype === "error_max_budget_usd") {
+            errors.push(
+              `Budget limit reached ($${(message.total_cost_usd as number).toFixed(2)})`,
+            );
+          } else if (subtype === "error_max_turns") {
+            errors.push(
+              `Max turns limit reached (${message.num_turns as number} turns)`,
+            );
+          } else {
+            errors.push(`Agent stopped: ${subtype.replace(/_/g, " ")}`);
+          }
+        }
+
         yield {
           type: "done",
-          subtype: message.subtype === "success" ? "success" : "error",
-          answer: message.subtype === "success" ? message.result : "",
-          errors:
-            message.subtype === "success" ? [] : [...message.errors],
+          subtype: isSuccess ? "success" : "error",
+          answer: isSuccess ? message.result : "",
+          errors,
           usage: {
             inputTokens: resultUsage.input_tokens ?? 0,
             outputTokens: resultUsage.output_tokens ?? 0,

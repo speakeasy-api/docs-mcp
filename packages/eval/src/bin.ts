@@ -216,7 +216,7 @@ program
     "--max-budget-usd <number>",
     "Default max budget per scenario in USD",
     parseFloatOption,
-    0.5,
+    2.0,
   )
   .option("--max-concurrency <number>", "Max concurrent scenarios", parseIntOption, 1)
   .option("--system-prompt <value>", "Custom system prompt for the agent")
@@ -394,6 +394,7 @@ program
         model: model ?? `${provider.name} (default)`,
         suite: suiteName,
         debug: options.debug,
+        provider: provider.name,
         ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
       });
 
@@ -585,6 +586,7 @@ async function runCompare(options: {
         suite: suiteName,
         debug: options.debug,
         ...(feedbackToolConfig !== undefined ? { feedbackToolConfig } : {}),
+        provider: provider.name,
       }),
       debug: options.debug,
       judge: options.judge,

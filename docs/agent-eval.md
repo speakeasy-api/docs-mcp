@@ -145,6 +145,80 @@ For `docsSpec` scenarios, cloned repositories are cached at `.cache/repos/` keye
 
 Multiple scenarios sharing the same docs directory and description share a single index build.
 
+## Feedback Tool
+
+After completing a task, the agent is instructed to call a feedback tool to report its experience with the documentation. The feedback tool is registered as a custom MCP tool on the docs-mcp server and its responses are captured in the eval results.
+
+By default, the eval uses a built-in feedback tool (`docs_feedback`) with three 0–100 integer metrics: `confidence_score`, `docs_relevance`, and `docs_utilization`, plus a `reasoning` text field.
+
+### Custom Feedback Tool (`_config.feedback_tool`)
+
+Suites can define a custom feedback tool with a different schema, instruction, and metric set via the `_config.feedback_tool` key at the top level of the YAML file:
+
+```yaml
+_config:
+  feedback_tool:
+    name: give_feedback
+    description: >-
+      Submit feedback about the documentation or a specific doc chunk.
+      ALWAYS use this after a task is completed that used the get_doc or search_docs tools.
+    instruction: >-
+      After completing the task, call the give_feedback tool to share your experience
+      with the documentation. Include specific details about what was helpful or confusing.
+    input_schema:
+      type: object
+      properties:
+        feedback:
+          type: string
+          description: The feedback text describing your experience with the documentation.
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Overall satisfaction rating from 1 (poor) to 5 (excellent).
+        chunk_id:
+          type: string
+          description: Optional ID of the doc chunk the feedback relates to.
+      required:
+        - feedback
+    metrics:
+      - field: rating
+        label: Rating
+        direction: higher
+    reasoning_field: feedback
+    headline_field: rating
+```
+
+The `_config` key is suite-level only — mixing different feedback schemas within a suite would break metric aggregation. Like other `_`-prefixed keys, it is stripped before scenario parsing.
+
+### Field Reference
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | yes | MCP tool name registered on the server (e.g. `give_feedback`) |
+| `description` | `string` | yes | Tool description shown to the agent |
+| `instruction` | `string` | yes | Text appended to the system prompt instructing the agent to call this tool |
+| `input_schema` | `object` | yes | JSON Schema for the tool's input (must be `type: object` with `properties`) |
+| `metrics` | `FeedbackMetricSpec[]` | yes | Which fields are numeric metrics to aggregate across scenarios |
+| `reasoning_field` | `string` | no | Property name containing free-text reasoning/feedback |
+| `headline_field` | `string` | no | Which metric to show in the per-scenario one-liner output |
+
+Each entry in `metrics` has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `field` | `string` | Property name in `input_schema.properties` |
+| `label` | `string` | Display label used in output |
+| `direction` | `"higher"` or `"lower"` | Whether higher or lower values are better (used for trend arrows) |
+
+### How It Works
+
+1. The feedback tool config is serialized and passed to the MCP server via `--custom-tools-json`. The server registers each tool with an echo handler that returns the agent's input as-is.
+2. The `instruction` text is appended to the system prompt so the agent knows to call the tool.
+3. After the agent finishes, the runner scans the tool call trace for a call matching `mcp__docs-mcp__<name>`.
+4. Numeric metric fields are extracted from the tool call args. Missing or non-numeric fields are skipped (the result is still captured as long as at least one metric or the reasoning field has data).
+5. Metrics are aggregated across scenarios in the eval summary as `feedbackMetrics`.
+
 ## Assertion Types
 
 All assertion types support an optional `soft` flag:
@@ -490,6 +564,9 @@ Results are saved as JSON (auto-saved to `.eval-results/<suite>/` by default, or
       "mcp__docs-mcp__search_docs": 35,
       "mcp__docs-mcp__get_doc": 22
     },
+    "feedbackMetrics": {
+      "rating": 4.2
+    },
     "categoryBreakdown": [
       {
         "category": "sdk-usage",
@@ -511,6 +588,7 @@ Results are saved as JSON (auto-saved to `.eval-results/<suite>/` by default, or
 | `avgTurns` / `medianTurns`    | Agent conversation turns (lower = more efficient)                                                    |
 | `avgCostUsd` / `totalCostUsd` | API spend per scenario and total                                                                     |
 | `toolUsageDistribution`       | Total calls per tool across all scenarios                                                            |
+| `feedbackMetrics`             | Average feedback scores keyed by metric field name (only present if the agent called the feedback tool) |
 | `categoryBreakdown`           | Per-category metrics (activation, pass rate, turns, cost)                                            |
 
 ### Per-Scenario Result
@@ -524,6 +602,7 @@ Each scenario result includes:
 - `inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens` — token usage
 - `toolsCalled` — tool name → call count map
 - `toolCallTrace` — ordered list of tool invocations with args, results, and timing
+- `feedbackResult` — extracted feedback scores and reasoning (if the agent called the feedback tool)
 - `finalAnswer` — the agent's last text response
 - `resultSubtype` — `"success"`, `"error_max_turns"`, etc.
 

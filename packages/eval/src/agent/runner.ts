@@ -28,8 +28,8 @@ const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dist", "bin.js");
 
-const DEFAULT_MAX_TURNS = 15;
-const DEFAULT_MAX_BUDGET_USD = 0.5;
+const DEFAULT_MAX_TURNS = 100;
+const DEFAULT_MAX_BUDGET_USD = 4.0;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -338,11 +338,25 @@ export async function runAgentScenario(
               finalAnswer = event.answer;
             } else {
               errors.push(...event.errors);
+              // Safety net: if the provider didn't give us error details,
+              // synthesize from context so we never show a bare "Result: error".
+              if (event.errors.length === 0) {
+                errors.push("Agent ended with error (no details from provider)");
+              }
             }
+
+            // Include the first provider error in the summary line for quick scanning
+            const providerError =
+              event.subtype !== "success" && event.errors.length > 0
+                ? event.errors[0]!
+                : undefined;
+            const reasonHint = providerError
+              ? ` — ${providerError.length > 60 ? providerError.slice(0, 60) + "…" : providerError}`
+              : "";
 
             observer?.onAgentMessage(scenario, {
               type: "result",
-              summary: `Result: ${resultSubtype} ($${totalCostUsd.toFixed(4)}, ${numTurns} turns)`,
+              summary: `Result: ${resultSubtype}${reasonHint} ($${totalCostUsd.toFixed(4)}, ${numTurns} turns)`,
               timestampMs: performance.now() - startMs,
             });
             break;

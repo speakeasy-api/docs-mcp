@@ -244,6 +244,8 @@ export interface ConsoleObserverOptions {
   suite?: string;
   debug?: boolean;
   feedbackToolConfig?: FeedbackToolConfig;
+  /** Provider name ("anthropic" | "openai"). Used to annotate estimated costs. */
+  provider?: string;
 }
 
 // ── Console observer (Rich-style) ──────────────────────────────────────
@@ -427,6 +429,15 @@ export class ConsoleObserver implements AgentEvalObserver {
       }
     }
 
+    // Show feedback reasoning
+    if (result.feedbackResult?.reasoning) {
+      const scores = Object.entries(result.feedbackResult.scores)
+        .map(([field, val]) => `${field}: ${val}`)
+        .join(", ");
+      const fbTitle = `${c.cyan}Agent Feedback${c.reset}${scores ? ` ${c.dim}(${scores})${c.reset}` : ""}`;
+      write("\n" + panel(wordWrap(result.feedbackResult.reasoning, PANEL_MAX_WIDTH - 4), fbTitle, c.cyan) + "\n");
+    }
+
     // Show workspace files written by the agent
     if (result.workspaceFiles?.length) {
       for (const file of result.workspaceFiles) {
@@ -456,10 +467,16 @@ export class ConsoleObserver implements AgentEvalObserver {
     // ── Scenario results table ──────────────────────────────────────
     write(`\n${c.bold}${c.cyan}━━━ Results ━━━${c.reset}\n\n`);
 
+    const feedbackCfg = this.opts.feedbackToolConfig;
+    const headlineField = feedbackCfg?.headlineField ?? feedbackCfg?.metrics[0]?.field;
+    const headlineLabel =
+      feedbackCfg?.metrics.find((m) => m.field === headlineField)?.label ?? "Feedback";
+    const hasFeedback = headlineField && results.some((r) => r.feedbackResult);
+
     const nameW = Math.max(10, ...results.map((r) => r.id.length));
     const costW = Math.max(10, ...results.map((r) => `$${r.totalCostUsd.toFixed(4)}`.length));
     const durW = Math.max(10, ...results.map((r) => `${(r.durationMs / 1000).toFixed(1)}s`.length));
-    const header = `  ${padRight("Scenario", nameW)}  Result    MCP  Turns  ${padRight("Cost", costW)}  Duration`;
+    const header = `  ${padRight("Scenario", nameW)}  Result    MCP  Turns  ${padRight("Cost", costW)}  ${padRight("Duration", durW)}${hasFeedback ? `  ${headlineLabel}` : ""}`;
     const sep = `  ${"─".repeat(stripAnsi(header).length - 2)}`;
 
     write(`${c.bold}${header}${c.reset}\n`);
@@ -471,9 +488,14 @@ export class ConsoleObserver implements AgentEvalObserver {
       const turns = String(r.numTurns);
       const cost = `$${r.totalCostUsd.toFixed(4)}`;
       const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
+      const fb = hasFeedback && headlineField
+        ? r.feedbackResult?.scores[headlineField] !== undefined
+          ? `  ${c.cyan}${r.feedbackResult.scores[headlineField]}${c.reset}`
+          : `  ${c.dim}—${c.reset}`
+        : "";
 
       write(
-        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, costW)}  ${padRight(dur, durW)}\n`,
+        `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, costW)}  ${padRight(dur, durW)}${fb}\n`,
       );
     }
 
@@ -487,7 +509,7 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${padRight("Pass rate", 16)}${passColor}${(s.passRate * 100).toFixed(1)}%${c.reset}`,
       `${padRight("Activation", 16)}${activationColor}${(s.activationRate * 100).toFixed(1)}%${c.reset}`,
       `${padRight("Avg turns", 16)}${s.avgTurns.toFixed(1)} ${c.dim}(median ${s.medianTurns})${c.reset}`,
-      `${padRight("Avg cost", 16)}$${s.avgCostUsd.toFixed(4)} ${c.dim}(total $${s.totalCostUsd.toFixed(4)})${c.reset}`,
+      `${padRight("Avg cost", 16)}$${s.avgCostUsd.toFixed(4)} ${c.dim}(total $${s.totalCostUsd.toFixed(4)})${c.reset}${this.opts.provider === "openai" ? ` ${c.dim}(estimated)${c.reset}` : ""}`,
       `${padRight("Avg duration", 16)}${(s.avgDurationMs / 1000).toFixed(1)}s ${c.dim}(median ${(s.medianDurationMs / 1000).toFixed(1)}s)${c.reset}`,
       `${padRight("Avg tokens", 16)}${s.avgInputTokens.toFixed(0)}in / ${s.avgOutputTokens.toFixed(0)}out${formatCacheTokens(s.avgCacheReadInputTokens, s.avgCacheCreationInputTokens)}`,
       formatMcpCallsLine(s),
@@ -529,13 +551,8 @@ function formatFeedbackLine(s: import("./types.js").AgentEvalSummary): string {
   if (!s.feedbackMetrics) return "";
   const entries = Object.entries(s.feedbackMetrics);
   if (entries.length === 0) return "";
-  const [, firstVal] = entries[0]!;
-  const rest = entries
-    .slice(1)
-    .map(([k, v]) => `${k}: ${v.toFixed(0)}`)
-    .join(", ");
-  const detail = rest ? ` ${c.dim}(${rest})${c.reset}` : "";
-  return `${padRight("Feedback", 16)}${firstVal.toFixed(0)}${detail}`;
+  const parts = entries.map(([field, val]) => `${field}: ${c.cyan}${val.toFixed(1)}${c.reset}`);
+  return `${padRight("Feedback", 16)}${parts.join(", ")}`;
 }
 
 function formatMcpCallsLine(s: import("./types.js").AgentEvalSummary): string {
