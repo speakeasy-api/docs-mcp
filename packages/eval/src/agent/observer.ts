@@ -43,6 +43,32 @@ function toolColor(name: string): string {
   return c.white;
 }
 
+// ── Tool name helpers ──────────────────────────────────────────────────
+
+function cleanToolName(name: string): string {
+  return name.replace(/^mcp__docs-mcp__/, "");
+}
+
+function formatBarChart(dist: Record<string, number>): string {
+  const entries = Object.entries(dist).sort(([, a], [, b]) => b - a);
+  if (entries.length === 0) return "";
+
+  const maxCount = entries[0]![1];
+  const maxNameLen = Math.max(...entries.map(([n]) => cleanToolName(n).length));
+  const maxBarWidth = Math.max(1, PANEL_MAX_WIDTH - maxNameLen - 12);
+
+  const lines: string[] = [];
+  for (const [name, count] of entries) {
+    const clean = cleanToolName(name);
+    const barLen = maxCount > 0 ? Math.max(1, Math.round((count / maxCount) * maxBarWidth)) : 1;
+    const color = toolColor(name);
+    lines.push(
+      `${padRight(clean, maxNameLen)}  ${color}${"█".repeat(barLen)}${c.reset} ${c.dim}${count}${c.reset}`,
+    );
+  }
+  return lines.join("\n");
+}
+
 // ── Box-drawing helpers ────────────────────────────────────────────────
 
 /** Max visible width for panel boxes. */
@@ -362,6 +388,9 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${c.dim}${result.numTurns} turns${c.reset}`,
       `${c.dim}${(result.durationMs / 1000).toFixed(1)}s${c.reset}`,
     ];
+    if (result.feedbackResult) {
+      parts.push(`${c.cyan}judge: ${result.feedbackResult.confidenceScore}${c.reset}`);
+    }
     write(`\n${parts.join(` ${c.dim}|${c.reset} `)}\n`);
 
     // Assertion details
@@ -451,9 +480,18 @@ export class ConsoleObserver implements AgentEvalObserver {
       `${padRight("Avg duration", 16)}${(s.avgDurationMs / 1000).toFixed(1)}s ${c.dim}(median ${(s.medianDurationMs / 1000).toFixed(1)}s)${c.reset}`,
       `${padRight("Avg tokens", 16)}${s.avgInputTokens.toFixed(0)}in / ${s.avgOutputTokens.toFixed(0)}out${formatCacheTokens(s.avgCacheReadInputTokens, s.avgCacheCreationInputTokens)}`,
       formatMcpCallsLine(s),
+      formatFeedbackLine(s),
     ].filter(Boolean);
 
     write("\n" + panel(summaryLines.join("\n"), `${c.cyan}Summary${c.reset}`) + "\n");
+
+    // Tool usage bar chart
+    if (Object.keys(s.toolUsageDistribution).length > 0) {
+      const chart = formatBarChart(s.toolUsageDistribution);
+      if (chart) {
+        write("\n" + panel(chart, `${c.cyan}Tool Usage${c.reset}`) + "\n");
+      }
+    }
 
     // Category breakdown
     if (s.categoryBreakdown.length > 0) {
@@ -474,6 +512,14 @@ export class ConsoleObserver implements AgentEvalObserver {
 function formatCacheTokens(avgRead: number, avgCreate: number): string {
   if (avgRead === 0 && avgCreate === 0) return "";
   return ` ${c.dim}(cache: ${Math.round(avgRead)} read, ${Math.round(avgCreate)} create)${c.reset}`;
+}
+
+function formatFeedbackLine(s: import("./types.js").AgentEvalSummary): string {
+  if (s.avgConfidenceScore === undefined) return "";
+  const conf = s.avgConfidenceScore.toFixed(0);
+  const rel = s.avgDocsRelevance?.toFixed(0) ?? "—";
+  const util = s.avgDocsUtilization?.toFixed(0) ?? "—";
+  return `${padRight("Feedback score", 16)}${conf} ${c.dim}(relevance: ${rel}, utilization: ${util})${c.reset}`;
 }
 
 function formatMcpCallsLine(s: import("./types.js").AgentEvalSummary): string {

@@ -22,6 +22,7 @@ interface ServerCliOptions {
   vectorWeight?: number;
   transport: "stdio" | "http";
   port: number;
+  feedbackTool: boolean;
 }
 
 const program = new Command();
@@ -46,7 +47,53 @@ program
     parseIntOption,
     20310,
   )
+  .option("--feedback-tool", "Register a docs_feedback tool for eval confidence scoring", false)
   .action(async (options: ServerCliOptions) => {
+    const customTools = options.feedbackTool
+      ? [
+          {
+            name: "docs_feedback",
+            description:
+              "Submit structured feedback about how useful the documentation tools were for this task. Call this ONCE after you have finished using search_docs/get_doc and completed the task.",
+            inputSchema: {
+              type: "object" as const,
+              properties: {
+                confidence_score: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: 100,
+                  description:
+                    "How confident are you that the documentation helped you produce a correct solution? (0=not at all, 100=completely)",
+                },
+                docs_relevance: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: 100,
+                  description:
+                    "How relevant was the retrieved documentation to the task? (0=irrelevant, 100=perfectly relevant)",
+                },
+                docs_utilization: {
+                  type: "integer",
+                  minimum: 0,
+                  maximum: 100,
+                  description:
+                    "How much of the documentation content did you incorporate into your solution? (0=none, 100=all)",
+                },
+                reasoning: {
+                  type: "string",
+                  description: "Brief explanation of your assessment (1-2 sentences)",
+                },
+              },
+              required: ["confidence_score", "docs_relevance", "docs_utilization", "reasoning"],
+            },
+            handler: async (args: unknown) => ({
+              content: [{ type: "text" as const, text: JSON.stringify(args) }],
+              isError: false,
+            }),
+          },
+        ]
+      : [];
+
     const app = await createDocsServer({
       indexDir: options.indexDir,
       toolPrefix: options.toolPrefix,
@@ -56,6 +103,7 @@ program
       proximityWeight: options.proximityWeight,
       phraseSlop: options.phraseSlop,
       vectorWeight: options.vectorWeight,
+      ...(customTools.length > 0 ? { customTools } : {}),
     });
 
     const serverName =

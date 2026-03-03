@@ -16,6 +16,7 @@ import type {
   AgentEvalOutput,
   AgentScenario,
   AgentScenarioResult,
+  FeedbackResult,
   ToolCallRecord,
   WorkspaceFile,
 } from "./types.js";
@@ -28,6 +29,7 @@ const SERVER_BIN_PATH = path.resolve(__dirname, "..", "..", "..", "server", "dis
 const DEFAULT_MAX_TURNS = 15;
 const DEFAULT_MAX_BUDGET_USD = 0.5;
 const DOCS_MCP_TOOLS = new Set(["mcp__docs-mcp__search_docs", "mcp__docs-mcp__get_doc"]);
+const FEEDBACK_TOOL = "mcp__docs-mcp__docs_feedback";
 
 const DEFAULT_SYSTEM_PROMPT =
   "Write all output files to the current working directory. Do not create new directories or use absolute paths from documentation examples.";
@@ -93,10 +95,14 @@ export async function runAgentScenario(
   const model = scenario.models?.[provider.name] ?? config.model ?? defaultModelForProvider(provider.name);
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
+  const judge = config.judge !== false;
   const customSystemPrompt = scenario.systemPrompt ?? config.systemPrompt;
+  const feedbackInstruction = judge && !config.noMcp
+    ? "\n\nAfter completing the task, call the docs_feedback tool to report how useful the documentation was."
+    : "";
   const systemPrompt = customSystemPrompt
-    ? `${DEFAULT_SYSTEM_PROMPT}\n\n${customSystemPrompt}`
-    : DEFAULT_SYSTEM_PROMPT;
+    ? `${DEFAULT_SYSTEM_PROMPT}\n\n${customSystemPrompt}${feedbackInstruction}`
+    : `${DEFAULT_SYSTEM_PROMPT}${feedbackInstruction}`;
 
   const workspaceDir = config.workspaceDir
     ? path.join(config.workspaceDir, scenario.id)
@@ -170,9 +176,11 @@ export async function runAgentScenario(
         | undefined;
 
       if (scenario.indexDir) {
+        const serverArgs = [SERVER_BIN_PATH, "--index-dir", scenario.indexDir];
+        if (judge) serverArgs.push("--feedback-tool");
         mcpServerConfig = {
           command: "node",
-          args: [SERVER_BIN_PATH, "--index-dir", scenario.indexDir],
+          args: serverArgs,
           env: serverEnv,
         };
       } else if (config.server) {
@@ -352,6 +360,15 @@ export async function runAgentScenario(
       if (DOCS_MCP_TOOLS.has(trace.name)) mcpToolResultChars += trace.result.length;
     }
 
+    // Extract feedback from tool trace
+    let feedbackResult: FeedbackResult | undefined;
+    if (judge) {
+      const feedbackCall = toolCallTrace.find((t) => t.name === FEEDBACK_TOOL);
+      if (feedbackCall) {
+        feedbackResult = parseFeedbackArgs(feedbackCall.args);
+      }
+    }
+
     return {
       id: scenario.id,
       name: scenario.name,
@@ -376,6 +393,7 @@ export async function runAgentScenario(
       resultSubtype,
       workspaceDir,
       ...(errors.length > 0 ? { errors } : {}),
+      ...(feedbackResult !== undefined ? { feedbackResult } : {}),
     };
   } finally {
     if (config.cleanWorkspace) {
@@ -424,6 +442,24 @@ const EXT_LANG: Record<string, string> = {
   css: "css",
   sql: "sql",
 };
+
+function parseFeedbackArgs(args: Record<string, unknown>): FeedbackResult | undefined {
+  const confidence = Number(args.confidence_score);
+  const relevance = Number(args.docs_relevance);
+  const utilization = Number(args.docs_utilization);
+  const reasoning = typeof args.reasoning === "string" ? args.reasoning : "";
+
+  if (!Number.isFinite(confidence) || !Number.isFinite(relevance) || !Number.isFinite(utilization)) {
+    return undefined;
+  }
+
+  return {
+    confidenceScore: Math.max(0, Math.min(100, Math.round(confidence))),
+    docsRelevance: Math.max(0, Math.min(100, Math.round(relevance))),
+    docsUtilization: Math.max(0, Math.min(100, Math.round(utilization))),
+    reasoning,
+  };
+}
 
 async function collectWorkspaceFiles(
   trace: ToolCallRecord[],

@@ -66,6 +66,13 @@ export interface AssertionResult {
   message: string;
 }
 
+export interface FeedbackResult {
+  confidenceScore: number;
+  docsRelevance: number;
+  docsUtilization: number;
+  reasoning: string;
+}
+
 export interface WorkspaceFile {
   /** Relative path within workspace */
   path: string;
@@ -110,6 +117,7 @@ export interface AgentScenarioResult {
   /** Workspace directory used for this scenario run */
   workspaceDir?: string;
   errors?: string[];
+  feedbackResult?: FeedbackResult;
 }
 
 export interface AgentCategoryBreakdown {
@@ -138,6 +146,9 @@ export interface AgentEvalSummary {
   avgMcpToolCalls: number;
   mcpToolUsageDistribution: Record<string, number>;
   toolUsageDistribution: Record<string, number>;
+  avgConfidenceScore?: number;
+  avgDocsRelevance?: number;
+  avgDocsUtilization?: number;
   categoryBreakdown: AgentCategoryBreakdown[];
 }
 
@@ -164,6 +175,8 @@ export interface AgentEvalConfig {
   noMcp?: boolean;
   /** Delete workspace directories after run. Default: false (preserve). */
   cleanWorkspace?: boolean;
+  /** Enable feedback tool for agent self-reported confidence scoring. Default: true. */
+  judge?: boolean;
 }
 
 export interface AgentEvalOutput {
@@ -224,6 +237,7 @@ export interface ComparisonSummaryDelta {
   avgCostUsdDelta: number;
   totalCostUsdDelta: number;
   avgDurationMsDelta: number;
+  avgConfidenceScoreDelta?: number;
 }
 
 export interface ComparisonOutput {

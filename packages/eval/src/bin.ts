@@ -223,6 +223,7 @@ program
   .option("--no-mcp", "Run without docs-mcp server (baseline mode)")
   .option("--compare", "Run with and without docs-mcp and compare results")
   .option("--debug", "Enable verbose agent event logging", false)
+  .option("--no-judge", "Disable feedback tool for confidence scoring (enabled by default)")
   .option("--clean-workspace", "Delete workspace directories after run (default: keep)", false)
   .option("--no-save", "Skip auto-saving results to .eval-results/")
   .option("--out <path>", "Output JSON path")
@@ -246,6 +247,7 @@ program
       systemPrompt?: string;
       mcp: boolean;
       compare?: true;
+      judge: boolean;
       debug: boolean;
       cleanWorkspace: boolean;
       save: boolean;
@@ -402,6 +404,7 @@ program
         ...(options.systemPrompt ? { systemPrompt: options.systemPrompt } : {}),
         observer,
         debug: options.debug,
+        judge: options.judge,
         cleanWorkspace: options.cleanWorkspace,
         noMcp,
       });
@@ -447,6 +450,7 @@ async function runCompare(options: {
   maxBudgetUsd: number;
   maxConcurrency: number;
   systemPrompt?: string;
+  judge: boolean;
   debug: boolean;
   cleanWorkspace: boolean;
   save: boolean;
@@ -573,6 +577,7 @@ async function runCompare(options: {
         debug: options.debug,
       }),
       debug: options.debug,
+      judge: options.judge,
       cleanWorkspace: options.cleanWorkspace,
       noMcp,
     };
