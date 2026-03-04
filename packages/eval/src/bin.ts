@@ -27,7 +27,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const EVAL_PKG_ROOT = path.resolve(__dirname, "..");
 const FIXTURES_DIR = path.join(EVAL_PKG_ROOT, "fixtures", "agent-scenarios");
-const CLI_BIN_PATH = path.resolve(EVAL_PKG_ROOT, "..", "cli", "dist", "index.js");
+const CLI_BIN_PATH = fileURLToPath(import.meta.resolve("@speakeasy-api/docs-mcp-cli"));
 
 const program = new Command();
 
