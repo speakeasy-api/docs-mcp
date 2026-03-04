@@ -34,6 +34,7 @@
   "scripts": {
     "prepack": "node ../../scripts/check-workspace-protocol.mjs",
     "prepublishOnly": "pnpm run build",
+    "dev": "tsx watch --include ${INDEX_DIR:-../../tests/fixtures/index} src/bin.ts --index-dir ${INDEX_DIR:-../../tests/fixtures/index} --transport ${MCP_TRANSPORT:-http} --port ${PORT:-20310}",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
@@ -45,5 +46,8 @@
     "change-case": "^5.4.4",
     "commander": "^13.1.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
   }
 }
