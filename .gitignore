@@ -1,3 +1,6 @@
+.vscode/mcp.json
+.cursor/mcp.json
+.codex/config.toml
 node_modules/
 dist/
 .turbo/
