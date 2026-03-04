@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-core
 
+## 0.13.0
+
+### Minor Changes
+
+- 8a321c5: Extract human-readable titles for MCP resources from markdown files. Titles are resolved using frontmatter `title` with a fallback to the first H1 heading. These titles appear in MCP resource listings, making it easier for agents to identify documents.
+
 ## 0.12.1
 
 ## 0.12.0

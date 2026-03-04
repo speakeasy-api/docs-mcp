@@ -1,5 +1,17 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.13.0
+
+### Patch Changes
+
+- 7305f3e: Fix eval usage reporting to fall back to accumulated counts when SDK final values are zero
+  - Prefer SDK-reported final usage values but fall back to incrementally accumulated counts when they are zero
+  - Add debug logging for Claude provider result and runner done events
+
+- Updated dependencies [8a321c5]
+  - @speakeasy-api/docs-mcp-core@0.13.0
+  - @speakeasy-api/docs-mcp-cli@0.13.0
+
 ## 0.12.1
 
 ### Patch Changes
