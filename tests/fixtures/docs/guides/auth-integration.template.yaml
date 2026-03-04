@@ -1,0 +1,20 @@
+title: AcmeAuth Integration Advisor (YAML)
+description: Multi-message template for AcmeAuth integration guidance.
+arguments:
+  - name: app_type
+    required: true
+  - name: auth_method
+    required: true
+messages:
+  - role: user
+    content:
+      type: text
+      text: |
+        You are helping integrate AcmeAuth for a {{app_type}}.
+        Use {{auth_method}} as the primary authentication method.
+  - role: assistant
+    content:
+      type: text
+      text: |
+        I will propose an implementation plan using authentication,
+        rate limiting, and webhook best practices.

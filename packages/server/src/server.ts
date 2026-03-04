@@ -1,6 +1,8 @@
 import path from "node:path";
+import Mustache from "mustache";
 import type {
   CorpusMetadata,
+  PromptDefinition,
   RrfWeights,
   SearchEngine,
   GetDocRequest,
@@ -12,6 +14,8 @@ import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
 import type {
   CallToolResult,
   CustomTool,
+  GetPromptResult,
+  ListPromptsResult,
   ReadResourceResult,
   ResourceDefinition,
   ToolCallContext,
@@ -19,6 +23,8 @@ import type {
   ToolProvider,
 } from "./types.js";
 import { properCase } from "./strings.js";
+
+Mustache.escape = (value: string) => value;
 
 export interface McpDocsServerOptions {
   index: SearchEngine;
@@ -111,6 +117,51 @@ export class McpDocsServer implements ToolProvider {
     }));
 
     return [...builtIn, ...custom];
+  }
+
+  getPrompts(): ListPromptsResult["prompts"] {
+    const prompts = this.metadata.prompts ?? [];
+    return prompts.map((prompt) => ({
+      name: prompt.name,
+      ...(prompt.title ? { title: prompt.title } : {}),
+      ...(prompt.description ? { description: prompt.description } : {}),
+      ...(prompt.arguments.length > 0
+        ? {
+            arguments: prompt.arguments.map((argument) => ({
+              name: argument.name,
+              ...(argument.description ? { description: argument.description } : {}),
+              ...(argument.required !== undefined ? { required: argument.required } : {}),
+            })),
+          }
+        : {}),
+    }));
+  }
+
+  async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
+    const prompt = this.findPrompt(name);
+    const argumentsByName = args ?? {};
+
+    for (const argument of prompt.arguments) {
+      if (!argument.required) {
+        continue;
+      }
+
+      const value = argumentsByName[argument.name];
+      if (typeof value !== "string" || !value.trim()) {
+        throw new Error(`Missing required prompt argument '${argument.name}'`);
+      }
+    }
+
+    return {
+      ...(prompt.description ? { description: prompt.description } : {}),
+      messages: prompt.messages.map((message) => ({
+        role: message.role,
+        content: {
+          type: "text",
+          text: Mustache.render(message.content.text, argumentsByName),
+        },
+      })),
+    };
   }
 
   async callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult> {
@@ -222,6 +273,14 @@ export class McpDocsServer implements ToolProvider {
     const tail = fileTitle || properCase(sentenceCase(basename));
 
     return [...dirParts, tail].join(" / ");
+  }
+
+  private findPrompt(name: string): PromptDefinition {
+    const prompt = (this.metadata.prompts ?? []).find((entry) => entry.name === name);
+    if (!prompt) {
+      throw new Error(`Prompt '${name}' not found`);
+    }
+    return prompt;
   }
 }
 

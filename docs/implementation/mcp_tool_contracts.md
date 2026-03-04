@@ -174,3 +174,27 @@ The `get_doc` success response uses a stable delimiter format for chunk boundari
 - `Chunk {N} of {M}`: 1-indexed position within the source file.
 - `Target`: The requested chunk. Exactly one delimiter per response carries this label.
 - `Context: {+N|-N}`: A context chunk. `+1` means one chunk after the target, `-1` means one before.
+
+---
+
+## MCP Prompts
+
+In addition to tools, the server exposes MCP prompts discovered from `*.template.md` and `*.template.yaml` files at build time.
+
+### `prompts/list`
+
+- Returns prompt definitions from `metadata.json.prompts`.
+- Each prompt includes `name`, optional `title`, optional `description`, and optional `arguments`.
+- Prompt argument fields exposed over MCP are `name`, optional `description`, and optional `required`.
+
+### `prompts/get`
+
+- Input:
+  - `name` (required): prompt name.
+  - `arguments` (optional): string-to-string map used for mustache templating.
+- Behavior:
+  - Resolves prompt by `name`.
+  - Validates all `required: true` arguments are present and non-empty.
+  - Renders all prompt text content with mustache.
+- Output:
+  - `GetPromptResult` with one or more rendered messages.

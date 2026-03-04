@@ -3,6 +3,7 @@ import type {
   CorpusMetadata,
   EmbeddingMetadata,
   FileMeta,
+  PromptDefinition,
   TaxonomyField,
   TaxonomyValueProperties,
   ToolDescriptions,
@@ -60,6 +61,7 @@ export function normalizeMetadata(
   const toolDescriptions = normalizeToolDescriptions(metadata.tool_descriptions);
   const mcpServerInstructions = normalizeInstructions(metadata.mcpServerInstructions);
   const files = normalizeFiles(metadata.files);
+  const prompts = normalizePrompts(metadata.prompts);
 
   return {
     metadata_version: metadataVersion,
@@ -68,9 +70,168 @@ export function normalizeMetadata(
     stats,
     embedding,
     files,
+    ...(prompts.length > 0 ? { prompts } : {}),
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
     ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
   };
+}
+
+function normalizePrompts(value: unknown): PromptDefinition[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error("prompts must be an array");
+  }
+
+  const names = new Set<string>();
+  return value.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`prompts[${index}] must be an object`);
+    }
+
+    const prompt = entry as Record<string, unknown>;
+    const name = asNonEmptyString(prompt.name, `prompts[${index}].name`);
+    if (names.has(name)) {
+      throw new Error(`Duplicate prompt name '${name}'`);
+    }
+    names.add(name);
+
+    const args = normalizePromptArguments(prompt.arguments, index);
+    const messages = normalizePromptMessages(prompt, index);
+    const title =
+      prompt.title === undefined
+        ? undefined
+        : asNonEmptyString(prompt.title, `prompts[${index}].title`);
+    const description =
+      prompt.description === undefined
+        ? undefined
+        : asNonEmptyString(prompt.description, `prompts[${index}].description`);
+
+    return {
+      name,
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      arguments: args,
+      messages,
+    };
+  });
+}
+
+function normalizePromptMessages(
+  prompt: Record<string, unknown>,
+  promptIndex: number,
+): PromptDefinition["messages"] {
+  const hasMessages = prompt.messages !== undefined;
+  const hasTemplate = prompt.template !== undefined;
+
+  if (hasMessages && hasTemplate) {
+    throw new Error(`prompts[${promptIndex}] cannot define both messages and template`);
+  }
+
+  if (hasTemplate) {
+    const template = asNonEmptyString(prompt.template, `prompts[${promptIndex}].template`);
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: template,
+        },
+      },
+    ];
+  }
+
+  if (!Array.isArray(prompt.messages) || prompt.messages.length === 0) {
+    throw new Error(`prompts[${promptIndex}].messages must be a non-empty array`);
+  }
+
+  return prompt.messages.map((entry, messageIndex) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`prompts[${promptIndex}].messages[${messageIndex}] must be an object`);
+    }
+    const message = entry as Record<string, unknown>;
+
+    const roleRaw = message.role;
+    if (roleRaw !== "user" && roleRaw !== "assistant") {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].role must be 'user' or 'assistant'`,
+      );
+    }
+    const role: "user" | "assistant" = roleRaw;
+
+    if (!message.content || typeof message.content !== "object" || Array.isArray(message.content)) {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].content must be an object`,
+      );
+    }
+    const content = message.content as Record<string, unknown>;
+    if (content.type !== "text") {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].content.type must be 'text'`,
+      );
+    }
+
+    return {
+      role,
+      content: {
+        type: "text",
+        text: asNonEmptyString(
+          content.text,
+          `prompts[${promptIndex}].messages[${messageIndex}].content.text`,
+        ),
+      },
+    };
+  });
+}
+
+function normalizePromptArguments(
+  value: unknown,
+  promptIndex: number,
+): PromptDefinition["arguments"] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`prompts[${promptIndex}].arguments must be an array`);
+  }
+
+  const names = new Set<string>();
+  return value.map((entry, argIndex) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`prompts[${promptIndex}].arguments[${argIndex}] must be an object`);
+    }
+
+    const arg = entry as Record<string, unknown>;
+    const name = asNonEmptyString(arg.name, `prompts[${promptIndex}].arguments[${argIndex}].name`);
+    if (names.has(name)) {
+      throw new Error(`Duplicate argument name '${name}' in prompt '${promptIndex}'`);
+    }
+    names.add(name);
+
+    const title =
+      arg.title === undefined
+        ? undefined
+        : asNonEmptyString(arg.title, `prompts[${promptIndex}].arguments[${argIndex}].title`);
+    const description =
+      arg.description === undefined
+        ? undefined
+        : asNonEmptyString(
+            arg.description,
+            `prompts[${promptIndex}].arguments[${argIndex}].description`,
+          );
+
+    if (arg.required !== undefined && typeof arg.required !== "boolean") {
+      throw new Error(`prompts[${promptIndex}].arguments[${argIndex}].required must be a boolean`);
+    }
+
+    return {
+      name,
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      ...(arg.required !== undefined ? { required: arg.required } : {}),
+    };
+  });
 }
 
 function normalizeTaxonomy(value: unknown): Record<string, TaxonomyField> {
@@ -271,7 +432,6 @@ function normalizeFiles(value: unknown): Record<string, FileMeta> {
 
   const raw = value as Record<string, unknown>;
   const result: Record<string, FileMeta> = {};
-  let hasAny = false;
 
   for (const [filepath, entry] of Object.entries(raw)) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
@@ -292,7 +452,6 @@ function normalizeFiles(value: unknown): Record<string, FileMeta> {
     }
 
     result[filepath] = fileMeta;
-    hasAny = true;
   }
 
   return result;

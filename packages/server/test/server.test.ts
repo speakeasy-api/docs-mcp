@@ -330,3 +330,83 @@ describe("McpDocsServer resources", () => {
     await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid URI scheme/);
   });
 });
+
+describe("McpDocsServer prompts", () => {
+  const metadataWithPrompts = normalizeMetadata({
+    metadata_version: "1.1.0",
+    corpus_description: "Speakeasy SDK docs",
+    taxonomy: {
+      language: {
+        description: "Filter results by programming language.",
+        values: ["python", "typescript"],
+      },
+      scope: {
+        values: ["global-guide", "sdk-specific"],
+      },
+    },
+    stats: {
+      total_chunks: 2,
+      total_files: 2,
+      indexed_at: "2026-02-22T00:00:00Z",
+    },
+    embedding: null,
+    prompts: [
+      {
+        name: "guides/auth-integration",
+        title: "Auth Integration",
+        description: "AcmeAuth integration guidance.",
+        arguments: [{ name: "auth_method", description: "Authentication method", required: true }],
+        messages: [
+          {
+            role: "user",
+            content: { type: "text", text: "Use {{auth_method}} for this integration." },
+          },
+          {
+            role: "assistant",
+            content: { type: "text", text: "I will provide a plan." },
+          },
+        ],
+      },
+    ],
+  });
+
+  it("lists prompts from metadata", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    const prompts = server.getPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.name).toBe("guides/auth-integration");
+    expect(prompts[0]?.arguments?.[0]?.name).toBe("auth_method");
+  });
+
+  it("renders prompt with mustache arguments", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    const prompt = await server.getPrompt("guides/auth-integration", {
+      auth_method: "oauth2",
+    });
+
+    expect(prompt.messages).toHaveLength(2);
+    expect(prompt.messages[0]?.content.type).toBe("text");
+    if (prompt.messages[0]?.content.type === "text") {
+      expect(prompt.messages[0].content.text).toContain("oauth2");
+    }
+  });
+
+  it("throws when required arguments are missing", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    await expect(server.getPrompt("guides/auth-integration")).rejects.toThrow(
+      /Missing required prompt argument 'auth_method'/,
+    );
+  });
+});

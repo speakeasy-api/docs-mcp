@@ -1,7 +1,14 @@
 export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-export type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+export type {
+  CallToolResult,
+  GetPromptResult,
+  ListPromptsResult,
+  ReadResourceResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import type {
   CallToolResult,
+  GetPromptResult,
+  ListPromptsResult,
   ReadResourceResult,
   ListToolsResult,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -27,6 +34,8 @@ export interface ToolDefinition {
 export interface ToolProvider {
   getInstructions(): string | undefined;
   getTools(): ToolDefinition[];
+  getPrompts(): ListPromptsResult["prompts"];
+  getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult>;
   callTool(name: string, args: unknown, context: ToolCallContext): Promise<CallToolResult>;
   getResources(): Promise<ResourceDefinition[]>;
   readResource(uri: string): Promise<ReadResourceResult>;

@@ -20,6 +20,38 @@ const TaxonomyFieldSchema = z
   })
   .passthrough();
 
+const PromptArgumentSchema = z
+  .object({
+    name: z.string(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    required: z.boolean().optional(),
+  })
+  .passthrough();
+
+const PromptSchema = z
+  .object({
+    name: z.string(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    arguments: z.array(PromptArgumentSchema).optional(),
+    template: z.string().optional(),
+    messages: z
+      .array(
+        z
+          .object({
+            role: z.enum(["user", "assistant"]),
+            content: z.object({
+              type: z.literal("text"),
+              text: z.string(),
+            }),
+          })
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
 const MetadataDocumentSchema = z
   .object({
     metadata_version: z.string(),
@@ -40,6 +72,7 @@ const MetadataDocumentSchema = z
         dimensions: z.number().int(),
       })
       .nullable(),
+    prompts: z.array(PromptSchema).optional(),
     tool_descriptions: z
       .object({
         search_docs: z.string().optional(),

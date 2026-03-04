@@ -1,0 +1,27 @@
+title: Webhook Delivery Debug Playbook
+description: Triage and resolve failed AcmeAuth webhook deliveries.
+arguments:
+  - name: event_type
+    description: Webhook event type being debugged
+    required: true
+  - name: status_code
+    description: HTTP status code returned by your endpoint
+    required: true
+  - name: retry_attempt
+    description: Current delivery retry attempt number
+messages:
+  - role: user
+    content:
+      type: text
+      text: |
+        Investigate a failing AcmeAuth webhook delivery for event `{{event_type}}`.
+        Our endpoint returned HTTP `{{status_code}}` on retry attempt `{{retry_attempt}}`.
+  - role: user
+    content:
+      type: text
+      text: |
+        Use the Webhooks and Rate Limiting guides to produce:
+        1) likely root causes,
+        2) concrete remediation steps,
+        3) signature verification checks,
+        4) a safe retry/replay checklist.

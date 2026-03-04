@@ -3,7 +3,6 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import fg from "fast-glob";
 import { Command } from "commander";
 
 const require = createRequire(import.meta.url);
@@ -21,6 +20,8 @@ import {
   loadChunksFromPreviousIndex,
   mergeTaxonomyConfigs,
   parseManifestJson,
+  parsePromptMarkdown,
+  parsePromptTemplateYaml,
   resolveFileConfig,
   saveCache,
   type BatchProgressEvent,
@@ -32,8 +33,16 @@ import {
   type FileMeta,
   type Manifest,
   type PreviousIndexReader,
+  type PromptDefinition,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
+import {
+  derivePromptName,
+  getPromptTemplateFormat,
+  listMarkdownFiles,
+  listPromptFiles,
+  resolvePreferredPromptFiles,
+} from "./discovery.js";
 import { resolveCorpusLabel, resolveSourceCommit } from "./git.js";
 
 const program = new Command();
@@ -163,6 +172,11 @@ program
   .action(async (options: { docsDir: string }) => {
     const docsDir = path.resolve(options.docsDir);
     const files = await listMarkdownFiles(docsDir);
+    const promptFiles = resolvePreferredPromptFiles(
+      await listPromptFiles(docsDir),
+      docsDir,
+      (message) => console.warn(`warn: ${message}`),
+    );
     const manifestCache = new Map<string, Manifest>();
 
     let warnings = 0;
@@ -194,6 +208,16 @@ program
         strategy: resolved.strategy,
         metadata: resolved.metadata,
       });
+    }
+
+    for (const file of promptFiles) {
+      const source = await readFile(file, "utf8");
+      const format = getPromptTemplateFormat(file);
+      if (format === "yaml") {
+        parsePromptTemplateYaml(source);
+      } else {
+        parsePromptMarkdown(source);
+      }
     }
 
     console.log(`validated ${files.length} markdown files`);
@@ -246,6 +270,11 @@ program
       const docsDir = path.resolve(options.docsDir);
       const outDir = path.resolve(options.out);
       const files = await listMarkdownFiles(docsDir);
+      const promptFiles = resolvePreferredPromptFiles(
+        await listPromptFiles(docsDir),
+        docsDir,
+        (message) => console.warn(`warn: ${message}`),
+      );
       const manifestCache = new Map<string, Manifest>();
       const lanceDbPath = path.join(outDir, ".lancedb");
       const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
@@ -306,6 +335,7 @@ program
       }
 
       const chunks: Chunk[] = [];
+      const prompts: PromptDefinition[] = [];
       const newFileFingerprints: Record<string, string> = {};
       const filesMeta: Record<string, FileMeta> = {};
       let chunkCacheHits = 0;
@@ -349,6 +379,22 @@ program
         chunks.push(...fileChunks);
       }
       clearProgress();
+
+      for (const promptFile of promptFiles) {
+        const source = await readFile(promptFile, "utf8");
+        const promptName = derivePromptName(promptFile, docsDir);
+        const format = getPromptTemplateFormat(promptFile);
+        const parsed =
+          format === "yaml" ? parsePromptTemplateYaml(source) : parsePromptMarkdown(source);
+        prompts.push({
+          name: promptName,
+          ...(parsed.title ? { title: parsed.title } : {}),
+          ...(parsed.description ? { description: parsed.description } : {}),
+          arguments: parsed.arguments,
+          messages: parsed.messages,
+        });
+      }
+
       const cacheSuffix = chunkCacheHits > 0 ? ` (${chunkCacheHits} cached)` : "";
       console.warn(
         `Chunked ${files.length} files into ${chunks.length.toLocaleString()} chunks${cacheSuffix}`,
@@ -504,6 +550,7 @@ program
         sourceCommit,
         taxonomyConfig,
         filesMeta,
+        prompts,
         Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined,
         mcpServerInstructions,
       );
@@ -651,17 +698,6 @@ async function loadNearestManifest(
   return undefined;
 }
 
-async function listMarkdownFiles(docsDir: string): Promise<string[]> {
-  const files = await fg(["**/*.md"], {
-    cwd: docsDir,
-    absolute: true,
-    onlyFiles: true,
-    dot: false,
-  });
-  files.sort((a, b) => a.localeCompare(b));
-  return files;
-}
-
 function buildMetadata(
   chunks: Chunk[],
   files: string[],
@@ -670,6 +706,7 @@ function buildMetadata(
   sourceCommit: string | null,
   taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>,
   filesMeta: Record<string, FileMeta>,
+  prompts: PromptDefinition[],
   toolDescriptions?: Record<string, string>,
   mcpServerInstructions?: string,
 ): {
@@ -691,6 +728,7 @@ function buildMetadata(
     source_commit: string | null;
   };
   embedding: EmbeddingMetadata | null;
+  prompts?: PromptDefinition[];
   tool_descriptions?: Record<string, string>;
   mcpServerInstructions?: string;
   files?: Record<string, FileMeta>;
@@ -734,6 +772,7 @@ function buildMetadata(
       source_commit: sourceCommit,
     },
     embedding,
+    ...(prompts.length > 0 ? { prompts } : {}),
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
     ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
     ...(filesMeta ? { files: filesMeta } : {}),

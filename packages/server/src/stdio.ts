@@ -3,10 +3,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
+  type GetPromptResult,
+  type ListPromptsResult,
   type ListResourcesResult,
   type ListResourceTemplatesResult,
   type ListToolsResult,
@@ -35,6 +39,7 @@ export async function startStdioServer(
       capabilities: {
         tools: {},
         resources: {},
+        prompts: {},
       },
       ...(instructions ? { instructions } : {}),
     },
@@ -80,6 +85,17 @@ export async function startStdioServer(
   server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const result = await app.readResource(request.params.uri);
     return result;
+  });
+
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return {
+      prompts: app.getPrompts(),
+    } satisfies ListPromptsResult;
+  });
+
+  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const result = await app.getPrompt(request.params.name, request.params.arguments);
+    return result as GetPromptResult;
   });
 
   const transport = new StdioServerTransport();
