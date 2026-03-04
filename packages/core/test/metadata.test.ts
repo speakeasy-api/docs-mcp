@@ -75,6 +75,54 @@ describe("normalizeMetadata", () => {
     expect(result.stats.source_commit).toBe(commit);
   });
 
+  it("accepts valid metadata with prompts", () => {
+    const input = validMetadata({
+      prompts: [
+        {
+          name: "guides/convert-currency",
+          arguments: [
+            {
+              name: "currency",
+              description: "Target currency",
+              required: true,
+            },
+          ],
+          template: "Convert 100 USD to {{currency}}",
+        },
+      ],
+    });
+
+    const result = normalizeMetadata(input);
+    expect(result.prompts).toHaveLength(1);
+    expect(result.prompts?.[0]?.name).toBe("guides/convert-currency");
+    expect(result.prompts?.[0]?.arguments[0]?.name).toBe("currency");
+  });
+
+  it("rejects duplicate prompt names", () => {
+    const input = validMetadata({
+      prompts: [
+        { name: "a", arguments: [], template: "one" },
+        { name: "a", arguments: [], template: "two" },
+      ],
+    });
+
+    expect(() => normalizeMetadata(input)).toThrow(/Duplicate prompt name 'a'/);
+  });
+
+  it("rejects prompt arguments with invalid required type", () => {
+    const input = validMetadata({
+      prompts: [
+        {
+          name: "a",
+          arguments: [{ name: "currency", required: "yes" }],
+          template: "{{currency}}",
+        },
+      ],
+    });
+
+    expect(() => normalizeMetadata(input)).toThrow(/required must be a boolean/);
+  });
+
   // ─── metadata_version validation ───────────────────────────────
 
   it("rejects invalid semver version", () => {

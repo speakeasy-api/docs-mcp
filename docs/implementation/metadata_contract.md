@@ -43,7 +43,25 @@ This document defines the schema for `metadata.json`, the build artifact generat
 
   // The embedding provider used at build time (if any).
   // Null means FTS-only index — the server disables vector search.
-  "embedding": null
+  "embedding": null,
+
+  // Optional MCP prompts discovered from *.template.md files.
+  // These files are excluded from search indexing and exposed via prompts/list + prompts/get.
+  "prompts": [
+    {
+      "name": "guides/convert-currency",
+      "title": "Convert Currency",
+      "description": "Convert 100 USD to a target currency.",
+      "arguments": [
+        {
+          "name": "currency",
+          "description": "The target currency for conversion",
+          "required": true
+        }
+      ],
+      "template": "Convert 100 USD to {{currency}}. Use current forex mcp tools and APIs if available."
+    }
+  ]
 }
 ```
 
@@ -79,6 +97,10 @@ This document defines the schema for `metadata.json`, the build artifact generat
 - **`embedding`**
   - Type: `null | { provider: string; model: string; dimensions: number }`
   - If object is provided, `dimensions` must be `> 0`.
+- **`prompts`**
+  - Type: optional array of `{ name, title?, description?, arguments[], template }`.
+  - `name` and `template` are required non-empty strings.
+  - `arguments` entries require `name`; support optional `description` and `required`.
 
 ## Rationale for each field
 
@@ -87,6 +109,7 @@ This document defines the schema for `metadata.json`, the build artifact generat
 - **`taxonomy`**: This is the load-bearing field for the Dynamic Schema feature. The server reads it at boot to inject `enum` arrays into the `search_docs` JSON Schema. Keys are strictly dynamic (not hardcoded to `language`), guaranteeing the core engine remains domain-agnostic per the architecture's design goal.
 - **`stats`**: Cheap to compute at index time, useful for the eval harness and the Host's telemetry pipeline. `source_commit` adds lightweight source provenance without introducing brittle boot-time coupling.
 - **`embedding`**: The runtime server needs to know whether to execute vector search pathways (`table.search().nearestTo()`) or fall back to pure FTS if the index was built with `--embedding-provider none`. It is also required by the eval harness to record the specific provider/model permutation in its markdown delta reports.
+- **`prompts`**: Allows docs authors to ship reusable MCP prompts next to docs content via `*.template.md`, while keeping prompt templates out of search indexing.
 
 ## System Boundaries (Who Writes vs. Reads)
 

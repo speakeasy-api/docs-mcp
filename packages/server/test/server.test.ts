@@ -330,3 +330,74 @@ describe("McpDocsServer resources", () => {
     await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid URI scheme/);
   });
 });
+
+describe("McpDocsServer prompts", () => {
+  const metadataWithPrompts = normalizeMetadata({
+    metadata_version: "1.1.0",
+    corpus_description: "Speakeasy SDK docs",
+    taxonomy: {
+      language: {
+        description: "Filter results by programming language.",
+        values: ["python", "typescript"],
+      },
+      scope: {
+        values: ["global-guide", "sdk-specific"],
+      },
+    },
+    stats: {
+      total_chunks: 2,
+      total_files: 2,
+      indexed_at: "2026-02-22T00:00:00Z",
+    },
+    embedding: null,
+    prompts: [
+      {
+        name: "guides/convert-currency",
+        title: "Convert Currency",
+        description: "Convert 100 USD to a target currency.",
+        arguments: [{ name: "currency", description: "Target currency", required: true }],
+        template: "Convert 100 USD to {{currency}}.",
+      },
+    ],
+  });
+
+  it("lists prompts from metadata", () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    const prompts = server.getPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.name).toBe("guides/convert-currency");
+    expect(prompts[0]?.arguments?.[0]?.name).toBe("currency");
+  });
+
+  it("renders prompt with mustache arguments", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    const prompt = await server.getPrompt("guides/convert-currency", {
+      currency: "JPY",
+    });
+
+    expect(prompt.messages).toHaveLength(1);
+    expect(prompt.messages[0]?.content.type).toBe("text");
+    if (prompt.messages[0]?.content.type === "text") {
+      expect(prompt.messages[0].content.text).toContain("JPY");
+    }
+  });
+
+  it("throws when required arguments are missing", async () => {
+    const server = new McpDocsServer({
+      index: new DocsIndex(chunks),
+      metadata: metadataWithPrompts,
+    });
+
+    await expect(server.getPrompt("guides/convert-currency")).rejects.toThrow(
+      /Missing required prompt argument 'currency'/,
+    );
+  });
+});

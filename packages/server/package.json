@@ -40,14 +40,16 @@
     "test": "vitest run",
     "lint": "eslint src test"
   },
+  "devDependencies": {
+    "@types/mustache": "^4.2.6",
+    "tsx": "^4.19.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@speakeasy-api/docs-mcp-core": "workspace:*",
     "change-case": "^5.4.4",
     "commander": "^13.1.0",
+    "mustache": "^4.2.0",
     "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "tsx": "^4.19.0"
   }
 }

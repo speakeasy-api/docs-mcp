@@ -6,10 +6,14 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
+  type GetPromptResult,
+  type ListPromptsResult,
   type ListToolsResult,
   type ListResourcesResult,
   type ListResourceTemplatesResult,
@@ -93,6 +97,7 @@ function createMcpServer(
       capabilities: {
         tools: {},
         resources: {},
+        prompts: {},
       },
       ...(instructions ? { instructions } : {}),
     },
@@ -144,6 +149,17 @@ function createMcpServer(
   server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const result = await app.readResource(request.params.uri);
     return result;
+  });
+
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return {
+      prompts: app.getPrompts(),
+    } satisfies ListPromptsResult;
+  });
+
+  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const result = await app.getPrompt(request.params.name, request.params.arguments);
+    return result as GetPromptResult;
   });
 
   return server;

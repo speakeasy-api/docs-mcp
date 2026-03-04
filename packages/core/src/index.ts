@@ -5,6 +5,7 @@ export * from "./cursor.js";
 export * from "./manifest.js";
 export * from "./manifest-schema.js";
 export * from "./metadata.js";
+export * from "./prompt.js";
 export * from "./search.js";
 export * from "./embedding.js";
 export * from "./embedding-cache.js";

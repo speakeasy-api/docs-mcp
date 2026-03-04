@@ -49,6 +49,15 @@ const metadata = normalizeMetadata({
     indexed_at: "2026-01-01T00:00:00Z",
   },
   embedding: null,
+  prompts: [
+    {
+      name: "guides/convert-currency",
+      title: "Convert Currency",
+      description: "Convert 100 USD to a target currency",
+      arguments: [{ name: "currency", description: "Target currency", required: true }],
+      template: "Convert 100 USD to {{currency}}.",
+    },
+  ],
 });
 
 // Use a random high port to avoid conflicts
@@ -138,6 +147,37 @@ describe("MCP HTTP transport compliance", () => {
     expect(result.isError).not.toBe(true);
     const text = (result.content as Array<{ text: string }>)[0].text;
     expect(text).toContain("TypeScript retry");
+
+    await client.close();
+  });
+
+  it("lists prompts", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    const { prompts } = await client.listPrompts();
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.name).toBe("guides/convert-currency");
+
+    await client.close();
+  });
+
+  it("gets and renders a prompt", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    const prompt = await client.getPrompt({
+      name: "guides/convert-currency",
+      arguments: { currency: "EUR" },
+    });
+
+    expect(prompt.messages).toHaveLength(1);
+    expect(prompt.messages[0]?.content.type).toBe("text");
+    if (prompt.messages[0]?.content.type === "text") {
+      expect(prompt.messages[0].content.text).toContain("EUR");
+    }
 
     await client.close();
   });
@@ -271,7 +311,10 @@ describe("MCP HTTP transport resources", () => {
       uri: "docs:///guides/ts.md",
     });
     expect(result.contents).toHaveLength(1);
-    expect(result.contents[0].text).toContain("TypeScript retry");
+    expect("text" in result.contents[0]).toBe(true);
+    if ("text" in result.contents[0]) {
+      expect(result.contents[0].text).toContain("TypeScript retry");
+    }
 
     await client.close();
   });

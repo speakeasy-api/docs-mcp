@@ -127,6 +127,21 @@ export interface ToolDescriptions {
   get_doc?: string;
 }
 
+export interface PromptArgument {
+  name: string;
+  title?: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface PromptDefinition {
+  name: string;
+  title?: string;
+  description?: string;
+  arguments: PromptArgument[];
+  template: string;
+}
+
 export interface FileMeta {
   title?: string;
 }
@@ -138,6 +153,7 @@ export interface CorpusMetadata {
   stats: MetadataStats;
   embedding: EmbeddingMetadata | null;
   files: Record<string, FileMeta>;
+  prompts?: PromptDefinition[];
   tool_descriptions?: ToolDescriptions;
   mcpServerInstructions?: string;
 }
