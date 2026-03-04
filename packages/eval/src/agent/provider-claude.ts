@@ -107,6 +107,9 @@ export class ClaudeAgentProvider implements AgentProvider {
       }
 
       if (message.type === "result") {
+        console.error(
+          `[claude] result: turns=${message.num_turns} cost=${message.total_cost_usd} usage=${JSON.stringify(message.usage)}`,
+        );
         const resultUsage = message.usage as Record<string, number>;
         const isSuccess = message.subtype === "success";
         const errors: string[] = isSuccess ? [] : [...message.errors];

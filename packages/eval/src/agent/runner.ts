@@ -331,13 +331,18 @@ export async function runAgentScenario(
 
           case "done": {
             resultSubtype = event.subtype;
-            totalCostUsd = event.usage.totalCostUsd;
-            durationApiMs = event.usage.durationApiMs;
-            numTurns = event.usage.numTurns;
-            inputTokens = event.usage.inputTokens;
-            outputTokens = event.usage.outputTokens;
-            cacheReadInputTokens = event.usage.cacheReadInputTokens;
-            cacheCreationInputTokens = event.usage.cacheCreationInputTokens;
+            console.error(
+              `[runner] done: sdk turns=${event.usage.numTurns} cost=${event.usage.totalCostUsd} | accumulated turns=${numTurns} cost=${totalCostUsd}`,
+            );
+            // Prefer SDK-reported final values when > 0; fall back to incrementally accumulated counts
+            totalCostUsd = event.usage.totalCostUsd || totalCostUsd;
+            durationApiMs = event.usage.durationApiMs || durationApiMs;
+            numTurns = event.usage.numTurns || numTurns;
+            inputTokens = event.usage.inputTokens || inputTokens;
+            outputTokens = event.usage.outputTokens || outputTokens;
+            cacheReadInputTokens = event.usage.cacheReadInputTokens || cacheReadInputTokens;
+            cacheCreationInputTokens =
+              event.usage.cacheCreationInputTokens || cacheCreationInputTokens;
             if (event.subtype === "success") {
               finalAnswer = event.answer;
             } else {
