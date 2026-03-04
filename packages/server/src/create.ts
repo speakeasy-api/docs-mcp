@@ -34,8 +34,21 @@ const PromptSchema = z
     name: z.string(),
     title: z.string().optional(),
     description: z.string().optional(),
-    arguments: z.array(PromptArgumentSchema),
-    template: z.string(),
+    arguments: z.array(PromptArgumentSchema).optional(),
+    template: z.string().optional(),
+    messages: z
+      .array(
+        z
+          .object({
+            role: z.enum(["user", "assistant"]),
+            content: z.object({
+              type: z.literal("text"),
+              text: z.string(),
+            }),
+          })
+          .passthrough(),
+      )
+      .optional(),
   })
   .passthrough();
 

@@ -97,8 +97,8 @@ function normalizePrompts(value: unknown): PromptDefinition[] {
     }
     names.add(name);
 
-    const template = asNonEmptyString(prompt.template, `prompts[${index}].template`);
     const args = normalizePromptArguments(prompt.arguments, index);
+    const messages = normalizePromptMessages(prompt, index);
     const title =
       prompt.title === undefined
         ? undefined
@@ -113,7 +113,74 @@ function normalizePrompts(value: unknown): PromptDefinition[] {
       ...(title ? { title } : {}),
       ...(description ? { description } : {}),
       arguments: args,
-      template,
+      messages,
+    };
+  });
+}
+
+function normalizePromptMessages(
+  prompt: Record<string, unknown>,
+  promptIndex: number,
+): PromptDefinition["messages"] {
+  const hasMessages = prompt.messages !== undefined;
+  const hasTemplate = prompt.template !== undefined;
+
+  if (hasMessages && hasTemplate) {
+    throw new Error(`prompts[${promptIndex}] cannot define both messages and template`);
+  }
+
+  if (hasTemplate) {
+    const template = asNonEmptyString(prompt.template, `prompts[${promptIndex}].template`);
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: template,
+        },
+      },
+    ];
+  }
+
+  if (!Array.isArray(prompt.messages) || prompt.messages.length === 0) {
+    throw new Error(`prompts[${promptIndex}].messages must be a non-empty array`);
+  }
+
+  return prompt.messages.map((entry, messageIndex) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`prompts[${promptIndex}].messages[${messageIndex}] must be an object`);
+    }
+    const message = entry as Record<string, unknown>;
+
+    const roleRaw = message.role;
+    if (roleRaw !== "user" && roleRaw !== "assistant") {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].role must be 'user' or 'assistant'`,
+      );
+    }
+    const role: "user" | "assistant" = roleRaw;
+
+    if (!message.content || typeof message.content !== "object" || Array.isArray(message.content)) {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].content must be an object`,
+      );
+    }
+    const content = message.content as Record<string, unknown>;
+    if (content.type !== "text") {
+      throw new Error(
+        `prompts[${promptIndex}].messages[${messageIndex}].content.type must be 'text'`,
+      );
+    }
+
+    return {
+      role,
+      content: {
+        type: "text",
+        text: asNonEmptyString(
+          content.text,
+          `prompts[${promptIndex}].messages[${messageIndex}].content.text`,
+        ),
+      },
     };
   });
 }

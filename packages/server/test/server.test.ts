@@ -352,11 +352,20 @@ describe("McpDocsServer prompts", () => {
     embedding: null,
     prompts: [
       {
-        name: "guides/convert-currency",
-        title: "Convert Currency",
-        description: "Convert 100 USD to a target currency.",
-        arguments: [{ name: "currency", description: "Target currency", required: true }],
-        template: "Convert 100 USD to {{currency}}.",
+        name: "guides/auth-integration",
+        title: "Auth Integration",
+        description: "AcmeAuth integration guidance.",
+        arguments: [{ name: "auth_method", description: "Authentication method", required: true }],
+        messages: [
+          {
+            role: "user",
+            content: { type: "text", text: "Use {{auth_method}} for this integration." },
+          },
+          {
+            role: "assistant",
+            content: { type: "text", text: "I will provide a plan." },
+          },
+        ],
       },
     ],
   });
@@ -369,8 +378,8 @@ describe("McpDocsServer prompts", () => {
 
     const prompts = server.getPrompts();
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.name).toBe("guides/convert-currency");
-    expect(prompts[0]?.arguments?.[0]?.name).toBe("currency");
+    expect(prompts[0]?.name).toBe("guides/auth-integration");
+    expect(prompts[0]?.arguments?.[0]?.name).toBe("auth_method");
   });
 
   it("renders prompt with mustache arguments", async () => {
@@ -379,14 +388,14 @@ describe("McpDocsServer prompts", () => {
       metadata: metadataWithPrompts,
     });
 
-    const prompt = await server.getPrompt("guides/convert-currency", {
-      currency: "JPY",
+    const prompt = await server.getPrompt("guides/auth-integration", {
+      auth_method: "oauth2",
     });
 
-    expect(prompt.messages).toHaveLength(1);
+    expect(prompt.messages).toHaveLength(2);
     expect(prompt.messages[0]?.content.type).toBe("text");
     if (prompt.messages[0]?.content.type === "text") {
-      expect(prompt.messages[0].content.text).toContain("JPY");
+      expect(prompt.messages[0].content.text).toContain("oauth2");
     }
   });
 
@@ -396,8 +405,8 @@ describe("McpDocsServer prompts", () => {
       metadata: metadataWithPrompts,
     });
 
-    await expect(server.getPrompt("guides/convert-currency")).rejects.toThrow(
-      /Missing required prompt argument 'currency'/,
+    await expect(server.getPrompt("guides/auth-integration")).rejects.toThrow(
+      /Missing required prompt argument 'auth_method'/,
     );
   });
 });

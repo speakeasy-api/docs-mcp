@@ -87,7 +87,12 @@ describe("normalizeMetadata", () => {
               required: true,
             },
           ],
-          template: "Convert 100 USD to {{currency}}",
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: "Convert 100 USD to {{currency}}" },
+            },
+          ],
         },
       ],
     });
@@ -101,8 +106,16 @@ describe("normalizeMetadata", () => {
   it("rejects duplicate prompt names", () => {
     const input = validMetadata({
       prompts: [
-        { name: "a", arguments: [], template: "one" },
-        { name: "a", arguments: [], template: "two" },
+        {
+          name: "a",
+          arguments: [],
+          messages: [{ role: "user", content: { type: "text", text: "one" } }],
+        },
+        {
+          name: "a",
+          arguments: [],
+          messages: [{ role: "user", content: { type: "text", text: "two" } }],
+        },
       ],
     });
 
@@ -115,7 +128,7 @@ describe("normalizeMetadata", () => {
         {
           name: "a",
           arguments: [{ name: "currency", required: "yes" }],
-          template: "{{currency}}",
+          messages: [{ role: "user", content: { type: "text", text: "{{currency}}" } }],
         },
       ],
     });

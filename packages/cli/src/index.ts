@@ -21,6 +21,7 @@ import {
   mergeTaxonomyConfigs,
   parseManifestJson,
   parsePromptMarkdown,
+  parsePromptTemplateYaml,
   resolveFileConfig,
   saveCache,
   type BatchProgressEvent,
@@ -35,7 +36,13 @@ import {
   type PromptDefinition,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
-import { derivePromptName, listMarkdownFiles, listPromptFiles } from "./discovery.js";
+import {
+  derivePromptName,
+  getPromptTemplateFormat,
+  listMarkdownFiles,
+  listPromptFiles,
+  resolvePreferredPromptFiles,
+} from "./discovery.js";
 import { resolveCorpusLabel, resolveSourceCommit } from "./git.js";
 
 const program = new Command();
@@ -165,7 +172,11 @@ program
   .action(async (options: { docsDir: string }) => {
     const docsDir = path.resolve(options.docsDir);
     const files = await listMarkdownFiles(docsDir);
-    const promptFiles = await listPromptFiles(docsDir);
+    const promptFiles = resolvePreferredPromptFiles(
+      await listPromptFiles(docsDir),
+      docsDir,
+      (message) => console.warn(`warn: ${message}`),
+    );
     const manifestCache = new Map<string, Manifest>();
 
     let warnings = 0;
@@ -200,8 +211,13 @@ program
     }
 
     for (const file of promptFiles) {
-      const markdown = await readFile(file, "utf8");
-      parsePromptMarkdown(markdown);
+      const source = await readFile(file, "utf8");
+      const format = getPromptTemplateFormat(file);
+      if (format === "yaml") {
+        parsePromptTemplateYaml(source);
+      } else {
+        parsePromptMarkdown(source);
+      }
     }
 
     console.log(`validated ${files.length} markdown files`);
@@ -254,7 +270,11 @@ program
       const docsDir = path.resolve(options.docsDir);
       const outDir = path.resolve(options.out);
       const files = await listMarkdownFiles(docsDir);
-      const promptFiles = await listPromptFiles(docsDir);
+      const promptFiles = resolvePreferredPromptFiles(
+        await listPromptFiles(docsDir),
+        docsDir,
+        (message) => console.warn(`warn: ${message}`),
+      );
       const manifestCache = new Map<string, Manifest>();
       const lanceDbPath = path.join(outDir, ".lancedb");
       const lanceDbTmpPath = path.join(outDir, ".lancedb.tmp");
@@ -361,15 +381,17 @@ program
       clearProgress();
 
       for (const promptFile of promptFiles) {
-        const markdown = await readFile(promptFile, "utf8");
+        const source = await readFile(promptFile, "utf8");
         const promptName = derivePromptName(promptFile, docsDir);
-        const parsed = parsePromptMarkdown(markdown);
+        const format = getPromptTemplateFormat(promptFile);
+        const parsed =
+          format === "yaml" ? parsePromptTemplateYaml(source) : parsePromptMarkdown(source);
         prompts.push({
           name: promptName,
           ...(parsed.title ? { title: parsed.title } : {}),
           ...(parsed.description ? { description: parsed.description } : {}),
           arguments: parsed.arguments,
-          template: parsed.template,
+          messages: parsed.messages,
         });
       }
 

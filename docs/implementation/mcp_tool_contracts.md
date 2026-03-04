@@ -179,7 +179,7 @@ The `get_doc` success response uses a stable delimiter format for chunk boundari
 
 ## MCP Prompts
 
-In addition to tools, the server exposes MCP prompts discovered from `*.template.md` files at build time.
+In addition to tools, the server exposes MCP prompts discovered from `*.template.md` and `*.template.yaml` files at build time.
 
 ### `prompts/list`
 
@@ -195,6 +195,6 @@ In addition to tools, the server exposes MCP prompts discovered from `*.template
 - Behavior:
   - Resolves prompt by `name`.
   - Validates all `required: true` arguments are present and non-empty.
-  - Renders the prompt template with mustache.
+  - Renders all prompt text content with mustache.
 - Output:
-  - `GetPromptResult` with a single `user` text message containing the rendered markdown prompt body.
+  - `GetPromptResult` with one or more rendered messages.

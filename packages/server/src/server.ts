@@ -152,19 +152,15 @@ export class McpDocsServer implements ToolProvider {
       }
     }
 
-    const rendered = Mustache.render(prompt.template, argumentsByName);
-
     return {
       ...(prompt.description ? { description: prompt.description } : {}),
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: rendered,
-          },
+      messages: prompt.messages.map((message) => ({
+        role: message.role,
+        content: {
+          type: "text",
+          text: Mustache.render(message.content.text, argumentsByName),
         },
-      ],
+      })),
     };
   }
 

@@ -51,11 +51,20 @@ const metadata = normalizeMetadata({
   embedding: null,
   prompts: [
     {
-      name: "guides/convert-currency",
-      title: "Convert Currency",
-      description: "Convert 100 USD to a target currency",
-      arguments: [{ name: "currency", description: "Target currency", required: true }],
-      template: "Convert 100 USD to {{currency}}.",
+      name: "guides/auth-integration",
+      title: "Auth Integration",
+      description: "AcmeAuth integration guidance",
+      arguments: [{ name: "auth_method", description: "Authentication method", required: true }],
+      messages: [
+        {
+          role: "user",
+          content: { type: "text", text: "Use {{auth_method}} for this integration." },
+        },
+        {
+          role: "assistant",
+          content: { type: "text", text: "I will provide a plan." },
+        },
+      ],
     },
   ],
 });
@@ -158,7 +167,7 @@ describe("MCP HTTP transport compliance", () => {
 
     const { prompts } = await client.listPrompts();
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.name).toBe("guides/convert-currency");
+    expect(prompts[0]?.name).toBe("guides/auth-integration");
 
     await client.close();
   });
@@ -169,14 +178,14 @@ describe("MCP HTTP transport compliance", () => {
     await client.connect(transport);
 
     const prompt = await client.getPrompt({
-      name: "guides/convert-currency",
-      arguments: { currency: "EUR" },
+      name: "guides/auth-integration",
+      arguments: { auth_method: "api-key" },
     });
 
-    expect(prompt.messages).toHaveLength(1);
+    expect(prompt.messages).toHaveLength(2);
     expect(prompt.messages[0]?.content.type).toBe("text");
     if (prompt.messages[0]?.content.type === "text") {
-      expect(prompt.messages[0].content.text).toContain("EUR");
+      expect(prompt.messages[0].content.text).toContain("api-key");
     }
 
     await client.close();

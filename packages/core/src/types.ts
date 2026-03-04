@@ -139,7 +139,17 @@ export interface PromptDefinition {
   title?: string;
   description?: string;
   arguments: PromptArgument[];
-  template: string;
+  messages: PromptMessage[];
+}
+
+export interface PromptTextContent {
+  type: "text";
+  text: string;
+}
+
+export interface PromptMessage {
+  role: "user" | "assistant";
+  content: PromptTextContent;
 }
 
 export interface FileMeta {
