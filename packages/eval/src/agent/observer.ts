@@ -224,7 +224,8 @@ function formatCompactArgs(args: Record<string, unknown>): string {
   const entries = Object.entries(args);
   if (entries.length === 0) return "";
   const [k, v] = entries[0]!;
-  const val = typeof v === "string" ? (v.length > 40 ? v.slice(0, 40) + "…" : v) : JSON.stringify(v);
+  const val =
+    typeof v === "string" ? (v.length > 40 ? v.slice(0, 40) + "…" : v) : JSON.stringify(v);
   return `${k}=${val}`;
 }
 
@@ -301,7 +302,10 @@ export class ConsoleObserver implements AgentEvalObserver {
       case "system_init": {
         const initPrefix = `${ts} ${c.blue}▶ `;
         const initPrefixLen = stripAnsi(initPrefix).length;
-        const initWrapped = wordWrap(message.summary, Math.max(40, PANEL_MAX_WIDTH - initPrefixLen));
+        const initWrapped = wordWrap(
+          message.summary,
+          Math.max(40, PANEL_MAX_WIDTH - initPrefixLen),
+        );
         const initLines = initWrapped.split("\n");
         write(`${initPrefix}${initLines[0]}${c.reset}\n`);
         for (let i = 1; i < initLines.length; i++) {
@@ -380,9 +384,11 @@ export class ConsoleObserver implements AgentEvalObserver {
 
   onScenarioComplete(_scenario: AgentScenario, result: AgentScenarioResult): void {
     // One-liner summary (skills/evals style)
-    const status = result.passed
-      ? `${c.bold}${c.green}PASSED${c.reset}`
-      : `${c.bold}${c.red}FAILED${c.reset}`;
+    const status = result.skipped
+      ? `${c.bold}${c.yellow}ERROR${c.reset}`
+      : result.passed
+        ? `${c.bold}${c.green}PASSED${c.reset}`
+        : `${c.bold}${c.red}FAILED${c.reset}`;
     const mcp = result.activated ? `${c.green}MCP ✓${c.reset}` : `${c.yellow}MCP ✗${c.reset}`;
 
     const parts = [
@@ -395,11 +401,8 @@ export class ConsoleObserver implements AgentEvalObserver {
     if (result.feedbackResult) {
       const cfg = this.opts.feedbackToolConfig;
       const headlineField = cfg?.headlineField ?? cfg?.metrics[0]?.field;
-      const headlineLabel =
-        cfg?.metrics.find((m) => m.field === headlineField)?.label ?? "judge";
-      const headlineValue = headlineField
-        ? result.feedbackResult.scores[headlineField]
-        : undefined;
+      const headlineLabel = cfg?.metrics.find((m) => m.field === headlineField)?.label ?? "judge";
+      const headlineValue = headlineField ? result.feedbackResult.scores[headlineField] : undefined;
       if (headlineValue !== undefined) {
         parts.push(`${c.cyan}${headlineLabel}: ${headlineValue}${c.reset}`);
       }
@@ -435,7 +438,11 @@ export class ConsoleObserver implements AgentEvalObserver {
         .map(([field, val]) => `${field}: ${val}`)
         .join(", ");
       const fbTitle = `${c.cyan}Agent Feedback${c.reset}${scores ? ` ${c.dim}(${scores})${c.reset}` : ""}`;
-      write("\n" + panel(wordWrap(result.feedbackResult.reasoning, PANEL_MAX_WIDTH - 4), fbTitle, c.cyan) + "\n");
+      write(
+        "\n" +
+          panel(wordWrap(result.feedbackResult.reasoning, PANEL_MAX_WIDTH - 4), fbTitle, c.cyan) +
+          "\n",
+      );
     }
 
     // Show workspace files written by the agent
@@ -483,16 +490,21 @@ export class ConsoleObserver implements AgentEvalObserver {
     write(`${c.dim}${sep}${c.reset}\n`);
 
     for (const r of results) {
-      const result = r.passed ? `${c.green}✓ PASS${c.reset}` : `${c.red}✗ FAIL${c.reset}`;
+      const result = r.skipped
+        ? `${c.yellow}⚠ ERR${c.reset}`
+        : r.passed
+          ? `${c.green}✓ PASS${c.reset}`
+          : `${c.red}✗ FAIL${c.reset}`;
       const mcp = r.activated ? `${c.green}✓${c.reset}` : `${c.yellow}✗${c.reset}`;
       const turns = String(r.numTurns);
       const cost = `$${r.totalCostUsd.toFixed(4)}`;
       const dur = `${(r.durationMs / 1000).toFixed(1)}s`;
-      const fb = hasFeedback && headlineField
-        ? r.feedbackResult?.scores[headlineField] !== undefined
-          ? `  ${c.cyan}${r.feedbackResult.scores[headlineField]}${c.reset}`
-          : `  ${c.dim}—${c.reset}`
-        : "";
+      const fb =
+        hasFeedback && headlineField
+          ? r.feedbackResult?.scores[headlineField] !== undefined
+            ? `  ${c.cyan}${r.feedbackResult.scores[headlineField]}${c.reset}`
+            : `  ${c.dim}—${c.reset}`
+          : "";
 
       write(
         `  ${padRight(r.id, nameW)}  ${padRight(result, 8)}  ${padRight(mcp, 3)}  ${padRight(turns, 5)}  ${padRight(cost, costW)}  ${padRight(dur, durW)}${fb}\n`,

@@ -80,7 +80,12 @@ export async function runAgentEval(config: AgentEvalConfig): Promise<AgentEvalOu
   const output: AgentEvalOutput = {
     summary: computeAgentEvalSummary(results),
     results,
-    metadata: { model: model ?? `${provider.name} (default)`, startedAt, completedAt, totalDurationMs },
+    metadata: {
+      model: model ?? `${provider.name} (default)`,
+      startedAt,
+      completedAt,
+      totalDurationMs,
+    },
   };
 
   observer.onEvalComplete(output);
@@ -93,7 +98,8 @@ export async function runAgentScenario(
   provider = config.provider ?? new ClaudeAgentProvider(),
   observer?: AgentEvalObserver,
 ): Promise<AgentScenarioResult> {
-  const model = scenario.models?.[provider.name] ?? config.model ?? defaultModelForProvider(provider.name);
+  const model =
+    scenario.models?.[provider.name] ?? config.model ?? defaultModelForProvider(provider.name);
   const maxTurns = scenario.maxTurns ?? config.maxTurns ?? DEFAULT_MAX_TURNS;
   const maxBudgetUsd = scenario.maxBudgetUsd ?? config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD;
   const judge = config.judge !== false;
@@ -101,13 +107,9 @@ export async function runAgentScenario(
     judge && !config.noMcp
       ? (config.feedbackToolConfig ?? DEFAULT_FEEDBACK_TOOL_CONFIG)
       : undefined;
-  const feedbackToolFqn = feedbackConfig
-    ? `mcp__docs-mcp__${feedbackConfig.name}`
-    : undefined;
+  const feedbackToolFqn = feedbackConfig ? `mcp__docs-mcp__${feedbackConfig.name}` : undefined;
   const customSystemPrompt = scenario.systemPrompt ?? config.systemPrompt;
-  const feedbackInstruction = feedbackConfig
-    ? `\n\n${feedbackConfig.instruction}`
-    : "";
+  const feedbackInstruction = feedbackConfig ? `\n\n${feedbackConfig.instruction}` : "";
   const systemPrompt = customSystemPrompt
     ? `${DEFAULT_SYSTEM_PROMPT}\n\n${customSystemPrompt}${feedbackInstruction}`
     : `${DEFAULT_SYSTEM_PROMPT}${feedbackInstruction}`;
@@ -168,7 +170,9 @@ export async function runAgentScenario(
     >();
 
     // Build MCP server config (skipped in noMcp baseline mode)
-    let mcpServers: Record<string, { command: string; args?: string[]; env?: Record<string, string> }> | undefined;
+    let mcpServers:
+      | Record<string, { command: string; args?: string[]; env?: Record<string, string> }>
+      | undefined;
 
     if (!config.noMcp) {
       const serverEnv: Record<string, string> = {};
@@ -347,9 +351,7 @@ export async function runAgentScenario(
 
             // Include the first provider error in the summary line for quick scanning
             const providerError =
-              event.subtype !== "success" && event.errors.length > 0
-                ? event.errors[0]!
-                : undefined;
+              event.subtype !== "success" && event.errors.length > 0 ? event.errors[0]! : undefined;
             const reasonHint = providerError
               ? ` — ${providerError.length > 60 ? providerError.slice(0, 60) + "…" : providerError}`
               : "";
@@ -370,13 +372,17 @@ export async function runAgentScenario(
 
     const durationMs = performance.now() - startMs;
 
+    // Detect infrastructure errors (API overload, etc.) that should not count as test failures
+    const INFRA_ERROR_PATTERN = /529|overload|API Error.*Repeated/i;
+    const hasInfraError = errors.some((e) => INFRA_ERROR_PATTERN.test(e));
+
     const assertionResults = await evaluateAssertions(
       finalAnswer,
       scenario.assertions,
       workspaceDir,
     );
     const hard = assertionResults.filter((r) => !r.assertion.soft);
-    const passed = hard.length > 0 && hard.every((r) => r.passed);
+    const passed = hasInfraError ? false : hard.length > 0 && hard.every((r) => r.passed);
 
     // Collect workspace files written by the agent
     const workspaceFiles = await collectWorkspaceFiles(toolCallTrace, workspaceDir);
@@ -406,6 +412,7 @@ export async function runAgentScenario(
       ...(scenario.category !== undefined ? { category: scenario.category } : {}),
       activated,
       passed,
+      ...(hasInfraError ? { skipped: true } : {}),
       assertionResults,
       numTurns,
       totalCostUsd,
@@ -473,7 +480,6 @@ const EXT_LANG: Record<string, string> = {
   css: "css",
   sql: "sql",
 };
-
 
 async function collectWorkspaceFiles(
   trace: ToolCallRecord[],

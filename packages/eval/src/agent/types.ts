@@ -126,6 +126,8 @@ export interface AgentScenarioResult {
   activated: boolean;
   /** Did ALL assertions pass? */
   passed: boolean;
+  /** True when the scenario failed due to infrastructure errors (e.g. API overload), not a real test failure. */
+  skipped?: boolean;
   assertionResults: AssertionResult[];
   numTurns: number;
   totalCostUsd: number;

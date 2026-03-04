@@ -1,9 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type {
-  AgentProvider,
-  AgentProviderConfig,
-  AgentProviderEvent,
-} from "./provider.js";
+import type { AgentProvider, AgentProviderConfig, AgentProviderEvent } from "./provider.js";
 
 export class ClaudeAgentProvider implements AgentProvider {
   readonly name = "anthropic" as const;
@@ -44,24 +40,24 @@ export class ClaudeAgentProvider implements AgentProvider {
       }
 
       if (message.type === "assistant") {
-        const msgUsage = message.message.usage as
-          | Record<string, number>
-          | undefined;
+        const msgUsage = message.message.usage as Record<string, number> | undefined;
 
+        let usageEmitted = false;
         for (const block of message.message.content) {
           if ("text" in block && block.text) {
+            // Attach usage to the first text block only to avoid double-counting
+            const includeUsage = msgUsage && !usageEmitted;
+            usageEmitted = true;
             yield {
               type: "text",
               text: block.text,
-              ...(msgUsage
+              ...(includeUsage
                 ? {
                     usage: {
                       inputTokens: msgUsage.input_tokens ?? 0,
                       outputTokens: msgUsage.output_tokens ?? 0,
-                      cacheReadInputTokens:
-                        msgUsage.cache_read_input_tokens ?? 0,
-                      cacheCreationInputTokens:
-                        msgUsage.cache_creation_input_tokens ?? 0,
+                      cacheReadInputTokens: msgUsage.cache_read_input_tokens ?? 0,
+                      cacheCreationInputTokens: msgUsage.cache_creation_input_tokens ?? 0,
                     },
                   }
                 : {}),
@@ -87,9 +83,7 @@ export class ClaudeAgentProvider implements AgentProvider {
           yield {
             type: "tool_result",
             id: msg.parent_tool_use_id,
-            result: extractToolResultText(
-              msg.tool_use_result as Record<string, unknown>,
-            ),
+            result: extractToolResultText(msg.tool_use_result as Record<string, unknown>),
           };
         } else {
           // Fallback: extract tool_result blocks from the raw API message content
@@ -97,16 +91,14 @@ export class ClaudeAgentProvider implements AgentProvider {
           const content = apiMsg?.content;
           if (Array.isArray(content)) {
             for (const block of content as Array<Record<string, unknown>>) {
-              if (
-                block.type === "tool_result" &&
-                typeof block.tool_use_id === "string"
-              ) {
+              if (block.type === "tool_result" && typeof block.tool_use_id === "string") {
                 yield {
                   type: "tool_result",
                   id: block.tool_use_id,
-                  result: extractToolResultText(
-                  { content: block.content } as Record<string, unknown>,
-                ),
+                  result: extractToolResultText({ content: block.content } as Record<
+                    string,
+                    unknown
+                  >),
                 };
               }
             }
@@ -125,13 +117,9 @@ export class ClaudeAgentProvider implements AgentProvider {
         if (!isSuccess && errors.length === 0) {
           const subtype = message.subtype as string;
           if (subtype === "error_max_budget_usd") {
-            errors.push(
-              `Budget limit reached ($${(message.total_cost_usd as number).toFixed(2)})`,
-            );
+            errors.push(`Budget limit reached ($${(message.total_cost_usd as number).toFixed(2)})`);
           } else if (subtype === "error_max_turns") {
-            errors.push(
-              `Max turns limit reached (${message.num_turns as number} turns)`,
-            );
+            errors.push(`Max turns limit reached (${message.num_turns as number} turns)`);
           } else {
             errors.push(`Agent stopped: ${subtype.replace(/_/g, " ")}`);
           }
@@ -145,10 +133,8 @@ export class ClaudeAgentProvider implements AgentProvider {
           usage: {
             inputTokens: resultUsage.input_tokens ?? 0,
             outputTokens: resultUsage.output_tokens ?? 0,
-            cacheReadInputTokens:
-              resultUsage.cache_read_input_tokens ?? 0,
-            cacheCreationInputTokens:
-              resultUsage.cache_creation_input_tokens ?? 0,
+            cacheReadInputTokens: resultUsage.cache_read_input_tokens ?? 0,
+            cacheCreationInputTokens: resultUsage.cache_creation_input_tokens ?? 0,
             totalCostUsd: message.total_cost_usd,
             durationApiMs: message.duration_api_ms,
             numTurns: message.num_turns,
