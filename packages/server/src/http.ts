@@ -130,6 +130,7 @@ function createMcpServer(
       resources: resources.map((r) => ({
         uri: r.uri,
         name: r.name,
+        title: r.title,
         description: r.description,
         mimeType: r.mimeType,
       })),

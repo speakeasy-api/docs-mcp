@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import picomatch from "picomatch";
 import { ManifestTaxonomyConfigSchema } from "./manifest-schema.js";
+import { extractFirstH1 } from "./parser.js";
 import type {
   ChunkingStrategy,
   Manifest,
@@ -147,6 +148,8 @@ export function resolveFileConfig(params: {
     }
   }
 
+  let title: string | undefined;
+
   if (params.markdown) {
     // HTML comment hints: applied after manifest but before frontmatter
     const htmlHint = parseHtmlChunkingHint(params.markdown);
@@ -167,11 +170,14 @@ export function resolveFileConfig(params: {
     if (frontmatterOverrides.strategy) {
       strategy = frontmatterOverrides.strategy;
     }
+
+    title = frontmatterOverrides.title ?? extractFirstH1(params.markdown);
   }
 
   return {
     strategy,
     metadata,
+    ...(title ? { title } : {}),
   };
 }
 
@@ -201,6 +207,7 @@ function toPosixPath(value: string): string {
 function parseFrontmatterOverrides(markdown: string): {
   strategy?: ChunkingStrategy;
   metadata?: Record<string, string>;
+  title?: string;
 } {
   const parsed = matter(markdown);
   if (!parsed.data || typeof parsed.data !== "object") {
@@ -229,15 +236,22 @@ function parseFrontmatterOverrides(markdown: string): {
     };
   }
 
+  const title =
+    typeof data.title === "string" && data.title.trim() ? data.title.trim() : undefined;
+
   const result: {
     strategy?: ChunkingStrategy;
     metadata?: Record<string, string>;
+    title?: string;
   } = {};
   if (strategy) {
     result.strategy = strategy;
   }
   if (metadata) {
     result.metadata = metadata;
+  }
+  if (title) {
+    result.title = title;
   }
   return result;
 }

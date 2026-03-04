@@ -29,6 +29,7 @@ import {
   type EmbeddingMetadata,
   type ManifestTaxonomyFieldConfig,
   type IndexBuildStep,
+  type FileMeta,
   type Manifest,
   type PreviousIndexReader,
 } from "@speakeasy-api/docs-mcp-core";
@@ -306,6 +307,7 @@ program
 
       const chunks: Chunk[] = [];
       const newFileFingerprints: Record<string, string> = {};
+      const filesMeta: Record<string, FileMeta> = {};
       let chunkCacheHits = 0;
       for (let fi = 0; fi < files.length; fi++) {
         writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
@@ -326,6 +328,10 @@ program
 
         const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);
         newFileFingerprints[relative] = fingerprint;
+
+        if (resolved.title) {
+          filesMeta[relative] = { title: resolved.title };
+        }
 
         if (previousIndex?.fingerprints.get(relative) === fingerprint) {
           const cachedChunks = await previousIndex.getChunks(relative);
@@ -497,6 +503,7 @@ program
         embeddingMetadata,
         sourceCommit,
         taxonomyConfig,
+        filesMeta,
         Object.keys(toolDescriptions).length > 0 ? toolDescriptions : undefined,
         mcpServerInstructions,
       );
@@ -662,6 +669,7 @@ function buildMetadata(
   embedding: EmbeddingMetadata | null,
   sourceCommit: string | null,
   taxonomyConfig: Record<string, ManifestTaxonomyFieldConfig>,
+  filesMeta: Record<string, FileMeta>,
   toolDescriptions?: Record<string, string>,
   mcpServerInstructions?: string,
 ): {
@@ -685,6 +693,7 @@ function buildMetadata(
   embedding: EmbeddingMetadata | null;
   tool_descriptions?: Record<string, string>;
   mcpServerInstructions?: string;
+  files?: Record<string, FileMeta>;
 } {
   const taxonomyValues = new Map<string, Set<string>>();
   for (const chunk of chunks) {
@@ -727,6 +736,7 @@ function buildMetadata(
     embedding,
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
     ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
+    ...(filesMeta ? { files: filesMeta } : {}),
   };
 }
 

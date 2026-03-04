@@ -305,6 +305,55 @@ describe("mergeTaxonomyConfigs", () => {
   });
 });
 
+describe("resolveFileConfig title resolution", () => {
+  it("prefers frontmatter title over H1 heading", () => {
+    const markdown = [
+      "---",
+      "title: Frontmatter Title",
+      "---",
+      "# H1 Title",
+      "Body text",
+    ].join("\n");
+
+    const resolved = resolveFileConfig({
+      relativeFilePath: "guide.md",
+      markdown,
+    });
+
+    expect(resolved.title).toBe("Frontmatter Title");
+  });
+
+  it("falls back to H1 heading when no frontmatter title", () => {
+    const markdown = ["# Getting Started", "", "Some content here."].join("\n");
+
+    const resolved = resolveFileConfig({
+      relativeFilePath: "guide.md",
+      markdown,
+    });
+
+    expect(resolved.title).toBe("Getting Started");
+  });
+
+  it("returns no title when neither frontmatter title nor H1 exist", () => {
+    const markdown = ["## Only H2", "", "Some content."].join("\n");
+
+    const resolved = resolveFileConfig({
+      relativeFilePath: "guide.md",
+      markdown,
+    });
+
+    expect(resolved.title).toBeUndefined();
+  });
+
+  it("returns no title when no markdown is provided", () => {
+    const resolved = resolveFileConfig({
+      relativeFilePath: "guide.md",
+    });
+
+    expect(resolved.title).toBeUndefined();
+  });
+});
+
 describe("parseManifest mcpServerInstructions", () => {
   it("parses mcpServerInstructions when present", () => {
     const manifest = parseManifest({

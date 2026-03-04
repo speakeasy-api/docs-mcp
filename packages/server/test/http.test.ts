@@ -251,10 +251,13 @@ describe("MCP HTTP transport resources", () => {
     await client.connect(transport);
 
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(1);
-    expect(resources[0].uri).toBe("docs:///guides/ts.md");
-    expect(resources[0].name).toBe("guides/ts.md");
-    expect(resources[0].mimeType).toBe("text/markdown");
+    expect(resources).toHaveLength(2);
+    const sorted = [...resources].sort((a, b) => a.uri.localeCompare(b.uri));
+    expect(sorted[0].uri).toBe("docs:///guides/global.md");
+    expect(sorted[1].uri).toBe("docs:///guides/ts.md");
+    for (const r of sorted) {
+      expect(r.mimeType).toBe("text/markdown");
+    }
 
     await client.close();
   });

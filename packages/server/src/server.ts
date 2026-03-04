@@ -1,10 +1,13 @@
+import path from "node:path";
 import type {
   CorpusMetadata,
   RrfWeights,
   SearchEngine,
   GetDocRequest,
   SearchRequest,
+  FileEntry,
 } from "@speakeasy-api/docs-mcp-core";
+import { sentenceCase } from "change-case";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
 import type {
   CallToolResult,
@@ -15,6 +18,7 @@ import type {
   ToolDefinition,
   ToolProvider,
 } from "./types.js";
+import { properCase } from "./strings.js";
 
 export interface McpDocsServerOptions {
   index: SearchEngine;
@@ -157,30 +161,16 @@ export class McpDocsServer implements ToolProvider {
   }
 
   async getResources(): Promise<ResourceDefinition[]> {
-    const resources: ResourceDefinition[] = [];
-
-    for (const [dimKey, field] of Object.entries(this.metadata.taxonomy)) {
-      if (!field.properties) continue;
-
-      for (const [value, props] of Object.entries(field.properties)) {
-        if (!props.mcp_resource) continue;
-
-        const entries = await this.index.listFilepaths({
-          filters: { [dimKey]: value },
-        });
-
-        for (const entry of entries) {
-          resources.push({
-            uri: `docs:///${entry.filepath}`,
-            name: entry.filepath,
-            description: `${entry.filepath} (${dimKey}=${value})`,
-            mimeType: "text/markdown",
-          });
-        }
-      }
-    }
-
-    return resources;
+    const entries = await this.index.listFilepaths({ filters: {} });
+    return entries.map((entry) => {
+      return {
+        uri: `docs:///${entry.filepath}`,
+        name: entry.filepath,
+        title: this.buildFileEntryTitle(entry),
+        description: entry.filepath,
+        mimeType: "text/markdown",
+      };
+    });
   }
 
   async readResource(uri: string): Promise<ReadResourceResult> {
@@ -198,7 +188,6 @@ export class McpDocsServer implements ToolProvider {
       throw new Error(`Invalid URI: missing filepath in '${uri}'`);
     }
 
-    console.log("Looking up resource for filepath:", filepath);
     const entries = await this.index.listFilepaths({
       filters: {},
     });
@@ -223,6 +212,16 @@ export class McpDocsServer implements ToolProvider {
         },
       ],
     };
+  }
+
+  buildFileEntryTitle(entry: FileEntry): string | undefined {
+    const fileTitle = this.metadata.files?.[entry.filepath]?.title;
+    const basename = path.basename(entry.filepath, path.extname(entry.filepath));
+    const dir = path.dirname(entry.filepath);
+    const dirParts = dir.split(path.sep).map((part) => properCase(sentenceCase(part)));
+    const tail = fileTitle || properCase(sentenceCase(basename));
+
+    return [...dirParts, tail].join(" / ");
   }
 }
 
