@@ -42,8 +42,9 @@ export interface CustomTool {
 export interface ResourceDefinition {
   uri: string;
   name: string;
-  description?: string;
-  mimeType?: string;
+  title?: string | undefined;
+  description?: string | undefined;
+  mimeType?: string | undefined;
 }
 
 export interface ResourceContent {

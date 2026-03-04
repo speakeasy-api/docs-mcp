@@ -2,6 +2,7 @@ import semver from "semver";
 import type {
   CorpusMetadata,
   EmbeddingMetadata,
+  FileMeta,
   TaxonomyField,
   TaxonomyValueProperties,
   ToolDescriptions,
@@ -58,6 +59,7 @@ export function normalizeMetadata(
   const embedding = normalizeEmbedding(metadata.embedding);
   const toolDescriptions = normalizeToolDescriptions(metadata.tool_descriptions);
   const mcpServerInstructions = normalizeInstructions(metadata.mcpServerInstructions);
+  const files = normalizeFiles(metadata.files);
 
   return {
     metadata_version: metadataVersion,
@@ -65,6 +67,7 @@ export function normalizeMetadata(
     taxonomy,
     stats,
     embedding,
+    files,
     ...(toolDescriptions ? { tool_descriptions: toolDescriptions } : {}),
     ...(mcpServerInstructions ? { mcpServerInstructions } : {}),
   };
@@ -255,6 +258,44 @@ function normalizeInstructions(value: unknown): string | undefined {
     return undefined;
   }
   return asNonEmptyString(value, "mcpServerInstructions");
+}
+
+function normalizeFiles(value: unknown): Record<string, FileMeta> {
+  if (value === null || value === undefined) {
+    return {};
+  }
+
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("files must be an object");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const result: Record<string, FileMeta> = {};
+  let hasAny = false;
+
+  for (const [filepath, entry] of Object.entries(raw)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`files['${filepath}'] must be an object`);
+    }
+
+    const meta = entry as Record<string, unknown>;
+    const fileMeta: FileMeta = {};
+
+    if (meta.title !== undefined) {
+      if (typeof meta.title !== "string") {
+        throw new Error(`files['${filepath}'].title must be a string`);
+      }
+      const trimmed = meta.title.trim();
+      if (trimmed) {
+        fileMeta.title = trimmed;
+      }
+    }
+
+    result[filepath] = fileMeta;
+    hasAny = true;
+  }
+
+  return result;
 }
 
 function asTrimmedString(value: unknown): string {

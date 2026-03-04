@@ -127,12 +127,17 @@ export interface ToolDescriptions {
   get_doc?: string;
 }
 
+export interface FileMeta {
+  title?: string;
+}
+
 export interface CorpusMetadata {
   metadata_version: string;
   corpus_description: string;
   taxonomy: Record<string, TaxonomyField>;
   stats: MetadataStats;
   embedding: EmbeddingMetadata | null;
+  files: Record<string, FileMeta>;
   tool_descriptions?: ToolDescriptions;
   mcpServerInstructions?: string;
 }
@@ -156,6 +161,7 @@ export interface BuildChunksInput {
 export interface ResolvedFileConfig {
   strategy: ChunkingStrategy;
   metadata: Record<string, string>;
+  title?: string;
 }
 
 export interface EmbeddingConfig {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, assert, it } from "vitest";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { McpDocsServer } from "../src/server.js";
 import type { ToolCallContext } from "../src/types.js";
@@ -86,9 +86,9 @@ describe("McpDocsServer", () => {
     expect(search).toBeDefined();
 
     const schema = search?.inputSchema as Record<string, Record<string, unknown>>;
-    expect(schema.properties.language.enum).toEqual(["python", "typescript"]);
-    expect(schema.properties.scope.enum).toEqual(["global-guide", "sdk-specific"]);
-    expect(schema.properties.scope.description).toBe("Filter results by scope.");
+    expect(schema).toHaveProperty("properties.language.enum", ["python", "typescript"]);
+    expect(schema).toHaveProperty("properties.scope.enum", ["global-guide", "sdk-specific"]);
+    expect(schema).toHaveProperty("properties.scope.description", "Filter results by scope.");
   });
 
   it("passes through auto-include behavior from core", async () => {
@@ -97,12 +97,17 @@ describe("McpDocsServer", () => {
       metadata,
     });
 
-    const result = await server.callTool("search_docs", {
-      query: "retry",
-      language: "typescript",
-    }, stubContext);
+    const result = await server.callTool(
+      "search_docs",
+      {
+        query: "retry",
+        language: "typescript",
+      },
+      stubContext,
+    );
 
     expect(result.isError).toBe(false);
+    assert(result.content[0].type === "text");
     const payload = JSON.parse(result.content[0].text);
     const hitIds = payload.hits.map((entry: { chunk_id: string }) => entry.chunk_id).sort();
     expect(hitIds).toEqual(["guides/global.md#retry", "guides/ts.md#retry"]);
@@ -114,12 +119,17 @@ describe("McpDocsServer", () => {
       metadata,
     });
 
-    const result = await server.callTool("search_docs", {
-      query: "retry",
-      cursor: "bad-cursor",
-    }, stubContext);
+    const result = await server.callTool(
+      "search_docs",
+      {
+        query: "retry",
+        cursor: "bad-cursor",
+      },
+      stubContext,
+    );
 
     expect(result.isError).toBe(true);
+    assert(result.content[0].type === "text");
     expect(result.content[0].text).toMatch(/Invalid cursor/);
   });
 
@@ -129,12 +139,17 @@ describe("McpDocsServer", () => {
       metadata,
     });
 
-    const result = await server.callTool("search_docs", {
-      query: "retry",
-      unsupported: "x",
-    }, stubContext);
+    const result = await server.callTool(
+      "search_docs",
+      {
+        query: "retry",
+        unsupported: "x",
+      },
+      stubContext,
+    );
 
     expect(result.isError).toBe(true);
+    assert(result.content[0].type === "text");
     expect(result.content[0].text).toMatch(/Unexpected field 'unsupported'/);
   });
 
@@ -144,18 +159,28 @@ describe("McpDocsServer", () => {
       metadata,
     });
 
-    const badLimit = await server.callTool("search_docs", {
-      query: "retry",
-      limit: 0,
-    }, stubContext);
+    const badLimit = await server.callTool(
+      "search_docs",
+      {
+        query: "retry",
+        limit: 0,
+      },
+      stubContext,
+    );
     expect(badLimit.isError).toBe(true);
+    assert(badLimit.content[0].type === "text");
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
 
-    const badContext = await server.callTool("get_doc", {
-      chunk_id: "guides/ts.md#retry",
-      context: 6,
-    }, stubContext);
+    const badContext = await server.callTool(
+      "get_doc",
+      {
+        chunk_id: "guides/ts.md#retry",
+        context: 6,
+      },
+      stubContext,
+    );
     expect(badContext.isError).toBe(true);
+    assert(badContext.content[0].type === "text");
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
   });
 });
@@ -183,12 +208,17 @@ describe("McpDocsServer with toolPrefix", () => {
       toolPrefix: "acme",
     });
 
-    const result = await server.callTool("acme_search_docs", {
-      query: "retry",
-      language: "typescript",
-    }, stubContext);
+    const result = await server.callTool(
+      "acme_search_docs",
+      {
+        query: "retry",
+        language: "typescript",
+      },
+      stubContext,
+    );
 
     expect(result.isError).toBe(false);
+    assert(result.content[0].type === "text");
     const payload = JSON.parse(result.content[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
   });
@@ -202,31 +232,36 @@ describe("McpDocsServer with toolPrefix", () => {
 
     const result = await server.callTool("search_docs", { query: "retry" }, stubContext);
     expect(result.isError).toBe(true);
+    assert(result.content[0].type === "text");
     expect(result.content[0].text).toMatch(/Unknown tool/);
   });
 });
 
 describe("McpDocsServer resources", () => {
-  it("returns empty resources when no taxonomy values have mcp_resource", async () => {
+  it("lists all documents as resources", async () => {
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
       metadata,
     });
     const resources = await server.getResources();
-    expect(resources).toEqual([]);
+    expect(resources).toHaveLength(2);
+    const uris = resources.map((r) => r.uri).sort();
+    expect(uris).toEqual(["docs:///guides/global.md", "docs:///guides/ts.md"]);
+    // Without files metadata, name falls back to filepath
+    for (const r of resources) {
+      expect(r.name).toBe(r.description);
+      expect(r.mimeType).toBe("text/markdown");
+    }
   });
 
-  it("lists resources for taxonomy values with mcp_resource: true", async () => {
-    const metadataWithResources = normalizeMetadata({
+  it("uses title from files metadata as resource name", async () => {
+    const metadataWithFiles = normalizeMetadata({
       metadata_version: "1.1.0",
       corpus_description: "Speakeasy SDK docs",
       taxonomy: {
         language: {
           description: "Filter results by programming language.",
           values: ["python", "typescript"],
-          properties: {
-            typescript: { mcp_resource: true },
-          },
         },
         scope: {
           values: ["global-guide", "sdk-specific"],
@@ -238,82 +273,47 @@ describe("McpDocsServer resources", () => {
         indexed_at: "2026-02-22T00:00:00Z",
       },
       embedding: null,
+      files: {
+        "guides/ts.md": { title: "TypeScript Guide" },
+      },
     });
 
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata: metadataWithResources,
+      metadata: metadataWithFiles,
     });
 
     const resources = await server.getResources();
-    expect(resources).toHaveLength(1);
-    expect(resources[0].uri).toBe("docs:///guides/ts.md");
-    expect(resources[0].name).toBe("guides/ts.md");
-    expect(resources[0].mimeType).toBe("text/markdown");
+    expect(resources).toHaveLength(2);
+
+    const tsResource = resources.find((r) => r.uri === "docs:///guides/ts.md");
+    expect(tsResource?.name).toBe("guides/ts.md");
+    expect(tsResource?.title).toBe("Guides / TypeScript Guide");
+    expect(tsResource?.description).toBe("guides/ts.md");
+
+    const globalResource = resources.find((r) => r.uri === "docs:///guides/global.md");
+    expect(globalResource?.name).toBe("guides/global.md");
+    expect(globalResource?.title).toBe("Guides / Global");
+    expect(globalResource?.description).toBe("guides/global.md");
   });
 
   it("reads a resource and returns file content", async () => {
-    const metadataWithResources = normalizeMetadata({
-      metadata_version: "1.1.0",
-      corpus_description: "Speakeasy SDK docs",
-      taxonomy: {
-        language: {
-          description: "Filter results by programming language.",
-          values: ["python", "typescript"],
-          properties: {
-            typescript: { mcp_resource: true },
-          },
-        },
-        scope: {
-          values: ["global-guide", "sdk-specific"],
-        },
-      },
-      stats: {
-        total_chunks: 2,
-        total_files: 2,
-        indexed_at: "2026-02-22T00:00:00Z",
-      },
-      embedding: null,
-    });
-
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata: metadataWithResources,
+      metadata,
     });
 
     const result = await server.readResource("docs:///guides/ts.md");
     expect(result.contents).toHaveLength(1);
+    assert("text" in result.contents[0]);
     expect(result.contents[0].text).toContain("TypeScript retry");
     expect(result.contents[0].mimeType).toBe("text/markdown");
   });
 
   it("throws for nonexistent resource", async () => {
-    const metadataWithResources = normalizeMetadata({
-      metadata_version: "1.1.0",
-      corpus_description: "Speakeasy SDK docs",
-      taxonomy: {
-        language: {
-          description: "Filter results by programming language.",
-          values: ["python", "typescript"],
-          properties: {
-            typescript: { mcp_resource: true },
-          },
-        },
-        scope: {
-          values: ["global-guide", "sdk-specific"],
-        },
-      },
-      stats: {
-        total_chunks: 2,
-        total_files: 2,
-        indexed_at: "2026-02-22T00:00:00Z",
-      },
-      embedding: null,
-    });
-
     const server = new McpDocsServer({
       index: new DocsIndex(chunks),
-      metadata: metadataWithResources,
+      metadata,
     });
 
     await expect(server.readResource("docs:///nonexistent.md")).rejects.toThrow(
