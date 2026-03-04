@@ -432,7 +432,6 @@ function normalizeFiles(value: unknown): Record<string, FileMeta> {
 
   const raw = value as Record<string, unknown>;
   const result: Record<string, FileMeta> = {};
-  let hasAny = false;
 
   for (const [filepath, entry] of Object.entries(raw)) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
@@ -453,7 +452,6 @@ function normalizeFiles(value: unknown): Record<string, FileMeta> {
     }
 
     result[filepath] = fileMeta;
-    hasAny = true;
   }
 
   return result;
