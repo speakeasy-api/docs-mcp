@@ -20,6 +20,7 @@ A lightweight, domain-agnostic hybrid search engine for markdown (`.md`) corpora
 - **Faceted taxonomy** — metadata keys become enum-injected JSON Schema filters on the search tool
 - **Vector collapse** — deduplicates near-identical cross-language results at search time
 - **Incremental builds** — embedding cache fingerprints each chunk; only changed content is re-embedded
+- **MCP prompt templates** — register reusable prompts from docs using `*.template.md` (single-message shorthand) or `*.template.yaml` (multi-message format) with mustache argument rendering
 - **Graceful degradation**
   - _Chunking_ — chunk sizes adapt to the configured embedding provider's context window; falls back to conservative defaults when no provider is set
   - _Query_ — if the embedding API errors at runtime (downtime, expired credits, network issues), the server falls back to FTS-only search with a one-time warning
@@ -99,7 +100,7 @@ We recommend starting with FTS-only search. While embeddings improve relevance f
 
 ## Supported File Types
 
-The indexer processes **`.md` (Markdown)** files. Files are discovered via the `**/*.md` glob pattern within the configured docs directory. YAML frontmatter is supported for per-file metadata and chunking overrides.
+The indexer processes **`.md` (Markdown)** files. Files are discovered via the `**/*.md` glob pattern within the configured docs directory. YAML frontmatter is supported for per-file metadata and chunking overrides. Prompt templates are also discovered from `*.template.md` and `*.template.yaml`, and are excluded from search indexing.
 
 ## Corpus Structure
 
@@ -217,6 +218,17 @@ The tools exposed to the agent are dynamically generated based on your `corpus_d
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `search_docs` | Performs hybrid search. Tool names and descriptions are user-configurable. Parameters are dynamically generated with valid taxonomy injected as JSON Schema `enum`s. Supports stateless cursor pagination. Returns fallback hints on zero results. |
 | `get_doc`     | Returns a specific chunk, plus `context: N` neighboring chunks for surrounding detail.                                                                                                                                                             |
+
+## MCP Prompts
+
+Prompt definitions are discovered at build time and exposed over MCP via `prompts/list` and `prompts/get`.
+
+See [docs/prompt-templates.md](docs/prompt-templates.md) for full usage guidelines and examples.
+
+- `*.template.md` — Markdown body shorthand for a single `user` text message
+- `*.template.yaml` — Structured prompt format for multiple messages/content parts
+- Mustache templating is applied to prompt text content at runtime
+- If both formats exist for the same prompt name, YAML is preferred and a warning is emitted during `build` and `validate`
 
 ## Quick Start
 
