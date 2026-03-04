@@ -1,5 +1,23 @@
 # @speakeasy-api/docs-mcp-eval
 
+## 0.12.1
+
+### Patch Changes
+
+- 19fc61f: Fix CLI resolution when installed from npm
+
+  Resolve the CLI entry point via `import.meta.resolve` instead of a hardcoded relative path (`../cli/dist/index.js`) that only works inside the monorepo. Adds `@speakeasy-api/docs-mcp-cli` as a dependency so the module resolver can find it in both monorepo and published contexts.
+
+- 8ad7ffa: Improve agent eval resiliency and parameterization
+  - Skip scenarios that fail due to infrastructure errors (API overload/529) instead of counting them as test failures
+  - Exclude skipped scenarios from pass rate calculations
+  - Fix double-counting of token usage when assistant messages contain multiple text blocks
+  - Bump default max-turns to 100 and max-budget-usd to 5.00
+  - Allow suite config files to specify `system_prompt` and per-scenario `maxTurns`/`maxBudgetUsd` overrides
+  - Update default model to claude-opus-4-6
+  - @speakeasy-api/docs-mcp-core@0.12.1
+  - @speakeasy-api/docs-mcp-cli@0.12.1
+
 ## 0.12.0
 
 ### Minor Changes

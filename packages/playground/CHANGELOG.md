@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.12.1
+
+### Patch Changes
+
+- 967f398: fix incorrect logo used to represent codex
+
 ## 0.12.0
 
 ## 0.11.0
