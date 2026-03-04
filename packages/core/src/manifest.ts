@@ -1,6 +1,7 @@
 import matter from "gray-matter";
 import picomatch from "picomatch";
 import { ManifestTaxonomyConfigSchema } from "./manifest-schema.js";
+import { extractFirstH1 } from "./parser.js";
 import type {
   ChunkingStrategy,
   Manifest,
@@ -170,9 +171,7 @@ export function resolveFileConfig(params: {
       strategy = frontmatterOverrides.strategy;
     }
 
-    if (frontmatterOverrides.title) {
-      title = frontmatterOverrides.title;
-    }
+    title = frontmatterOverrides.title ?? extractFirstH1(params.markdown);
   }
 
   return {
