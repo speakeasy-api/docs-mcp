@@ -11,7 +11,8 @@ import {
   type EmbeddingProvider,
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
-import { McpDocsServer } from "./server.js";
+import { createMcpServer } from "./server.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -113,6 +114,12 @@ const CustomToolSchema = z.object({
 
 /** Zod schema for `createDocsServer()` options. Consumers can use this to validate config. */
 export const CreateDocsServerOptionsSchema = z.object({
+  /** Name of the MCP server. */
+  serverName: z.string().min(1, "serverName must be a non-empty string"),
+
+  /** Version of the MCP server. */
+  serverVersion: z.string().min(1, "serverVersion must be a non-empty string"),
+
   /** Directory containing chunks.json and metadata.json produced by `docs-mcp build`. */
   indexDir: z.string().min(1, "indexDir must be a non-empty string"),
 
@@ -179,9 +186,9 @@ export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSch
  * opens the search engine, and returns a server ready to be passed to `startStdioServer()` or
  * `startHttpServer()`.
  */
-export async function createDocsServer(
+export async function createDocsMcpServerFactory(
   input: CreateDocsServerOptionsInput,
-): Promise<McpDocsServer> {
+): Promise<() => McpServer> {
   const options = CreateDocsServerOptionsSchema.parse(input);
 
   const indexDir = path.resolve(options.indexDir);
@@ -238,14 +245,22 @@ export async function createDocsServer(
 
   const index = await loadSearchEngine(loadInput);
 
-  return new McpDocsServer({
-    index,
-    metadata,
-    vectorSearchAvailable:
-      queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
-    ...(options.toolPrefix ? { toolPrefix: options.toolPrefix } : {}),
-    ...(options.customTools.length > 0 ? { customTools: options.customTools } : {}),
-  });
+  return () => {
+    return createMcpServer({
+      mcp: {
+        name: options.serverName,
+        version: options.serverVersion,
+      },
+      app: {
+        index,
+        metadata,
+        vectorSearchAvailable:
+          queryEmbeddingProvider !== undefined && queryEmbeddingProvider.name !== "hash",
+        ...(options.toolPrefix ? { toolPrefix: options.toolPrefix } : {}),
+        ...(options.customTools.length > 0 ? { customTools: options.customTools } : {}),
+      },
+    });
+  };
 }
 
 async function loadSearchEngine(input: {

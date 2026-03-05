@@ -2,9 +2,9 @@
 
 import { createRequire } from "node:module";
 import { Command } from "commander";
-import { createDocsServer } from "./create.js";
 import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
+import { createDocsMcpServerFactory } from "./create.js";
 
 const require = createRequire(import.meta.url);
 const SERVER_VERSION = readPackageVersion();
@@ -68,7 +68,14 @@ program
         }))
       : [];
 
-    const app = await createDocsServer({
+    const serverName =
+      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
+        ? `${options.toolPrefix}-docs-server`
+        : options.name;
+
+    const mcpServerFactory = await createDocsMcpServerFactory({
+      serverName,
+      serverVersion: options.version,
       indexDir: options.indexDir,
       toolPrefix: options.toolPrefix,
       queryEmbeddingApiKey: options.queryEmbeddingApiKey,
@@ -80,22 +87,10 @@ program
       ...(customTools.length > 0 ? { customTools } : {}),
     });
 
-    const serverName =
-      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
-        ? `${options.toolPrefix}-docs-server`
-        : options.name;
-
     if (options.transport === "http") {
-      await startHttpServer(app, {
-        name: serverName,
-        version: options.version,
-        port: options.port,
-      });
+      await startHttpServer(mcpServerFactory, { port: options.port });
     } else {
-      await startStdioServer(app, {
-        name: serverName,
-        version: options.version,
-      });
+      await startStdioServer(mcpServerFactory);
     }
   });
 
