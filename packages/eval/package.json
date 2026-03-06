@@ -33,10 +33,10 @@
   },
   "scripts": {
     "prepublishOnly": "pnpm run build",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "lint": "eslint src test"
+    "lint": "eslint src"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",

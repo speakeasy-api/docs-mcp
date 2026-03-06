@@ -34,8 +34,8 @@
   "scripts": {
     "prepack": "node ../../scripts/check-workspace-protocol.mjs",
     "prepublishOnly": "pnpm run build",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src"
   },
