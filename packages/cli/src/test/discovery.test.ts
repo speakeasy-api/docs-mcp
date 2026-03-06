@@ -5,9 +5,9 @@ import {
   listMarkdownFiles,
   listPromptFiles,
   resolvePreferredPromptFiles,
-} from "../src/discovery.js";
+} from "../discovery.js";
 
-const FIXTURE_DOCS_DIR = path.resolve(import.meta.dirname, "../../../tests/fixtures/docs");
+const FIXTURE_DOCS_DIR = path.resolve(import.meta.dirname, "../../../../tests/fixtures/docs");
 
 describe("docs discovery", () => {
   it("excludes prompt template files from markdown indexing list", async () => {

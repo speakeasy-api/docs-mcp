@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHeuristicManifest, suggestChunkBy } from "../src/fix.js";
+import { buildHeuristicManifest, suggestChunkBy } from "../fix.js";
 
 describe("suggestChunkBy", () => {
   it("returns file when no headings exist", () => {
