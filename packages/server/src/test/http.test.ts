@@ -1,10 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, assert } from "vitest";
 import type http from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
-import { createMcpServer } from "../src/server.js";
-import { startHttpServer } from "../src/http.js";
+import { createMcpServer } from "../server.js";
+import { startHttpServer } from "../http.js";
+import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const buildInfo = { name: "test-server", version: "0.1.0" };
 
@@ -139,10 +140,11 @@ describe("MCP HTTP transport compliance", () => {
       name: "search_docs",
       arguments: { query: "retry" },
     });
-    expect(result.isError).not.toBe(true);
-    expect(result.content).toHaveLength(1);
+    const parsed = CallToolResultSchema.parse(result);
 
-    const payload = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+    expect(parsed.isError).toEqual(false);
+    assert(parsed.content[0]?.type === "text");
+    const payload = JSON.parse(parsed.content[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
 
     await client.close();
@@ -157,9 +159,11 @@ describe("MCP HTTP transport compliance", () => {
       name: "get_doc",
       arguments: { chunk_id: "guides/ts.md#retry" },
     });
-    expect(result.isError).not.toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0].text;
-    expect(text).toContain("TypeScript retry");
+    const parsed = CallToolResultSchema.parse(result);
+
+    expect(parsed.isError).toEqual(false);
+    assert(parsed.content[0]?.type === "text");
+    expect(parsed.content[0].text).toContain("TypeScript retry");
 
     await client.close();
   });
@@ -236,7 +240,7 @@ describe("MCP HTTP transport compliance", () => {
     });
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error.code).toBe(-32700);
+    expect(json).toHaveProperty("error.code", -32700);
   });
 
   it("returns JSON-RPC parse error for invalid JSON", async () => {
@@ -247,7 +251,7 @@ describe("MCP HTTP transport compliance", () => {
     });
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error.code).toBe(-32700);
+    expect(json).toHaveProperty("error.code", -32700);
   });
 
   it("server stays alive after bad requests", async () => {
@@ -325,10 +329,10 @@ describe("MCP HTTP transport resources", () => {
     const { resources } = await client.listResources();
     expect(resources).toHaveLength(2);
     const sorted = [...resources].sort((a, b) => a.uri.localeCompare(b.uri));
-    expect(sorted[0].uri).toBe("docs:///guides/global.md");
-    expect(sorted[1].uri).toBe("docs:///guides/ts.md");
+    expect(sorted[0]?.uri).toEqual("docs:///guides/global.md");
+    expect(sorted[1]?.uri).toEqual("docs:///guides/ts.md");
     for (const r of sorted) {
-      expect(r.mimeType).toBe("text/markdown");
+      expect(r.mimeType).toEqual("text/markdown");
     }
 
     await client.close();
@@ -342,11 +346,10 @@ describe("MCP HTTP transport resources", () => {
     const result = await client.readResource({
       uri: "docs:///guides/ts.md",
     });
-    expect(result.contents).toHaveLength(1);
-    expect("text" in result.contents[0]).toBe(true);
-    if ("text" in result.contents[0]) {
-      expect(result.contents[0].text).toContain("TypeScript retry");
-    }
+    const parsed = ReadResourceResultSchema.parse(result);
+
+    assert(parsed.contents[0] && "text" in parsed.contents[0]);
+    expect(parsed.contents[0].text).toContain("TypeScript retry");
 
     await client.close();
   });
@@ -418,8 +421,11 @@ describe("MCP HTTP transport with toolPrefix", () => {
       name: "acme_search_docs",
       arguments: { query: "retry" },
     });
-    expect(result.isError).not.toBe(true);
-    const payload = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+    const parsed = CallToolResultSchema.parse(result);
+
+    expect(parsed.isError).toEqual(false);
+    assert(parsed.content[0]?.type === "text");
+    const payload = JSON.parse(parsed.content[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
 
     await client.close();
@@ -434,9 +440,11 @@ describe("MCP HTTP transport with toolPrefix", () => {
       name: "acme_get_doc",
       arguments: { chunk_id: "guides/ts.md#retry" },
     });
-    expect(result.isError).not.toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0].text;
-    expect(text).toContain("TypeScript retry");
+    const parsed = CallToolResultSchema.parse(result);
+
+    expect(parsed.isError).toEqual(false);
+    assert(parsed.content[0]?.type === "text");
+    expect(parsed.content[0].text).toContain("TypeScript retry");
 
     await client.close();
   });
@@ -471,7 +479,7 @@ describe("HTTP session management", () => {
       const text = await res.text();
       const lines = text.split("\n").filter((l) => l.startsWith("data: "));
       expect(lines.length).toBeGreaterThan(0);
-      const body = JSON.parse(lines[0].slice(6));
+      const body = JSON.parse(lines[0]?.slice(6) || "{}");
       expect(body.result.tools.length).toBeGreaterThan(0);
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));

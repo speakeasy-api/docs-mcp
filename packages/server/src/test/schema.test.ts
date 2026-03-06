@@ -3,11 +3,15 @@ import {
   CreateDocsServerOptionsSchema,
   type CreateDocsServerOptionsInput,
   type CreateDocsServerOptions,
-} from "../src/create.js";
+} from "../create.js";
 
 describe("CreateDocsServerOptionsSchema", () => {
   it("validates a minimal config with just indexDir", () => {
-    const result = CreateDocsServerOptionsSchema.safeParse({ serverName: "test", serverVersion: "1.0.0", indexDir: "./my-index" });
+    const result = CreateDocsServerOptionsSchema.safeParse({
+      serverName: "test",
+      serverVersion: "1.0.0",
+      indexDir: "./my-index",
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.indexDir).toBe("./my-index");
@@ -52,7 +56,11 @@ describe("CreateDocsServerOptionsSchema", () => {
   });
 
   it("rejects empty indexDir", () => {
-    const result = CreateDocsServerOptionsSchema.safeParse({ serverName: "test", serverVersion: "1.0.0", indexDir: "" });
+    const result = CreateDocsServerOptionsSchema.safeParse({
+      serverName: "test",
+      serverVersion: "1.0.0",
+      indexDir: "",
+    });
     expect(result.success).toBe(false);
   });
 
@@ -67,10 +75,20 @@ describe("CreateDocsServerOptionsSchema", () => {
   });
 
   it("rejects phraseSlop out of range", () => {
-    const high = CreateDocsServerOptionsSchema.safeParse({ serverName: "test", serverVersion: "1.0.0", indexDir: "./x", phraseSlop: 10 });
+    const high = CreateDocsServerOptionsSchema.safeParse({
+      serverName: "test",
+      serverVersion: "1.0.0",
+      indexDir: "./x",
+      phraseSlop: 10,
+    });
     expect(high.success).toBe(false);
 
-    const negative = CreateDocsServerOptionsSchema.safeParse({ serverName: "test", serverVersion: "1.0.0", indexDir: "./x", phraseSlop: -1 });
+    const negative = CreateDocsServerOptionsSchema.safeParse({
+      serverName: "test",
+      serverVersion: "1.0.0",
+      indexDir: "./x",
+      phraseSlop: -1,
+    });
     expect(negative.success).toBe(false);
   });
 

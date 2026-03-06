@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpServer, McpServerOptions } from "../src/server";
+import { createMcpServer, McpServerOptions } from "../server.js";
 
 export async function createTestServer(
   options: McpServerOptions,

@@ -4,9 +4,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
-import { createMcpServer } from "../src/server.js";
-import { startHttpServer } from "../src/http.js";
-import type { CustomTool, ToolCallContext } from "../src/types.js";
+import { createMcpServer } from "../server.js";
+import { startHttpServer } from "../http.js";
+import type { CustomTool, ToolCallContext } from "../types.js";
 import { createTestServer } from "./mcp.helper.js";
 
 const chunks: Chunk[] = [
@@ -97,7 +97,7 @@ describe("McpDocsServer custom tools", () => {
     });
     const parsed = CallToolResultSchema.parse(result);
     expect(parsed.isError).toBe(false);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toBe("Feedback received: 5");
   });
 
@@ -117,7 +117,7 @@ describe("McpDocsServer custom tools", () => {
     });
     const parsed = CallToolResultSchema.parse(result);
     expect(parsed.isError).toBe(true);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toBe("Something went wrong");
   });
 
@@ -155,7 +155,7 @@ describe("McpDocsServer custom tools", () => {
     });
     const parsed = CallToolResultSchema.parse(result);
     expect(parsed.isError).toBe(true);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Unknown tool/);
   });
 });
@@ -353,9 +353,11 @@ describe("Custom tools over HTTP transport", () => {
       name: "submit_feedback",
       arguments: { chunk_id: "guides/ts.md#retry", rating: 4 },
     });
-    expect(result.isError).not.toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0].text;
-    expect(text).toBe("Feedback received: 4");
+    const parsed = CallToolResultSchema.parse(result);
+
+    expect(parsed.isError).toEqual(false);
+    assert(parsed.content[0]?.type === "text");
+    expect(parsed.content[0]?.text).toBe("Feedback received: 4");
 
     await client.close();
   });
@@ -369,9 +371,11 @@ describe("Custom tools over HTTP transport", () => {
       name: "always_throws",
       arguments: {},
     });
-    expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0].text;
-    expect(text).toBe("Something went wrong");
+    const parsed = CallToolResultSchema.parse(result);
+
+    expect(parsed.isError).toBe(true);
+    assert(parsed.content[0]?.type === "text");
+    expect(parsed.content[0]?.text).toBe("Something went wrong");
 
     await client.close();
   });
@@ -436,9 +440,11 @@ describe("HTTP authentication", () => {
         name: "auth_echo",
         arguments: {},
       });
-      expect(result.isError).not.toBe(true);
-      const text = (result.content as Array<{ text: string }>)[0].text;
-      expect(text).toBe("client=test-client-id");
+      const parsed = CallToolResultSchema.parse(result);
+
+      expect(parsed.isError).toEqual(false);
+      assert(parsed.content[0]?.type === "text");
+      expect(parsed.content[0]?.text).toBe("client=test-client-id");
 
       await client.close();
     } finally {
@@ -486,7 +492,7 @@ describe("HTTP authentication", () => {
 
       expect(res.status).toBe(401);
       const body = await res.json();
-      expect(body.error.message).toBe("Invalid credentials");
+      expect(body).toHaveProperty("error.message", "Invalid credentials");
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }
@@ -546,9 +552,11 @@ describe("HTTP authentication", () => {
         name: "header_echo",
         arguments: {},
       });
-      expect(result.isError).not.toBe(true);
-      const text = (result.content as Array<{ text: string }>)[0].text;
-      expect(text).toBe("x-custom=hello-world");
+      const parsed = CallToolResultSchema.parse(result);
+
+      expect(parsed.isError).toEqual(false);
+      assert(parsed.content[0]?.type === "text");
+      expect(parsed.content[0]?.text).toBe("x-custom=hello-world");
 
       await client.close();
     } finally {
@@ -715,8 +723,8 @@ describe("HTTP authentication", () => {
       const text = await res.text();
       const lines = text.split("\n").filter((l) => l.startsWith("data: "));
       expect(lines.length).toBeGreaterThan(0);
-      const body = JSON.parse(lines[0].slice(6));
-      expect(body.result.isError).not.toBe(true);
+      const body = JSON.parse(lines[0]?.slice(6) || "null");
+      expect(body.result.isError).toEqual(false);
       expect(body.result.content[0].text).toBe("missing");
       expect(receivedClientInfo).toBeUndefined();
     } finally {

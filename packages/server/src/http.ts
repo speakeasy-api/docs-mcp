@@ -245,7 +245,7 @@ async function handleRequest(
   const server = factory();
   const transport = createStatefulTransport(server, sessionManager);
   try {
-    await server.connect(transport as unknown as Transport);
+    await server.connect(transport);
     await transport.handleRequest(req, res, parsed);
   } catch (error) {
     console.error("Error handling MCP request:", error);
@@ -275,7 +275,7 @@ async function handleWithStatelessServer(
   const server = factory();
 
   try {
-    await server.connect(transport as unknown as Transport);
+    await server.connect(transport);
     await transport.handleRequest(req, res, parsed);
   } finally {
     await transport.close().catch(() => {});

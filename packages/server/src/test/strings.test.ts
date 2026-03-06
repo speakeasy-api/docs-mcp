@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { properCase } from "../src/strings.js";
+import { properCase } from "../strings.js";
 
 describe("properCase", () => {
   it("returns canonical form for a single dictionary word", () => {

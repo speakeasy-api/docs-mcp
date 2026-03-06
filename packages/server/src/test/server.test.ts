@@ -117,7 +117,7 @@ describe("McpDocsServer", () => {
     const parsed = CallToolResultSchema.parse(result);
 
     expect(parsed.isError).toBe(false);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     const payload = JSON.parse(parsed.content[0].text);
     const hitIds = payload.hits.map((entry: { chunk_id: string }) => entry.chunk_id).sort();
     expect(hitIds).toEqual(["guides/global.md#retry", "guides/ts.md#retry"]);
@@ -142,7 +142,7 @@ describe("McpDocsServer", () => {
     const parsed = CallToolResultSchema.parse(result);
 
     expect(parsed.isError).toBe(true);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Invalid cursor/);
   });
 
@@ -165,7 +165,7 @@ describe("McpDocsServer", () => {
     const parsed = CallToolResultSchema.parse(result);
 
     expect(parsed.isError).toBe(true);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Unexpected field 'unsupported'/);
   });
 
@@ -187,7 +187,7 @@ describe("McpDocsServer", () => {
     });
     const badLimit = CallToolResultSchema.parse(limitResult);
     expect(badLimit.isError).toBe(true);
-    assert(badLimit.content[0].type === "text");
+    assert(badLimit.content[0]?.type === "text");
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
 
     const contextResult = await client.callTool({
@@ -199,7 +199,7 @@ describe("McpDocsServer", () => {
     });
     const badContext = CallToolResultSchema.parse(contextResult);
     expect(badContext.isError).toBe(true);
-    assert(badContext.content[0].type === "text");
+    assert(badContext.content[0]?.type === "text");
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
   });
 });
@@ -243,7 +243,7 @@ describe("McpDocsServer with toolPrefix", () => {
     const parsed = CallToolResultSchema.parse(result);
 
     expect(parsed.isError).toBe(false);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     const payload = JSON.parse(parsed.content[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
   });
@@ -264,7 +264,7 @@ describe("McpDocsServer with toolPrefix", () => {
     });
     const parsed = CallToolResultSchema.parse(result);
     expect(parsed.isError).toBe(true);
-    assert(parsed.content[0].type === "text");
+    assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Unknown tool/);
   });
 });
@@ -346,8 +346,7 @@ describe("McpDocsServer resources", () => {
     const { client } = pair;
 
     const result = await client.readResource({ uri: "docs:///guides/ts.md" });
-    expect(result.contents).toHaveLength(1);
-    assert("text" in result.contents[0]);
+    assert(result.contents[0] && "text" in result.contents[0]);
     expect(result.contents[0].text).toContain("TypeScript retry");
     expect(result.contents[0].mimeType).toBe("text/markdown");
   });
