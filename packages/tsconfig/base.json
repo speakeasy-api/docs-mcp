@@ -4,6 +4,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "noEmit": true,
     "strict": true,
     "declaration": true,
     "declarationMap": true,
@@ -14,7 +15,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "lib": ["ES2022"]
+    "exactOptionalPropertyTypes": false,
+    "lib": [
+      "ES2022"
+    ]
   }
 }
