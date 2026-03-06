@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_FEEDBACK_TOOL_CONFIG, parseFeedbackResult } from "../../src/agent/feedback.js";
-import type { FeedbackToolConfig } from "../../src/agent/types.js";
+import { DEFAULT_FEEDBACK_TOOL_CONFIG, parseFeedbackResult } from "../../agent/feedback.js";
+import type { FeedbackToolConfig } from "../../agent/types.js";
 
 const customConfig: FeedbackToolConfig = {
   name: "give_feedback",
@@ -50,10 +50,7 @@ describe("parseFeedbackResult", () => {
   });
 
   it("skips non-numeric metric values instead of failing", () => {
-    const result = parseFeedbackResult(
-      { feedback: "test", rating: "not a number" },
-      customConfig,
-    );
+    const result = parseFeedbackResult({ feedback: "test", rating: "not a number" }, customConfig);
     expect(result).toEqual({ scores: {}, reasoning: "test" });
   });
 

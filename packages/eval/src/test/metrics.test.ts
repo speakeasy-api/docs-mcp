@@ -5,7 +5,7 @@ import {
   summarizeCases,
   toDeltaCases,
   type RankedCase,
-} from "../src/index.js";
+} from "../index.js";
 
 const cases: RankedCase[] = [
   {

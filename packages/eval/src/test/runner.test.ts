@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeRoundsToRightDoc } from "../src/runner.js";
+import { computeRoundsToRightDoc } from "../runner.js";
 
 describe("computeRoundsToRightDoc", () => {
   it("uses executed rounds when the expected chunk was found", () => {

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeAgentEvalSummary } from "../../src/agent/metrics.js";
-import type { AgentScenarioResult } from "../../src/agent/types.js";
+import { computeAgentEvalSummary } from "../../agent/metrics.js";
+import type { AgentScenarioResult } from "../../agent/types.js";
 
 function makeResult(overrides: Partial<AgentScenarioResult> = {}): AgentScenarioResult {
   return {
+    id: "1",
     name: "test",
     activated: true,
     passed: true,

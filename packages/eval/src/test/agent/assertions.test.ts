@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { evaluateAssertions } from "../../src/agent/assertions.js";
-import type { AgentAssertion } from "../../src/agent/types.js";
+import { evaluateAssertions } from "../../agent/assertions.js";
+import type { AgentAssertion } from "../../agent/types.js";
 
 let workspaceDir: string;
 
