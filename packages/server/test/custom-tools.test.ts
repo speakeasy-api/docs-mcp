@@ -187,6 +187,7 @@ describe("McpDocsServer context threading", () => {
           },
         }),
       {
+        buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
           const auth = headers.authorization;
@@ -314,7 +315,10 @@ describe("Custom tools over HTTP transport", () => {
             customTools: [feedbackTool, throwingTool],
           },
         }),
-      { port: 0 },
+      {
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+      },
     );
     httpServer = handle.httpServer;
     const addr = httpServer.address();
@@ -404,6 +408,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
           const auth = headers.authorization;
@@ -451,6 +456,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async () => {
           throw new Error("Invalid credentials");
@@ -517,7 +523,10 @@ describe("HTTP authentication", () => {
             ],
           },
         }),
-      { port: 0 },
+      {
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+      },
     );
 
     try {
@@ -569,7 +578,10 @@ describe("HTTP authentication", () => {
             ],
           },
         }),
-      { port: 0 },
+      {
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+      },
     );
 
     try {
@@ -613,7 +625,10 @@ describe("HTTP authentication", () => {
             ],
           },
         }),
-      { port: 0 },
+      {
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+      },
     );
 
     try {
@@ -662,7 +677,10 @@ describe("HTTP authentication", () => {
             ],
           },
         }),
-      { port: 0 },
+      {
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+      },
     );
 
     try {

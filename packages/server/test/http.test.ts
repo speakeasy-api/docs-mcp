@@ -6,6 +6,8 @@ import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mc
 import { createMcpServer } from "../src/server.js";
 import { startHttpServer } from "../src/http.js";
 
+const buildInfo = { name: "test-server", version: "0.1.0" };
+
 const chunks: Chunk[] = [
   {
     chunk_id: "guides/ts.md#retry",
@@ -78,7 +80,7 @@ let baseUrl: string;
 beforeAll(async () => {
   const handle = await startHttpServer(
     () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-    { port: TEST_PORT },
+    { buildInfo, port: TEST_PORT },
   );
   httpServer = handle.httpServer;
   const addr = httpServer.address();
@@ -212,6 +214,20 @@ describe("MCP HTTP transport compliance", () => {
     expect(res.status).toBe(405);
   });
 
+  it("serves /healthz with build info", async () => {
+    const res = await fetch(`${baseUrl}/healthz`);
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json).toEqual({ build: buildInfo });
+  });
+
+  it("includes DOCS-MCP response header", async () => {
+    const res = await fetch(`${baseUrl}/mcp`, { method: "OPTIONS" });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("DOCS-MCP")).toBe("name=test-server version=0.1.0");
+  });
+
   it("returns JSON-RPC parse error for empty body", async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
@@ -287,7 +303,7 @@ describe("MCP HTTP transport resources", () => {
             metadata: metadataWithResources,
           },
         }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
     resourceHttpServer = handle.httpServer;
     const addr = resourceHttpServer.address();
@@ -353,7 +369,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
             toolPrefix: "acme",
           },
         }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
     prefixedHttpServer = handle.httpServer;
     const addr = prefixedHttpServer.address();
@@ -430,7 +446,7 @@ describe("HTTP session management", () => {
   it("falls back to stateless for unknown session ID", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -465,7 +481,7 @@ describe("HTTP session management", () => {
   it("cleans up session after client sends DELETE via terminateSession", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -498,7 +514,7 @@ describe("HTTP session management", () => {
   it("DELETE with missing session ID is idempotent", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -515,7 +531,7 @@ describe("HTTP session management", () => {
   it("DELETE with unknown session ID is idempotent", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -616,7 +632,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests with active session", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -653,7 +669,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests without session header", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -678,7 +694,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests with stale session header", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { port: 0 },
+      { buildInfo, port: 0 },
     );
 
     try {
@@ -696,6 +712,36 @@ describe("HTTP built-in request retry consistency", () => {
           expect(second.body).toEqual(first.body);
         }
       }
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+});
+
+describe("DOCS-MCP build header", () => {
+  it("includes git commit and build date when provided", async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      {
+        buildInfo: {
+          name: "test-server",
+          version: "0.1.0",
+          gitCommit: "abc123def456",
+          buildDate: "2026-03-06T00:00:00.000Z",
+        },
+        port: 0,
+      },
+    );
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      const res = await fetch(`http://localhost:${port}/healthz`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("DOCS-MCP")).toBe(
+        "name=test-server version=0.1.0 git=abc123def456 date=2026-03-06T00:00:00.000Z",
+      );
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }

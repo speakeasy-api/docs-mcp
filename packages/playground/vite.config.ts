@@ -102,6 +102,9 @@ function apiPlugin(): Plugin {
     configureServer(server) {
       const password = process.env.PLAYGROUND_PASSWORD;
       const serverName = process.env.SERVER_NAME || "speakeasy-docs";
+      const serverVersion = process.env.SERVER_VERSION;
+      const serverCommit = process.env.GIT_COMMIT;
+      const serverBuildDate = process.env.BUILD_DATE;
       const chatEnabled = !!process.env.GRAM_API_KEY;
 
       server.middlewares.use((req, res, next) => {
@@ -111,6 +114,9 @@ function apiPlugin(): Plugin {
             JSON.stringify({
               ...(password ? { token: password } : {}),
               serverName,
+              ...(serverVersion ? { serverVersion } : {}),
+              ...(serverCommit ? { serverCommit } : {}),
+              ...(serverBuildDate ? { serverBuildDate } : {}),
               chatEnabled,
             }),
           );
