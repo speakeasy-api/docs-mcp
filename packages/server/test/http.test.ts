@@ -3,7 +3,7 @@ import type http from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
-import { McpDocsServer } from "../src/server.js";
+import { createMcpServer } from "../src/server.js";
 import { startHttpServer } from "../src/http.js";
 
 const chunks: Chunk[] = [
@@ -76,8 +76,10 @@ let httpServer: http.Server;
 let baseUrl: string;
 
 beforeAll(async () => {
-  const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-  const handle = await startHttpServer(app, { port: TEST_PORT });
+  const handle = await startHttpServer(
+    () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+    { port: TEST_PORT },
+  );
   httpServer = handle.httpServer;
   const addr = httpServer.address();
   const port = typeof addr === "object" && addr ? addr.port : handle.port;
@@ -277,11 +279,16 @@ describe("MCP HTTP transport resources", () => {
   });
 
   beforeAll(async () => {
-    const app = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata: metadataWithResources,
-    });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () =>
+        createMcpServer({
+          app: {
+            index: new DocsIndex(chunks),
+            metadata: metadataWithResources,
+          },
+        }),
+      { port: 0 },
+    );
     resourceHttpServer = handle.httpServer;
     const addr = resourceHttpServer.address();
     const port = typeof addr === "object" && addr ? addr.port : handle.port;
@@ -334,15 +341,20 @@ describe("MCP HTTP transport with toolPrefix", () => {
   let prefixedBaseUrl: string;
 
   beforeAll(async () => {
-    const app = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      toolPrefix: "acme",
-    });
-    const handle = await startHttpServer(app, {
-      name: "acme-docs-server",
-      port: 0,
-    });
+    const handle = await startHttpServer(
+      () =>
+        createMcpServer({
+          mcp: {
+            name: "acme-docs-server",
+          },
+          app: {
+            index: new DocsIndex(chunks),
+            metadata,
+            toolPrefix: "acme",
+          },
+        }),
+      { port: 0 },
+    );
     prefixedHttpServer = handle.httpServer;
     const addr = prefixedHttpServer.address();
     const port = typeof addr === "object" && addr ? addr.port : handle.port;
@@ -416,8 +428,10 @@ describe("MCP HTTP transport with toolPrefix", () => {
 
 describe("HTTP session management", () => {
   it("falls back to stateless for unknown session ID", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -449,8 +463,10 @@ describe("HTTP session management", () => {
   });
 
   it("cleans up session after client sends DELETE via terminateSession", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -480,8 +496,10 @@ describe("HTTP session management", () => {
   });
 
   it("DELETE with missing session ID is idempotent", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -495,8 +513,10 @@ describe("HTTP session management", () => {
   });
 
   it("DELETE with unknown session ID is idempotent", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -594,8 +614,10 @@ describe("HTTP built-in request retry consistency", () => {
   }
 
   it("returns same responses for repeated requests with active session", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -629,8 +651,10 @@ describe("HTTP built-in request retry consistency", () => {
   });
 
   it("returns same responses for repeated requests without session header", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();
@@ -652,8 +676,10 @@ describe("HTTP built-in request retry consistency", () => {
   });
 
   it("returns same responses for repeated requests with stale session header", async () => {
-    const app = new McpDocsServer({ index: new DocsIndex(chunks), metadata });
-    const handle = await startHttpServer(app, { port: 0 });
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { port: 0 },
+    );
 
     try {
       const addr = handle.httpServer.address();

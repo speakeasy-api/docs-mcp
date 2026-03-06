@@ -1,9 +1,7 @@
 import { describe, expect, assert, it } from "vitest";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
-import { McpDocsServer } from "../src/server.js";
-import type { ToolCallContext } from "../src/types.js";
-
-const stubContext: ToolCallContext = { signal: AbortSignal.timeout(5_000) };
+import { createTestServer } from "./mcp.helper.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const chunks: Chunk[] = [
   {
@@ -51,37 +49,46 @@ const metadata = normalizeMetadata({
 });
 
 describe("McpDocsServer", () => {
-  it("includes conceptual query guidance when vector search is available", () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      vectorSearchAvailable: true,
+  it("includes conceptual query guidance when vector search is available", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        vectorSearchAvailable: true,
+      },
     });
+    const { client } = pair;
 
-    const tools = server.getTools();
+    const { tools } = await client.listTools();
     const search = tools.find((tool) => tool.name === "search_docs");
     expect(search?.description).toContain("conceptual queries");
   });
 
-  it("omits conceptual query guidance when vector search is unavailable", () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      vectorSearchAvailable: false,
+  it("omits conceptual query guidance when vector search is unavailable", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        vectorSearchAvailable: false,
+      },
     });
+    const { client } = pair;
 
-    const tools = server.getTools();
+    const { tools } = await client.listTools();
     const search = tools.find((tool) => tool.name === "search_docs");
     expect(search?.description).not.toContain("conceptual queries");
   });
 
-  it("builds dynamic schema with injected taxonomy enums", () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+  it("builds dynamic schema with injected taxonomy enums", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const tools = server.getTools();
+    const { tools } = await client.listTools();
     const search = tools.find((tool) => tool.name === "search_docs");
     expect(search).toBeDefined();
 
@@ -92,93 +99,105 @@ describe("McpDocsServer", () => {
   });
 
   it("passes through auto-include behavior from core", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const result = await server.callTool(
-      "search_docs",
-      {
+    const result = await client.callTool({
+      name: "search_docs",
+      arguments: {
         query: "retry",
         language: "typescript",
       },
-      stubContext,
-    );
+    });
+    const parsed = CallToolResultSchema.parse(result);
 
-    expect(result.isError).toBe(false);
-    assert(result.content[0].type === "text");
-    const payload = JSON.parse(result.content[0].text);
+    expect(parsed.isError).toBe(false);
+    assert(parsed.content[0].type === "text");
+    const payload = JSON.parse(parsed.content[0].text);
     const hitIds = payload.hits.map((entry: { chunk_id: string }) => entry.chunk_id).sort();
     expect(hitIds).toEqual(["guides/global.md#retry", "guides/ts.md#retry"]);
   });
 
   it("returns structured errors for invalid cursor", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const result = await server.callTool(
-      "search_docs",
-      {
+    const result = await client.callTool({
+      name: "search_docs",
+      arguments: {
         query: "retry",
         cursor: "bad-cursor",
       },
-      stubContext,
-    );
+    });
+    const parsed = CallToolResultSchema.parse(result);
 
-    expect(result.isError).toBe(true);
-    assert(result.content[0].type === "text");
-    expect(result.content[0].text).toMatch(/Invalid cursor/);
+    expect(parsed.isError).toBe(true);
+    assert(parsed.content[0].type === "text");
+    expect(parsed.content[0].text).toMatch(/Invalid cursor/);
   });
 
   it("rejects unknown fields in search_docs", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const result = await server.callTool(
-      "search_docs",
-      {
+    const result = await client.callTool({
+      name: "search_docs",
+      arguments: {
         query: "retry",
         unsupported: "x",
       },
-      stubContext,
-    );
+    });
+    const parsed = CallToolResultSchema.parse(result);
 
-    expect(result.isError).toBe(true);
-    assert(result.content[0].type === "text");
-    expect(result.content[0].text).toMatch(/Unexpected field 'unsupported'/);
+    expect(parsed.isError).toBe(true);
+    assert(parsed.content[0].type === "text");
+    expect(parsed.content[0].text).toMatch(/Unexpected field 'unsupported'/);
   });
 
   it("enforces numeric bounds for limit and context", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const badLimit = await server.callTool(
-      "search_docs",
-      {
+    const limitResult = await client.callTool({
+      name: "search_docs",
+      arguments: {
         query: "retry",
         limit: 0,
       },
-      stubContext,
-    );
+    });
+    const badLimit = CallToolResultSchema.parse(limitResult);
     expect(badLimit.isError).toBe(true);
     assert(badLimit.content[0].type === "text");
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
 
-    const badContext = await server.callTool(
-      "get_doc",
-      {
+    const contextResult = await client.callTool({
+      name: "get_doc",
+      arguments: {
         chunk_id: "guides/ts.md#retry",
         context: 6,
       },
-      stubContext,
-    );
+    });
+    const badContext = CallToolResultSchema.parse(contextResult);
     expect(badContext.isError).toBe(true);
     assert(badContext.content[0].type === "text");
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
@@ -186,14 +205,17 @@ describe("McpDocsServer", () => {
 });
 
 describe("McpDocsServer with toolPrefix", () => {
-  it("prefixes tool names when toolPrefix is set", () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      toolPrefix: "acme",
+  it("prefixes tool names when toolPrefix is set", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        toolPrefix: "acme",
+      },
     });
+    const { client } = pair;
 
-    const tools = server.getTools();
+    const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
     expect(names).toContain("acme_search_docs");
     expect(names).toContain("acme_get_doc");
@@ -202,48 +224,62 @@ describe("McpDocsServer with toolPrefix", () => {
   });
 
   it("routes prefixed tool names to the correct handlers", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      toolPrefix: "acme",
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        toolPrefix: "acme",
+      },
     });
+    const { client } = pair;
 
-    const result = await server.callTool(
-      "acme_search_docs",
-      {
+    const result = await client.callTool({
+      name: "acme_search_docs",
+      arguments: {
         query: "retry",
         language: "typescript",
       },
-      stubContext,
-    );
+    });
+    const parsed = CallToolResultSchema.parse(result);
 
-    expect(result.isError).toBe(false);
-    assert(result.content[0].type === "text");
-    const payload = JSON.parse(result.content[0].text);
+    expect(parsed.isError).toBe(false);
+    assert(parsed.content[0].type === "text");
+    const payload = JSON.parse(parsed.content[0].text);
     expect(payload.hits.length).toBeGreaterThan(0);
   });
 
   it("rejects unprefixed tool names when prefix is set", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
-      toolPrefix: "acme",
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        toolPrefix: "acme",
+      },
     });
+    const { client } = pair;
 
-    const result = await server.callTool("search_docs", { query: "retry" }, stubContext);
-    expect(result.isError).toBe(true);
-    assert(result.content[0].type === "text");
-    expect(result.content[0].text).toMatch(/Unknown tool/);
+    const result = await client.callTool({
+      name: "search_docs",
+      arguments: { query: "retry" },
+    });
+    const parsed = CallToolResultSchema.parse(result);
+    expect(parsed.isError).toBe(true);
+    assert(parsed.content[0].type === "text");
+    expect(parsed.content[0].text).toMatch(/Unknown tool/);
   });
 });
 
 describe("McpDocsServer resources", () => {
   it("lists all documents as resources", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
-    const resources = await server.getResources();
+    const { client } = pair;
+
+    const { resources } = await client.listResources();
     expect(resources).toHaveLength(2);
     const uris = resources.map((r) => r.uri).sort();
     expect(uris).toEqual(["docs:///guides/global.md", "docs:///guides/ts.md"]);
@@ -278,12 +314,15 @@ describe("McpDocsServer resources", () => {
       },
     });
 
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata: metadataWithFiles,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithFiles,
+      },
     });
+    const { client } = pair;
 
-    const resources = await server.getResources();
+    const { resources } = await client.listResources();
     expect(resources).toHaveLength(2);
 
     const tsResource = resources.find((r) => r.uri === "docs:///guides/ts.md");
@@ -298,12 +337,15 @@ describe("McpDocsServer resources", () => {
   });
 
   it("reads a resource and returns file content", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    const result = await server.readResource("docs:///guides/ts.md");
+    const result = await client.readResource({ uri: "docs:///guides/ts.md" });
     expect(result.contents).toHaveLength(1);
     assert("text" in result.contents[0]);
     expect(result.contents[0].text).toContain("TypeScript retry");
@@ -311,23 +353,31 @@ describe("McpDocsServer resources", () => {
   });
 
   it("throws for nonexistent resource", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    await expect(server.readResource("docs:///nonexistent.md")).rejects.toThrow(
+    await expect(client.readResource({ uri: "docs:///nonexistent.md" })).rejects.toThrow(
       /Resource not found/,
     );
   });
 
   it("throws for malformed URI", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+      },
     });
+    const { client } = pair;
 
-    await expect(server.readResource("invalid://uri")).rejects.toThrow(/Invalid URI scheme/);
+    await expect(client.readResource({ uri: "invalid://uri" })).rejects.toThrow(
+      /Invalid URI scheme/,
+    );
   });
 });
 
@@ -370,26 +420,35 @@ describe("McpDocsServer prompts", () => {
     ],
   });
 
-  it("lists prompts from metadata", () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata: metadataWithPrompts,
+  it("lists prompts from metadata", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithPrompts,
+      },
     });
+    const { client } = pair;
 
-    const prompts = server.getPrompts();
+    const { prompts } = await client.listPrompts();
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.name).toBe("guides/auth-integration");
     expect(prompts[0]?.arguments?.[0]?.name).toBe("auth_method");
   });
 
   it("renders prompt with mustache arguments", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata: metadataWithPrompts,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithPrompts,
+      },
     });
+    const { client } = pair;
 
-    const prompt = await server.getPrompt("guides/auth-integration", {
-      auth_method: "oauth2",
+    const prompt = await client.getPrompt({
+      name: "guides/auth-integration",
+      arguments: {
+        auth_method: "oauth2",
+      },
     });
 
     expect(prompt.messages).toHaveLength(2);
@@ -400,12 +459,15 @@ describe("McpDocsServer prompts", () => {
   });
 
   it("throws when required arguments are missing", async () => {
-    const server = new McpDocsServer({
-      index: new DocsIndex(chunks),
-      metadata: metadataWithPrompts,
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithPrompts,
+      },
     });
+    const { client } = pair;
 
-    await expect(server.getPrompt("guides/auth-integration")).rejects.toThrow(
+    await expect(client.getPrompt({ name: "guides/auth-integration" })).rejects.toThrow(
       /Missing required prompt argument 'auth_method'/,
     );
   });

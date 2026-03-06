@@ -36,7 +36,7 @@ const require = createRequire(import.meta.url);
 const PKG_VERSION = readPackageVersion();
 Mustache.escape = (value: string) => value;
 
-export interface MCPServerOptions {
+export interface McpServerOptions {
   mcp?: {
     name?: string;
     version?: string;
@@ -45,7 +45,7 @@ export interface MCPServerOptions {
   app: DocsServerOptions;
 }
 
-export function createMcpServer(options: MCPServerOptions): McpServer {
+export function createMcpServer(options: McpServerOptions): McpServer {
   const app = new DocsServer(options.app);
 
   const instructions = app.getInstructions();
