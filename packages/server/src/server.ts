@@ -11,22 +11,107 @@ import type {
 } from "@speakeasy-api/docs-mcp-core";
 import { sentenceCase } from "change-case";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
-import type {
-  CallToolResult,
-  CustomTool,
-  GetPromptResult,
-  ListPromptsResult,
-  ReadResourceResult,
-  ResourceDefinition,
-  ToolCallContext,
-  ToolDefinition,
-  ToolProvider,
-} from "./types.js";
 import { properCase } from "./strings.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  CallToolRequestSchema,
+  CallToolResult,
+  GetPromptRequestSchema,
+  GetPromptResult,
+  ListPromptsRequestSchema,
+  ListPromptsResult,
+  ListResourcesRequestSchema,
+  ListResourcesResult,
+  ListResourceTemplatesRequestSchema,
+  ListResourceTemplatesResult,
+  ListToolsRequestSchema,
+  ListToolsResult,
+  ReadResourceRequestSchema,
+  ReadResourceResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import { createRequire } from "node:module";
+import { CustomTool, ToolCallContext } from "./types.js";
 
+const require = createRequire(import.meta.url);
+const PKG_VERSION = readPackageVersion();
 Mustache.escape = (value: string) => value;
 
-export interface McpDocsServerOptions {
+export interface McpServerOptions {
+  mcp?: {
+    name?: string;
+    version?: string;
+    includeClientInfo?: boolean;
+  };
+  app: DocsServerOptions;
+}
+
+export function createMcpServer(options: McpServerOptions): McpServer {
+  const app = new DocsServer(options.app);
+
+  const instructions = app.getInstructions();
+  const server = new McpServer(
+    {
+      name: options.mcp?.name ?? "@speakeasy-api/docs-mcp-server",
+      version: options.mcp?.version ?? PKG_VERSION,
+    },
+    {
+      capabilities: {
+        tools: {},
+        resources: {},
+        prompts: {},
+      },
+      ...(instructions ? { instructions } : {}),
+    },
+  );
+
+  server.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return app.getTools();
+  });
+
+  server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    const context: ToolCallContext = { signal: extra.signal };
+    if (extra.authInfo) {
+      context.authInfo = extra.authInfo;
+    }
+    if (extra.requestInfo?.headers) {
+      context.headers = extra.requestInfo.headers;
+    }
+    if (options.mcp?.includeClientInfo) {
+      const clientVersion = server.server.getClientVersion();
+      if (clientVersion) {
+        context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
+      }
+    }
+    return app.callTool(request.params.name, request.params.arguments ?? {}, context);
+  });
+
+  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const res = await app.getResources();
+    return res satisfies ListResourcesResult;
+  });
+
+  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
+  });
+
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const result = await app.readResource(request.params.uri);
+    return result satisfies ReadResourceResult;
+  });
+
+  server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return app.getPrompts() satisfies ListPromptsResult;
+  });
+
+  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const result = await app.getPrompt(request.params.name, request.params.arguments);
+    return result satisfies GetPromptResult;
+  });
+
+  return server;
+}
+
+export interface DocsServerOptions {
   index: SearchEngine;
   metadata: CorpusMetadata;
   toolPrefix?: string;
@@ -37,7 +122,7 @@ export interface McpDocsServerOptions {
 
 const MCP_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
-export class McpDocsServer implements ToolProvider {
+class DocsServer {
   private readonly index: SearchEngine;
   private readonly metadata: CorpusMetadata;
   private readonly rrfWeights: RrfWeights | undefined;
@@ -46,7 +131,7 @@ export class McpDocsServer implements ToolProvider {
   private readonly getDocToolName: string;
   private readonly customTools: CustomTool[];
 
-  constructor(options: McpDocsServerOptions) {
+  constructor(options: DocsServerOptions) {
     this.index = options.index;
     this.metadata = options.metadata;
     this.rrfWeights = options.rrfWeights;
@@ -88,7 +173,7 @@ export class McpDocsServer implements ToolProvider {
     return this.metadata.mcpServerInstructions;
   }
 
-  getTools(): ToolDefinition[] {
+  getTools(): ListToolsResult {
     const searchQueryGuidance = this.vectorSearchAvailable
       ? "Use exact identifiers, method names, or conceptual queries."
       : "Use exact identifiers and method names.";
@@ -97,7 +182,7 @@ export class McpDocsServer implements ToolProvider {
     const defaultGetDocDescription =
       "Retrieve the full content of a documentation page by its chunk_id (returned by search_docs). Each chunk is self-contained — do NOT set context on your first read. Only use context=1..3 if, after reading, you find the chunk references adjacent sections you need.";
 
-    const builtIn: ToolDefinition[] = [
+    const builtIn = [
       {
         name: this.searchToolName,
         description: this.metadata.tool_descriptions?.search_docs ?? defaultSearchDescription,
@@ -110,18 +195,18 @@ export class McpDocsServer implements ToolProvider {
       },
     ];
 
-    const custom: ToolDefinition[] = this.customTools.map((tool) => ({
+    const custom = this.customTools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
 
-    return [...builtIn, ...custom];
+    return { tools: [...builtIn, ...custom] };
   }
 
-  getPrompts(): ListPromptsResult["prompts"] {
-    const prompts = this.metadata.prompts ?? [];
-    return prompts.map((prompt) => ({
+  getPrompts(): ListPromptsResult {
+    const entries = this.metadata.prompts ?? [];
+    const prompts = entries.map((prompt) => ({
       name: prompt.name,
       ...(prompt.title ? { title: prompt.title } : {}),
       ...(prompt.description ? { description: prompt.description } : {}),
@@ -135,6 +220,8 @@ export class McpDocsServer implements ToolProvider {
           }
         : {}),
     }));
+
+    return { prompts };
   }
 
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
@@ -211,9 +298,9 @@ export class McpDocsServer implements ToolProvider {
     }
   }
 
-  async getResources(): Promise<ResourceDefinition[]> {
+  async getResources(): Promise<ListResourcesResult> {
     const entries = await this.index.listFilepaths({ filters: {} });
-    return entries.map((entry) => {
+    const resources = entries.map((entry) => {
       return {
         uri: `docs:///${entry.filepath}`,
         name: entry.filepath,
@@ -222,6 +309,7 @@ export class McpDocsServer implements ToolProvider {
         mimeType: "text/markdown",
       };
     });
+    return { resources };
   }
 
   async readResource(uri: string): Promise<ReadResourceResult> {
@@ -393,4 +481,9 @@ function errorResult(message: string): CallToolResult {
     content: [{ type: "text", text: message }],
     isError: true,
   };
+}
+
+function readPackageVersion(): string {
+  const pkg = require("../package.json");
+  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
 }

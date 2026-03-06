@@ -1,31 +1,11 @@
 import crypto from "node:crypto";
 import http from "node:http";
-import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import {
-  CallToolRequestSchema,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ListToolsRequestSchema,
-  ReadResourceRequestSchema,
-  type GetPromptResult,
-  type ListPromptsResult,
-  type ListToolsResult,
-  type ListResourcesResult,
-  type ListResourceTemplatesResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { AuthInfo, ToolCallContext, ToolProvider } from "./types.js";
-
-const require = createRequire(import.meta.url);
-const PKG_VERSION = readPackageVersion();
+import type { AuthInfo } from "./types.js";
 
 export interface StartHttpServerOptions {
-  name?: string;
-  version?: string;
   port?: number;
   /**
    * Async hook called before each request is processed.
@@ -72,121 +52,35 @@ class SessionManager {
     }
   }
 
-  evict(sessionId: string): void {
+  async evict(sessionId: string): Promise<void> {
     const entry = this.sessions.get(sessionId);
     if (entry) {
       this.sessions.delete(sessionId);
-      entry.transport.close();
-      entry.server.close().catch(() => {});
+      await entry.transport.close().catch(() => {});
+      await entry.server.close().catch(() => {});
     }
   }
 }
 
-function createMcpServer(
-  app: ToolProvider,
-  options: StartHttpServerOptions,
-  includeClientInfo = true,
-): McpServer {
-  const instructions = app.getInstructions();
-  const server = new McpServer(
-    {
-      name: options.name ?? "@speakeasy-api/docs-mcp-server",
-      version: options.version ?? PKG_VERSION,
-    },
-    {
-      capabilities: {
-        tools: {},
-        resources: {},
-        prompts: {},
-      },
-      ...(instructions ? { instructions } : {}),
-    },
-  );
-
-  server.server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const tools = app.getTools().map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    }));
-    return { tools } satisfies ListToolsResult;
-  });
-
-  server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const context: ToolCallContext = { signal: extra.signal };
-    if (extra.authInfo) {
-      context.authInfo = extra.authInfo;
-    }
-    if (extra.requestInfo?.headers) {
-      context.headers = extra.requestInfo.headers;
-    }
-    if (includeClientInfo) {
-      const clientVersion = server.server.getClientVersion();
-      if (clientVersion) {
-        context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
-      }
-    }
-    return app.callTool(request.params.name, request.params.arguments ?? {}, context);
-  });
-
-  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    const resources = await app.getResources();
-    return {
-      resources: resources.map((r) => ({
-        uri: r.uri,
-        name: r.name,
-        title: r.title,
-        description: r.description,
-        mimeType: r.mimeType,
-      })),
-    } satisfies ListResourcesResult;
-  });
-
-  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
-  });
-
-  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    const result = await app.readResource(request.params.uri);
-    return result;
-  });
-
-  server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    return {
-      prompts: app.getPrompts(),
-    } satisfies ListPromptsResult;
-  });
-
-  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    const result = await app.getPrompt(request.params.name, request.params.arguments);
-    return result as GetPromptResult;
-  });
-
-  return server;
-}
-
-function createSessionServer(
-  app: ToolProvider,
-  options: StartHttpServerOptions,
+function createStatefulTransport(
+  server: McpServer,
   sessionManager: SessionManager,
-): { server: McpServer; transport: StreamableHTTPServerTransport } {
-  const server = createMcpServer(app, options);
-
+): StreamableHTTPServerTransport {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (sid: string) => {
       sessionManager.add(sid, server, transport);
     },
-    onsessionclosed: (sid: string) => {
-      sessionManager.evict(sid);
+    onsessionclosed: async (sid: string) => {
+      await sessionManager.evict(sid);
     },
   });
 
-  return { server, transport };
+  return transport;
 }
 
 export async function startHttpServer(
-  app: ToolProvider,
+  factory: () => McpServer,
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const port = options.port ?? 20310;
@@ -194,7 +88,7 @@ export async function startHttpServer(
 
   const httpServer = http.createServer(async (req, res) => {
     try {
-      await handleRequest(req, res, app, options, sessionManager);
+      await handleRequest(factory, req, res, options, sessionManager);
     } catch (error) {
       console.error("Unhandled error in request handler:", error);
       if (!res.headersSent) {
@@ -236,9 +130,9 @@ function setCorsHeaders(res: http.ServerResponse): void {
 }
 
 async function handleRequest(
+  factory: () => McpServer,
   req: http.IncomingMessage,
   res: http.ServerResponse,
-  app: ToolProvider,
   options: StartHttpServerOptions,
   sessionManager: SessionManager,
 ): Promise<void> {
@@ -333,11 +227,12 @@ async function handleRequest(
       await entry.transport.handleRequest(req, res, parsed);
       return;
     }
-    await handleWithStatelessServer(req, res, parsed, app, options);
+    await handleWithStatelessServer(factory, req, res, parsed);
     return;
   }
 
-  const { server, transport } = createSessionServer(app, options, sessionManager);
+  const server = factory();
+  const transport = createStatefulTransport(server, sessionManager);
   try {
     await server.connect(transport as unknown as Transport);
     await transport.handleRequest(req, res, parsed);
@@ -353,27 +248,27 @@ async function handleRequest(
         }),
       );
     }
-    transport.close();
-    void server.close();
+
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
   }
 }
 
 async function handleWithStatelessServer(
+  factory: () => McpServer,
   req: http.IncomingMessage,
   res: http.ServerResponse,
   parsed: unknown,
-  app: ToolProvider,
-  options: StartHttpServerOptions,
 ): Promise<void> {
-  const server = createMcpServer(app, options, false);
   const transport = new StreamableHTTPServerTransport();
+  const server = factory();
 
   try {
     await server.connect(transport as unknown as Transport);
     await transport.handleRequest(req, res, parsed);
   } finally {
-    transport.close();
-    void server.close();
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
   }
 }
 
@@ -438,9 +333,4 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 
 function getHeaderValue(header: string | string[] | undefined): string | undefined {
   return typeof header === "string" ? header : undefined;
-}
-
-function readPackageVersion(): string {
-  const pkg = require("../package.json");
-  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
 }
