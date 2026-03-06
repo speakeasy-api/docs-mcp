@@ -3,9 +3,10 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { AuthInfo } from "./types.js";
+import type { AuthInfo, BuildInfo } from "./types.js";
 
 export interface StartHttpServerOptions {
+  buildInfo: BuildInfo;
   port?: number;
   /**
    * Async hook called before each request is processed.
@@ -81,7 +82,7 @@ function createStatefulTransport(
 
 export async function startHttpServer(
   factory: () => McpServer,
-  options: StartHttpServerOptions = {},
+  options: StartHttpServerOptions,
 ): Promise<HttpServerHandle> {
   const port = options.port ?? 20310;
   const sessionManager = new SessionManager();
@@ -116,10 +117,12 @@ export async function startHttpServer(
   return { httpServer, port: actualPort };
 }
 
+const DOCS_MCP_HEADER = "DOCS-MCP";
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "*",
+  "Access-Control-Expose-Headers": [DOCS_MCP_HEADER].join(", "),
   "Access-Control-Max-Age": "86400",
 };
 
@@ -137,6 +140,14 @@ async function handleRequest(
   sessionManager: SessionManager,
 ): Promise<void> {
   const url = new URL(req.url ?? "/", "http://localhost");
+  const { buildInfo } = options;
+  res.setHeader(DOCS_MCP_HEADER, makeBuildInfoHeader(buildInfo));
+
+  if (req.method === "GET" && url.pathname === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ build: buildInfo }, null, 2));
+    return;
+  }
 
   if (url.pathname !== "/mcp") {
     res.writeHead(405, { "Content-Type": "text/plain" });
@@ -333,4 +344,14 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 
 function getHeaderValue(header: string | string[] | undefined): string | undefined {
   return typeof header === "string" ? header : undefined;
+}
+
+function makeBuildInfoHeader(buildInfo: BuildInfo): string {
+  const arr: string[] = [];
+  arr.push(`name=${buildInfo.name}`);
+  arr.push(`version=${buildInfo.version}`);
+  if (buildInfo.gitCommit) arr.push(`git=${buildInfo.gitCommit}`);
+  if (buildInfo.buildDate) arr.push(`date=${buildInfo.buildDate}`);
+
+  return arr.join(" ");
 }

@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
 import { createDocsMcpServerFactory } from "./create.js";
+import { BuildInfo } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const SERVER_VERSION = readPackageVersion();
@@ -23,6 +24,8 @@ interface ServerCliOptions {
   transport: "stdio" | "http";
   port: number;
   customToolsJson?: string;
+  gitCommit?: string;
+  buildDate?: string;
 }
 
 const program = new Command();
@@ -31,9 +34,17 @@ program
   .name("docs-mcp-server")
   .description("Run @speakeasy-api/docs-mcp-server")
   .requiredOption("--index-dir <path>", "Directory containing chunks.json and metadata.json")
-  .option("--name <value>", "MCP server name", "@speakeasy-api/docs-mcp-server")
+  .option(
+    "--name <value>",
+    "MCP server name (env: SERVER_NAME)",
+    process.env["SERVER_NAME"] || "@speakeasy-api/docs-mcp-server",
+  )
   .option("--tool-prefix <value>", "Tool name prefix (e.g. 'acme' produces acme_search_docs)")
-  .option("--version <value>", "MCP server version", SERVER_VERSION)
+  .option(
+    "--version <value>",
+    "MCP server version (env: SERVER_VERSION)",
+    process.env["SERVER_VERSION"] || SERVER_VERSION,
+  )
   .option("--query-embedding-api-key <value>", "Query embedding API key (or set OPENAI_API_KEY)")
   .option("--query-embedding-base-url <value>", "Query embedding API base URL")
   .option("--query-embedding-batch-size <number>", "Query embedding batch size", parseIntOption)
@@ -51,7 +62,28 @@ program
     "--custom-tools-json <json>",
     "JSON array of custom tool definitions [{name, description, inputSchema}], each registered with an echo handler",
   )
+  .option(
+    "--git-commit <value>",
+    "Git commit SHA to include in server info (env: GIT_COMMIT)",
+    process.env["GIT_COMMIT"],
+  )
+  .option(
+    "--build-date <value>",
+    "Build date to include in server info (env: BUILD_DATE)",
+    process.env["BUILD_DATE"],
+  )
   .action(async (options: ServerCliOptions) => {
+    const serverName =
+      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
+        ? `${options.toolPrefix}-docs-server`
+        : options.name;
+    const buildInfo: BuildInfo = {
+      name: serverName,
+      version: options.version,
+      gitCommit: options.gitCommit,
+      buildDate: options.buildDate,
+    };
+
     const customTools = options.customToolsJson
       ? (
           JSON.parse(options.customToolsJson) as Array<{
@@ -68,11 +100,6 @@ program
         }))
       : [];
 
-    const serverName =
-      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
-        ? `${options.toolPrefix}-docs-server`
-        : options.name;
-
     const mcpServerFactory = await createDocsMcpServerFactory({
       serverName,
       serverVersion: options.version,
@@ -88,7 +115,10 @@ program
     });
 
     if (options.transport === "http") {
-      await startHttpServer(mcpServerFactory, { port: options.port });
+      await startHttpServer(mcpServerFactory, {
+        buildInfo,
+        port: options.port,
+      });
     } else {
       await startStdioServer(mcpServerFactory);
     }

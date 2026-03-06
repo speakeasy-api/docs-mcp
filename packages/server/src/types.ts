@@ -2,6 +2,13 @@ export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
+export interface BuildInfo {
+  name: string;
+  version: string;
+  gitCommit?: string | undefined;
+  buildDate?: string | undefined;
+}
+
 export interface ToolCallContext {
   /** Validated auth info from transport middleware (HTTP only). */
   authInfo?: AuthInfo;

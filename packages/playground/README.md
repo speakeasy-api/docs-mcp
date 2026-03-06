@@ -28,6 +28,9 @@ Then open `http://localhost:3001` in your browser.
 | `MCP_TARGET`          | `http://localhost:20310` | URL of the docs-mcp-server to proxy MCP requests to |
 | `PLAYGROUND_PASSWORD` | _(none)_                 | If set, enables password authentication             |
 | `SERVER_NAME`         | `speakeasy-docs`         | Display name shown in the playground UI             |
+| `SERVER_VERSION`      | _(none)_                 | Optional version label shown next to server name    |
+| `GIT_COMMIT`          | _(none)_                 | Optional commit SHA shown in muted metadata         |
+| `BUILD_DATE`          | _(none)_                 | Optional build date shown in muted metadata         |
 
 ## License
 

@@ -123,11 +123,17 @@ app.use(
 app.use(express.json());
 
 const serverDisplayName = process.env.SERVER_NAME || "speakeasy-docs";
+const serverDisplayVersion = process.env.SERVER_VERSION;
+const serverDisplayCommit = process.env.GIT_COMMIT;
+const serverDisplayBuildDate = process.env.BUILD_DATE;
 
 app.get("/api/config", (_req, res) => {
   res.json({
     ...(password ? { token: password } : {}),
     serverName: serverDisplayName,
+    ...(serverDisplayVersion ? { serverVersion: serverDisplayVersion } : {}),
+    ...(serverDisplayCommit ? { serverCommit: serverDisplayCommit } : {}),
+    ...(serverDisplayBuildDate ? { serverBuildDate: serverDisplayBuildDate } : {}),
     chatEnabled,
   });
 });
