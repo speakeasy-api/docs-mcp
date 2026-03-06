@@ -3,12 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildChunks } from "../src/chunking.js";
-import { buildLanceDbIndex, LanceDbSearchEngine } from "../src/lancedb.js";
-import { parseManifest, resolveFileConfig } from "../src/manifest.js";
-import type { Chunk, Manifest } from "../src/types.js";
+import { buildChunks } from "../chunking.js";
+import { buildLanceDbIndex, LanceDbSearchEngine } from "../lancedb.js";
+import { parseManifest, resolveFileConfig } from "../manifest.js";
+import type { Chunk, Manifest } from "../types.js";
 
-const FIXTURES_DIR = path.resolve(import.meta.dirname, "../../../tests/fixtures/docs");
+const FIXTURES_DIR = path.resolve(import.meta.dirname, "../../../../tests/fixtures/docs");
 
 const tempDirs: string[] = [];
 

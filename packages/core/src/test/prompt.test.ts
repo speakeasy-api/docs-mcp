@@ -1,15 +1,15 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parsePromptMarkdown, parsePromptTemplateYaml } from "../src/prompt.js";
+import { parsePromptMarkdown, parsePromptTemplateYaml } from "../prompt.js";
 
 const FIXTURE_PROMPT_PATH = path.resolve(
   import.meta.dirname,
-  "../../../tests/fixtures/docs/guides/auth-integration.template.md",
+  "../../../../tests/fixtures/docs/guides/auth-integration.template.md",
 );
 const FIXTURE_PROMPT_YAML_PATH = path.resolve(
   import.meta.dirname,
-  "../../../tests/fixtures/docs/guides/auth-integration.template.yaml",
+  "../../../../tests/fixtures/docs/guides/auth-integration.template.yaml",
 );
 
 describe("parsePromptMarkdown", () => {

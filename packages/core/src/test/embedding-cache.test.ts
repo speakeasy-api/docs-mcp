@@ -7,9 +7,9 @@ import {
   embedChunksIncremental,
   loadCache,
   saveCache,
-} from "../src/embedding-cache.js";
-import { HashEmbeddingProvider, toEmbeddingInput } from "../src/embedding.js";
-import type { Chunk, EmbeddingConfig } from "../src/types.js";
+} from "../embedding-cache.js";
+import { HashEmbeddingProvider, toEmbeddingInput } from "../embedding.js";
+import type { Chunk, EmbeddingConfig } from "../types.js";
 
 function makeChunk(overrides: Partial<Chunk> = {}): Chunk {
   return {

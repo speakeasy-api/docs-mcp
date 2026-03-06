@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { computeChunkFingerprint, loadChunksFromPreviousIndex } from "../src/chunk-cache.js";
-import { buildLanceDbIndex } from "../src/lancedb.js";
-import type { Chunk, ChunkingStrategy } from "../src/types.js";
+import { computeChunkFingerprint, loadChunksFromPreviousIndex } from "../chunk-cache.js";
+import { buildLanceDbIndex } from "../lancedb.js";
+import type { Chunk, ChunkingStrategy } from "../types.js";
 
 function makeChunk(overrides: Partial<Chunk> = {}): Chunk {
   return {

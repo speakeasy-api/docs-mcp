@@ -1,10 +1,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { buildLanceDbIndex, LanceDbSearchEngine } from "../src/lancedb.js";
-import type { Chunk, EmbeddingProvider } from "../src/types.js";
-import { buildChunks } from "../src/chunking.js";
+import { afterEach, describe, expect, it, assert } from "vitest";
+import { buildLanceDbIndex, LanceDbSearchEngine } from "../lancedb.js";
+import type { Chunk, EmbeddingProvider } from "../types.js";
+import { buildChunks } from "../chunking.js";
 
 const tempDirs: string[] = [];
 
@@ -234,6 +234,9 @@ describe("LanceDbSearchEngine", () => {
       async embed(): Promise<number[][]> {
         return [[0, 1, 0]];
       },
+
+      configFingerprint: "",
+      costPerMillionTokens: 0,
     };
 
     const engine = await LanceDbSearchEngine.open({
@@ -286,6 +289,8 @@ describe("LanceDbSearchEngine", () => {
       async embed(): Promise<number[][]> {
         throw new Error("provider unavailable");
       },
+      configFingerprint: "",
+      costPerMillionTokens: 0,
     };
 
     const engine = await LanceDbSearchEngine.open({
@@ -484,6 +489,7 @@ third
       metadataKeys: [],
     });
 
+    assert(chunks[1]?.chunk_id);
     const result = await engine.getDoc({
       chunk_id: chunks[1].chunk_id,
       context: -1,
@@ -554,6 +560,7 @@ Greetings friend!
       metadataKeys: [],
     });
 
+    assert(target[1]?.chunk_id);
     const result = await engine.getDoc({
       chunk_id: target[1].chunk_id,
       context: -1,

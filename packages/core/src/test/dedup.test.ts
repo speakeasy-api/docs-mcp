@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dedupKey } from "../src/search-common.js";
-import { InMemorySearchEngine } from "../src/search.js";
-import type { Chunk } from "../src/types.js";
+import { dedupKey } from "../search-common.js";
+import { InMemorySearchEngine } from "../search.js";
+import type { Chunk } from "../types.js";
 
 describe("dedupKey", () => {
   const getter = (metadata: Record<string, string>) => (key: string) => metadata[key] ?? "";

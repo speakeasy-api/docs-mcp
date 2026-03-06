@@ -4,7 +4,7 @@ import {
   NoopEmbeddingProvider,
   OpenAIEmbeddingProvider,
   createEmbeddingProvider,
-} from "../src/embedding.js";
+} from "../embedding.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -295,7 +295,7 @@ describe("embedding providers", () => {
     // Instead, we'll rely on the fact that the provider builds JSONL deterministically,
     // so two providers with the same config and inputs produce the same SHA.
     // We'll build the expected SHA by constructing a second provider.
-    const { sha256hex } = await import("../src/embedding.js");
+    const { sha256hex } = await import("../embedding.js");
     // Build the JSONL the provider would create (access via same logic)
     const expectedJsonl = [
       JSON.stringify({

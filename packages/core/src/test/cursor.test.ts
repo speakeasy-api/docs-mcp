@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  encodeCursor,
-  decodeCursor,
-  encodeSearchCursor,
-  decodeSearchCursor,
-} from "../src/cursor.js";
-import type { CursorPayload } from "../src/types.js";
+import { encodeCursor, decodeCursor, encodeSearchCursor, decodeSearchCursor } from "../cursor.js";
+import type { CursorPayload } from "../types.js";
 
 describe("cursor encode/decode", () => {
   // ─── Round-trip tests ──────────────────────────────────────────

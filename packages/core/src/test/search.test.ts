@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { DocsIndex } from "../src/search.js";
-import type { Chunk } from "../src/types.js";
-import { buildChunks } from "../src/chunking.js";
+import { describe, expect, it, assert } from "vitest";
+import { DocsIndex } from "../search.js";
+import type { Chunk } from "../types.js";
+import { buildChunks } from "../chunking.js";
 
 const baseChunks: Chunk[] = [
   {
@@ -271,6 +271,7 @@ third
     });
 
     const index = new DocsIndex(chunks);
+    assert(chunks[1]?.chunk_id);
     const result = await index.getDoc({
       chunk_id: chunks[1].chunk_id,
       context: -1,
@@ -333,6 +334,7 @@ Greetings friend!
     );
 
     const index = new DocsIndex(chunks);
+    assert(target[1]?.chunk_id);
     const result = await index.getDoc({
       chunk_id: target[1].chunk_id,
       context: -1,

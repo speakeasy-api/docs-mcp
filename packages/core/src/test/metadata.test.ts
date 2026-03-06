@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMetadata } from "../src/metadata.js";
+import { normalizeMetadata } from "../metadata.js";
 
 /**
  * Helper to build a minimal valid metadata object.

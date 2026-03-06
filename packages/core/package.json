@@ -30,10 +30,10 @@
   },
   "scripts": {
     "prepublishOnly": "pnpm run build",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "lint": "eslint src test",
+    "lint": "eslint src",
     "generate:schema": "tsx scripts/generate-schema.ts"
   },
   "devDependencies": {

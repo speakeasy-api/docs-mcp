@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mergeTaxonomyConfigs, parseManifest, resolveFileConfig } from "../src/manifest.js";
-import type { Manifest } from "../src/types.js";
+import { mergeTaxonomyConfigs, parseManifest, resolveFileConfig } from "../manifest.js";
+import type { Manifest } from "../types.js";
 
 describe("manifest resolution", () => {
   it("uses last-match wins for overrides", () => {
@@ -307,13 +307,9 @@ describe("mergeTaxonomyConfigs", () => {
 
 describe("resolveFileConfig title resolution", () => {
   it("prefers frontmatter title over H1 heading", () => {
-    const markdown = [
-      "---",
-      "title: Frontmatter Title",
-      "---",
-      "# H1 Title",
-      "Body text",
-    ].join("\n");
+    const markdown = ["---", "title: Frontmatter Title", "---", "# H1 Title", "Body text"].join(
+      "\n",
+    );
 
     const resolved = resolveFileConfig({
       relativeFilePath: "guide.md",

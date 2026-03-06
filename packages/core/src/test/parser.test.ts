@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractFirstH1 } from "../src/parser.js";
+import { extractFirstH1 } from "../parser.js";
 
 describe("extractFirstH1", () => {
   it("returns the text of the first H1 heading", () => {

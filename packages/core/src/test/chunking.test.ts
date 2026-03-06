@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChunks, DEFAULT_MAX_CHUNK_SIZE } from "../src/chunking.js";
+import { buildChunks, DEFAULT_MAX_CHUNK_SIZE } from "../chunking.js";
 
 describe("buildChunks", () => {
   it("creates deterministic chunk IDs and resolves duplicates", () => {
