@@ -167,16 +167,16 @@ const createLogMiddleware = (logger: Logger): Middleware => {
     try {
       logger.debug("request", {
         method: event.req.method,
-        url: event.req.url,
+        path: event.url.pathname,
       });
       return await next();
     } finally {
       const duration = process.hrtime(start);
-      const seconds = (duration[0] * 1000 + duration[1] / 1_000_000) / 1000;
+      const ms = duration[0] * 1000 + duration[1] / 1_000_000;
       logger.info("response", {
         method: event.req.method,
-        url: event.req.url,
-        duration: seconds,
+        path: event.url.pathname,
+        duration_ms: Number(ms.toFixed(2)),
       });
     }
   };
