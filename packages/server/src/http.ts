@@ -16,6 +16,7 @@ import {
   H3Event,
   defineHandler,
   toResponse,
+  bodyLimit,
 } from "h3";
 import { Logger } from "@logtape/logtape";
 
@@ -40,6 +41,38 @@ export interface HttpServerHandle {
   httpServer: http.Server;
   fetch: (request: Request) => Response | Promise<Response>;
   port: number;
+}
+
+export async function startHttpServer(
+  factory: () => McpServer,
+  options: StartHttpServerOptions,
+): Promise<HttpServerHandle> {
+  const { logger } = options;
+  const port = options.port ?? 20310;
+  const sessionManager = new SessionManager();
+
+  const app = new H3()
+    .use(bodyLimit(50 * 1024 * 1024))
+    .use(createLogMiddleware(logger))
+    .use(createBuildInfoMiddleware(options.buildInfo))
+    .use(createErrorMiddleware({ logger }))
+    .use(createCORSMiddleware())
+    .get("/healthz", handleHealthCheck(options.buildInfo))
+    .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
+    .post(
+      "/mcp",
+      handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate }),
+    );
+
+  const httpServer = http.createServer(toNodeHandler(app));
+  httpServer.on("close", () => {
+    sessionManager.closeAll();
+  });
+
+  const actualPort = await listenOnAvailablePort(httpServer, port);
+  logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
+
+  return { httpServer, fetch: app.fetch, port: actualPort };
 }
 
 interface SessionEntry {
@@ -101,37 +134,6 @@ function createStatefulTransport(
   });
 
   return transport;
-}
-
-export async function startHttpServer(
-  factory: () => McpServer,
-  options: StartHttpServerOptions,
-): Promise<HttpServerHandle> {
-  const { logger } = options;
-  const port = options.port ?? 20310;
-  const sessionManager = new SessionManager();
-
-  const app = new H3()
-    .use(createLogMiddleware(logger))
-    .use(createBuildInfoMiddleware(options.buildInfo))
-    .use(createErrorMiddleware({ logger }))
-    .use(createCORSMiddleware())
-    .get("/healthz", handleHealthCheck(options.buildInfo))
-    .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
-    .post(
-      "/mcp",
-      handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate }),
-    );
-
-  const httpServer = http.createServer(toNodeHandler(app));
-  httpServer.on("close", () => {
-    sessionManager.closeAll();
-  });
-
-  const actualPort = await listenOnAvailablePort(httpServer, port);
-  logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
-
-  return { httpServer, fetch: app.fetch, port: actualPort };
 }
 
 function createAuthMiddleware(deps: { handler?: Authenticator }): Middleware {
