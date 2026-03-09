@@ -11,3 +11,4 @@ export * from "./embedding.js";
 export * from "./embedding-cache.js";
 export * from "./lancedb.js";
 export * from "./chunk-cache.js";
+export * from "./source-ref.js";

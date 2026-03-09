@@ -34,6 +34,7 @@ import {
   type Manifest,
   type PreviousIndexReader,
   type PromptDefinition,
+  expandSourceRefs,
 } from "@speakeasy-api/docs-mcp-core";
 import { buildHeuristicManifest } from "./fix.js";
 import {
@@ -180,8 +181,14 @@ program
     const manifestCache = new Map<string, Manifest>();
 
     let warnings = 0;
+    const sourceRefCache = new Map<string, string>();
     for (const file of files) {
-      const markdown = await readFile(file, "utf8");
+      const rawMarkdown = await readFile(file, "utf8");
+      const markdown = expandSourceRefs(rawMarkdown, {
+        markdownDir: path.dirname(file),
+        docsDir,
+        fileCache: sourceRefCache,
+      });
       const relative = toPosix(path.relative(docsDir, file));
       const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
       const resolved = resolveFileConfig({
@@ -338,11 +345,17 @@ program
       const prompts: PromptDefinition[] = [];
       const newFileFingerprints: Record<string, string> = {};
       const filesMeta: Record<string, FileMeta> = {};
+      const sourceRefCache = new Map<string, string>();
       let chunkCacheHits = 0;
       for (let fi = 0; fi < files.length; fi++) {
         writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
         const file = files[fi]!;
-        const markdown = await readFile(file, "utf8");
+        const rawMarkdown = await readFile(file, "utf8");
+        const markdown = expandSourceRefs(rawMarkdown, {
+          markdownDir: path.dirname(file),
+          docsDir,
+          fileCache: sourceRefCache,
+        });
         const relative = toPosix(path.relative(docsDir, file));
         const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
         const resolved = resolveFileConfig({
