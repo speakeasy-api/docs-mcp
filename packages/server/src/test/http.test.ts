@@ -213,9 +213,9 @@ describe("MCP HTTP transport compliance", () => {
     await client.close();
   });
 
-  it("returns 405 for non-/mcp paths", async () => {
+  it("returns 404 for non-/mcp paths", async () => {
     const res = await fetch(`${baseUrl}/other`, { method: "POST" });
-    expect(res.status).toBe(405);
+    expect(res.status).toBe(404);
   });
 
   it("serves /healthz with build info", async () => {
@@ -227,15 +227,18 @@ describe("MCP HTTP transport compliance", () => {
   });
 
   it("includes DOCS-MCP response header", async () => {
-    const res = await fetch(`${baseUrl}/mcp`, { method: "OPTIONS" });
-    expect(res.status).toBe(204);
+    const res = await fetch(`${baseUrl}/healthz`);
+    expect(res.status).toBe(200);
     expect(res.headers.get("DOCS-MCP")).toBe("name=test-server version=0.1.0");
   });
 
   it("returns JSON-RPC parse error for empty body", async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
       body: "",
     });
     expect(res.status).toBe(400);
@@ -246,7 +249,10 @@ describe("MCP HTTP transport compliance", () => {
   it("returns JSON-RPC parse error for invalid JSON", async () => {
     const res = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
       body: "not json",
     });
     expect(res.status).toBe(400);

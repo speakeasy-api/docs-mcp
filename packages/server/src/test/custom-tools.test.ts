@@ -190,7 +190,7 @@ describe("McpDocsServer context threading", () => {
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
-          const auth = headers.authorization;
+          const auth = headers.get("authorization");
           const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
           return { token, clientId: "c1", scopes: ["read"] };
         },
@@ -214,7 +214,9 @@ describe("McpDocsServer context threading", () => {
 
       expect(receivedArgs).toEqual({ foo: "bar" });
       expect(receivedCtx?.signal).toBeInstanceOf(AbortSignal);
-      expect(receivedCtx?.authInfo).toEqual({ token: "tok", clientId: "c1", scopes: ["read"] });
+      expect(receivedCtx?.authInfo).toEqual(
+        expect.objectContaining({ token: "tok", clientId: "c1", scopes: ["read"] }),
+      );
       expect(receivedCtx?.headers).toMatchObject({ authorization: "Bearer tok" });
       expect(receivedCtx?.clientInfo).toEqual({ name: "test", version: "1.0" });
 
@@ -415,7 +417,7 @@ describe("HTTP authentication", () => {
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
-          const auth = headers.authorization;
+          const auth = headers.get("authorization");
           const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
           if (!token) throw new Error("Missing token");
           return { token, clientId: "test-client-id", scopes: ["read"] };
