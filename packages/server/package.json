@@ -45,6 +45,8 @@
     "tsx": "^4.19.0"
   },
   "dependencies": {
+    "@logtape/logtape": "^2.0.4",
+    "@logtape/pretty": "^2.0.4",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@speakeasy-api/docs-mcp-core": "workspace:*",
     "change-case": "^5.4.4",

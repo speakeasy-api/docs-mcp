@@ -17,6 +17,7 @@ import {
   defineHandler,
   toResponse,
 } from "h3";
+import { Logger } from "@logtape/logtape";
 
 const AUTH_INFO = Symbol("authInfo");
 const DOCS_MCP_HEADER = "DOCS-MCP";
@@ -24,6 +25,7 @@ const DOCS_MCP_HEADER = "DOCS-MCP";
 export type Authenticator = (request: { headers: Headers }) => AuthInfo | Promise<AuthInfo>;
 
 export interface StartHttpServerOptions {
+  logger: Logger;
   buildInfo: BuildInfo;
   port?: number;
   /**
@@ -105,16 +107,21 @@ export async function startHttpServer(
   factory: () => McpServer,
   options: StartHttpServerOptions,
 ): Promise<HttpServerHandle> {
+  const { logger } = options;
   const port = options.port ?? 20310;
   const sessionManager = new SessionManager();
 
   const app = new H3()
+    .use(createLogMiddleware(logger))
     .use(createBuildInfoMiddleware(options.buildInfo))
-    .use(createErrorMiddleware())
+    .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
     .get("/healthz", handleHealthCheck(options.buildInfo))
     .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
-    .post("/mcp", handleMCPRPC({ factory, sessionManager, authenticate: options.authenticate }));
+    .post(
+      "/mcp",
+      handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate }),
+    );
 
   const httpServer = http.createServer(toNodeHandler(app));
   httpServer.on("close", () => {
@@ -122,7 +129,7 @@ export async function startHttpServer(
   });
 
   const actualPort = await listenOnAvailablePort(httpServer, port);
-  console.error(`MCP HTTP server listening on http://localhost:${actualPort}/mcp`);
+  logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
 
   return { httpServer, fetch: app.fetch, port: actualPort };
 }
@@ -152,15 +159,38 @@ function createAuthMiddleware(deps: { handler?: Authenticator }): Middleware {
   };
 }
 
+const createLogMiddleware = (logger: Logger): Middleware => {
+  return async (event, next) => {
+    const start = process.hrtime();
+    try {
+      logger.debug("request", {
+        method: event.req.method,
+        url: event.req.url,
+      });
+      return await next();
+    } finally {
+      const duration = process.hrtime(start);
+      const seconds = (duration[0] * 1000 + duration[1] / 1_000_000) / 1000;
+      logger.info("response", {
+        method: event.req.method,
+        url: event.req.url,
+        duration: seconds,
+      });
+    }
+  };
+};
+
 const createBuildInfoMiddleware = (buildInfo: BuildInfo): Middleware => {
   return (event) => {
     event.res.headers.set(DOCS_MCP_HEADER, makeBuildInfoHeader(buildInfo));
   };
 };
 
-const createErrorMiddleware = () => {
+const createErrorMiddleware = (options: { logger: Logger }) => {
   return onError((err) => {
-    console.error("Unhandled error in HTTP server:", err);
+    const { logger } = options;
+
+    logger.error("unhandled error", { error: err });
     const body = JSON.stringify({
       jsonrpc: "2.0",
       error: { code: -32603, message: "Internal server error" },
@@ -255,6 +285,7 @@ const handleDeleteMCPSession = (deps: {
 };
 
 const handleMCPRPC = (deps: {
+  logger: Logger;
   factory: () => McpServer;
   sessionManager: SessionManager;
   authenticate?: Authenticator | undefined;
@@ -262,6 +293,7 @@ const handleMCPRPC = (deps: {
   return defineHandler({
     middleware: [createDisposeMiddleware(), createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
+      const { logger } = deps;
       const { req } = event;
 
       const authInfo = pullAuthInfo(event);
@@ -272,6 +304,8 @@ const handleMCPRPC = (deps: {
         if (entry) {
           return await entry.transport.handleRequest(req, { authInfo });
         }
+
+        logger.warn("no session state found for session id", { session_id: sessionId });
         const { response, dispose } = await handleWithStatelessServer(deps.factory, req, {
           authInfo,
         });
@@ -285,7 +319,7 @@ const handleMCPRPC = (deps: {
         await server.connect(transport);
         return await transport.handleRequest(req, { authInfo });
       } catch (error) {
-        console.error("Error handling MCP request:", error);
+        logger.error("error handling mcp request", { error });
 
         await transport.close().catch(() => {});
         await server.close().catch(() => {});
