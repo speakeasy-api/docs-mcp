@@ -1,7 +1,17 @@
 #!/usr/bin/env node
 
 import { createRequire } from "node:module";
+import stream from "node:stream";
 import { Command } from "commander";
+import {
+  configure,
+  getJsonLinesFormatter,
+  getLogger,
+  getLogLevels,
+  getStreamSink,
+} from "@logtape/logtape";
+import { getPrettyFormatter } from "@logtape/pretty";
+
 import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
 import { createDocsMcpServerFactory } from "./create.js";
@@ -26,6 +36,8 @@ interface ServerCliOptions {
   customToolsJson?: string;
   gitCommit?: string;
   buildDate?: string;
+  logPretty: boolean;
+  logLevel: string;
 }
 
 const program = new Command();
@@ -72,7 +84,23 @@ program
     "Build date to include in server info (env: BUILD_DATE)",
     process.env["BUILD_DATE"],
   )
+  .option(
+    "--log-pretty",
+    "Enable pretty logging output (env: LOG_PRETTY)",
+    (v) => v === "true",
+    process.env["LOG_PRETTY"] && process.env["LOG_PRETTY"] === "true",
+  )
+  .option(
+    "--log-level",
+    "Logging level (debug, info, warn, error)",
+    process.env["LOG_LEVEL"] || "info",
+  )
   .action(async (options: ServerCliOptions) => {
+    await configureLogging({
+      pretty: options.logPretty,
+      logLevel: options.logLevel,
+    });
+
     const serverName =
       options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
         ? `${options.toolPrefix}-docs-server`
@@ -100,7 +128,7 @@ program
         }))
       : [];
 
-    const mcpServerFactory = await createDocsMcpServerFactory({
+    const mcpServerFactory = await createDocsMcpServerFactory(getLogger(["app"]), {
       serverName,
       serverVersion: options.version,
       indexDir: options.indexDir,
@@ -116,6 +144,7 @@ program
 
     if (options.transport === "http") {
       await startHttpServer(mcpServerFactory, {
+        logger: getLogger(["app", "http"]),
         buildInfo,
         port: options.port,
       });
@@ -145,4 +174,31 @@ function parseIntOption(value: string): number {
     throw new Error(`invalid integer value '${value}'`);
   }
   return parsed;
+}
+
+async function configureLogging(options: { pretty: boolean; logLevel: string }) {
+  const { pretty, logLevel } = options;
+  const lowestLevel = getLogLevels().find((l) => l === logLevel) || "info";
+
+  const formatter = pretty
+    ? getPrettyFormatter({
+        colors: true,
+        icons: true,
+        properties: true,
+        timestampStyle: null,
+        levelStyle: ["bold"],
+        categoryStyle: ["italic"],
+        messageStyle: null,
+      })
+    : getJsonLinesFormatter();
+
+  await configure({
+    sinks: {
+      console: getStreamSink(stream.Writable.toWeb(process.stderr), { formatter }),
+    },
+    loggers: [
+      { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
+      { category: ["app"], lowestLevel, sinks: ["console"] },
+    ],
+  });
 }
