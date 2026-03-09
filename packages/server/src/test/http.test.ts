@@ -6,7 +6,9 @@ import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mc
 import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
 import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { getLogger } from "@logtape/logtape";
 
+const logger = getLogger(["test"]);
 const buildInfo = { name: "test-server", version: "0.1.0" };
 
 const chunks: Chunk[] = [
@@ -81,7 +83,7 @@ let baseUrl: string;
 beforeAll(async () => {
   const handle = await startHttpServer(
     () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-    { buildInfo, port: TEST_PORT },
+    { logger, buildInfo, port: TEST_PORT },
   );
   httpServer = handle.httpServer;
   const addr = httpServer.address();
@@ -313,7 +315,7 @@ describe("MCP HTTP transport resources", () => {
             metadata: metadataWithResources,
           },
         }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
     resourceHttpServer = handle.httpServer;
     const addr = resourceHttpServer.address();
@@ -378,7 +380,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
             toolPrefix: "acme",
           },
         }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
     prefixedHttpServer = handle.httpServer;
     const addr = prefixedHttpServer.address();
@@ -460,7 +462,7 @@ describe("HTTP session management", () => {
   it("falls back to stateless for unknown session ID", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -495,7 +497,7 @@ describe("HTTP session management", () => {
   it("cleans up session after client sends DELETE via terminateSession", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -528,7 +530,7 @@ describe("HTTP session management", () => {
   it("DELETE with missing session ID is idempotent", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -545,7 +547,7 @@ describe("HTTP session management", () => {
   it("DELETE with unknown session ID is idempotent", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -646,7 +648,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests with active session", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -683,7 +685,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests without session header", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -708,7 +710,7 @@ describe("HTTP built-in request retry consistency", () => {
   it("returns same responses for repeated requests with stale session header", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { buildInfo, port: 0 },
+      { logger, buildInfo, port: 0 },
     );
 
     try {
@@ -737,6 +739,7 @@ describe("DOCS-MCP build header", () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
       {
+        logger,
         buildInfo: {
           name: "test-server",
           version: "0.1.0",

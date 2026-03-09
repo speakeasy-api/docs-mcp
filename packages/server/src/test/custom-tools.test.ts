@@ -8,6 +8,9 @@ import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
 import type { CustomTool, ToolCallContext } from "../types.js";
 import { createTestServer } from "./mcp.helper.js";
+import { getLogger } from "@logtape/logtape";
+
+const logger = getLogger(["test"]);
 
 const chunks: Chunk[] = [
   {
@@ -187,6 +190,7 @@ describe("McpDocsServer context threading", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
@@ -318,6 +322,7 @@ describe("Custom tools over HTTP transport", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -414,6 +419,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
@@ -464,6 +470,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async () => {
@@ -532,6 +539,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -589,6 +597,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -636,6 +645,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -688,6 +698,7 @@ describe("HTTP authentication", () => {
           },
         }),
       {
+        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
