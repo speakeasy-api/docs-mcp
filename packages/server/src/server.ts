@@ -299,7 +299,7 @@ class DocsServer {
   }
 
   async getResources(): Promise<ListResourcesResult> {
-    const entries = await this.index.listFilepaths({ filters: {} });
+    const entries = await this.listResourceEntries();
     const resources = entries.map((entry) => {
       return {
         uri: `docs:///${entry.filepath}`,
@@ -327,9 +327,7 @@ class DocsServer {
       throw new Error(`Invalid URI: missing filepath in '${uri}'`);
     }
 
-    const entries = await this.index.listFilepaths({
-      filters: {},
-    });
+    const entries = await this.listResourceEntries();
 
     const entry = entries.find((e) => e.filepath === filepath);
     if (!entry) {
@@ -361,6 +359,39 @@ class DocsServer {
     const tail = fileTitle || properCase(sentenceCase(basename));
 
     return [...dirParts, tail].join(" / ");
+  }
+
+  private async listResourceEntries(): Promise<FileEntry[]> {
+    const filters = this.getResourceFilters();
+    if (filters.length === 0) {
+      return [];
+    }
+
+    const entriesByPath = new Map<string, FileEntry>();
+    for (const filter of filters) {
+      const entries = await this.index.listFilepaths({ filters: filter });
+      for (const entry of entries) {
+        if (!entriesByPath.has(entry.filepath)) {
+          entriesByPath.set(entry.filepath, entry);
+        }
+      }
+    }
+
+    return [...entriesByPath.values()].sort((a, b) => a.filepath.localeCompare(b.filepath));
+  }
+
+  private getResourceFilters(): Array<Record<string, string>> {
+    const filters: Array<Record<string, string>> = [];
+
+    for (const [field, config] of Object.entries(this.metadata.taxonomy)) {
+      for (const [value, properties] of Object.entries(config.properties ?? {})) {
+        if (properties.mcp_resource) {
+          filters.push({ [field]: value });
+        }
+      }
+    }
+
+    return filters;
   }
 
   private findPrompt(name: string): PromptDefinition {
