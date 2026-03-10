@@ -1,5 +1,17 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.16.2
+
+### Patch Changes
+
+- 4812c39: Restore `mcp_resource` filtering for MCP resources.
+
+  Documents are now exposed as MCP resources only when they match a taxonomy value
+  marked with `mcp_resource: true`. If no taxonomy values are marked, no MCP
+  resources are exposed. This also applies consistently to both resource listing
+  and resource reads.
+  - @speakeasy-api/docs-mcp-core@0.16.2
+
 ## 0.16.1
 
 ### Patch Changes
