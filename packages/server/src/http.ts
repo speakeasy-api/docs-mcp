@@ -5,7 +5,13 @@ import {
   HandleRequestOptions,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { AuthInfo, BuildInfo } from "./types.js";
+import type {
+  AuthInfo,
+  BuildInfo,
+  DocsServerFactory,
+  LoggingOptions,
+  ResolvedLogger,
+} from "./types.js";
 import {
   H3,
   handleCors,
@@ -18,16 +24,20 @@ import {
   toResponse,
   bodyLimit,
 } from "h3";
-import { Logger } from "@logtape/logtape";
+import { resolveLogger } from "./logging.js";
+import {
+  resolveBuildInfo as resolveDefaultBuildInfo,
+  resolveServerName,
+  resolveServerVersion,
+} from "./defaults.js";
 
 const AUTH_INFO = Symbol("authInfo");
 const DOCS_MCP_HEADER = "DOCS-MCP";
 
 export type Authenticator = (request: { headers: Headers }) => AuthInfo | Promise<AuthInfo>;
 
-export interface StartHttpServerOptions {
-  logger: Logger;
-  buildInfo: BuildInfo;
+export interface StartHttpServerOptions extends LoggingOptions {
+  buildInfo?: BuildInfo;
   port?: number;
   /**
    * Async hook called before each request is processed.
@@ -44,20 +54,21 @@ export interface HttpServerHandle {
 }
 
 export async function startHttpServer(
-  factory: () => McpServer,
-  options: StartHttpServerOptions,
+  factory: (() => McpServer) | DocsServerFactory,
+  options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
-  const { logger } = options;
+  const logger = await resolveLogger(options, ["app", "http"]);
+  const buildInfo = resolveBuildInfo(factory, options.buildInfo);
   const port = options.port ?? 20310;
   const sessionManager = new SessionManager();
 
   const app = new H3()
     .use(bodyLimit(50 * 1024 * 1024))
     .use(createLogMiddleware(logger))
-    .use(createBuildInfoMiddleware(options.buildInfo))
+    .use(createBuildInfoMiddleware(buildInfo))
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
-    .get("/healthz", handleHealthCheck(options.buildInfo))
+    .get("/healthz", handleHealthCheck(buildInfo))
     .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
     .post(
       "/mcp",
@@ -161,7 +172,7 @@ function createAuthMiddleware(deps: { handler?: Authenticator }): Middleware {
   };
 }
 
-const createLogMiddleware = (logger: Logger): Middleware => {
+const createLogMiddleware = (logger: ResolvedLogger): Middleware => {
   return async (event, next) => {
     const start = process.hrtime();
     try {
@@ -188,7 +199,7 @@ const createBuildInfoMiddleware = (buildInfo: BuildInfo): Middleware => {
   };
 };
 
-const createErrorMiddleware = (options: { logger: Logger }) => {
+const createErrorMiddleware = (options: { logger: ResolvedLogger }) => {
   return onError((err) => {
     const { logger } = options;
 
@@ -287,7 +298,7 @@ const handleDeleteMCPSession = (deps: {
 };
 
 const handleMCPRPC = (deps: {
-  logger: Logger;
+  logger: ResolvedLogger;
   factory: () => McpServer;
   sessionManager: SessionManager;
   authenticate?: Authenticator | undefined;
@@ -416,4 +427,24 @@ function pullAuthInfo(event: H3Event): AuthInfo | undefined {
   }
 
   return authInfo as unknown as AuthInfo;
+}
+
+function resolveBuildInfo(
+  factory: (() => McpServer) | DocsServerFactory,
+  buildInfo?: BuildInfo,
+): BuildInfo {
+  if (buildInfo) {
+    return buildInfo;
+  }
+
+  if ("buildInfo" in factory) {
+    return factory.buildInfo;
+  }
+
+  return {
+    ...resolveDefaultBuildInfo({
+      name: resolveServerName(),
+      version: resolveServerVersion(),
+    }),
+  };
 }

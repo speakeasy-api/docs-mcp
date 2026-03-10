@@ -7,6 +7,7 @@ import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
 import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { getLogger } from "@logtape/logtape";
+import type { DocsServerFactory } from "../types.js";
 
 const logger = getLogger(["test"]);
 const buildInfo = { name: "test-server", version: "0.1.0" };
@@ -735,6 +736,28 @@ describe("HTTP built-in request retry consistency", () => {
 });
 
 describe("DOCS-MCP build header", () => {
+  it("defaults build info from the server factory without requiring a logger", async () => {
+    const factory = (() =>
+      createMcpServer({ app: { index: new DocsIndex(chunks), metadata } })) as DocsServerFactory;
+    factory.buildInfo = {
+      name: "default-server",
+      version: "9.9.9",
+    };
+
+    const handle = await startHttpServer(factory, { port: 0 });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      const res = await fetch(`http://localhost:${port}/healthz`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("DOCS-MCP")).toBe("name=default-server version=9.9.9");
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
   it("includes git commit and build date when provided", async () => {
     const handle = await startHttpServer(
       () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),

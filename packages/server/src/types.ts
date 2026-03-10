@@ -1,4 +1,5 @@
 export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
@@ -8,6 +9,31 @@ export interface BuildInfo {
   gitCommit?: string | undefined;
   buildDate?: string | undefined;
 }
+
+export type LoggerLike = Pick<typeof console, "debug" | "info" | "warn" | "error"> & {
+  getChild?: (name: string) => LoggerLike;
+};
+
+export interface ResolvedLogger {
+  debug: (message: string, properties?: Record<string, unknown>) => void;
+  info: (message: string, properties?: Record<string, unknown>) => void;
+  warn: (message: string, properties?: Record<string, unknown>) => void;
+  error: (message: string, properties?: Record<string, unknown>) => void;
+  getChild: (name: string) => ResolvedLogger;
+}
+
+export interface LoggingOptions {
+  logger?: LoggerLike;
+  pretty?: boolean;
+  logLevel?: string;
+}
+
+export interface DocsServer {
+  (): McpServer;
+  buildInfo: BuildInfo;
+}
+
+export type DocsServerFactory = DocsServer;
 
 export interface ToolCallContext {
   /** Validated auth info from transport middleware (HTTP only). */

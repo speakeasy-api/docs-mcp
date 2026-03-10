@@ -19,6 +19,7 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 # Stdio transport (for MCP host integration)
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
+
 ## Programmatic Usage
 
 ### Boot with defaults
@@ -45,16 +46,16 @@ const server = await createDocsServer({
         type: "object",
         properties: {
           chunk_id: { type: "string" },
-          rating: { type: "integer", minimum: 1, maximum: 5 }
+          rating: { type: "integer", minimum: 1, maximum: 5 },
         },
-        required: ["chunk_id", "rating"]
+        required: ["chunk_id", "rating"],
       },
       handler: async (args) => {
         console.log("Feedback:", args);
         return { content: [{ type: "text", text: "Thanks!" }], isError: false };
-      }
-    }
-  ]
+      },
+    },
+  ],
 });
 await startStdioServer(server);
 ```
@@ -68,6 +69,13 @@ const server = await createDocsServer({ indexDir: "./my-index" });
 const { port } = await startHttpServer(server, { port: 3000 });
 console.log(`Listening on http://localhost:${port}/mcp`);
 ```
+
+`createDocsServer()` and `startHttpServer()` share the same defaults as the CLI:
+
+- `serverName` defaults to `SERVER_NAME`, then `@speakeasy-api/docs-mcp-server`, or `${toolPrefix}-docs-server` when only `toolPrefix` is provided.
+- `serverVersion` defaults to `SERVER_VERSION`, then the package version.
+- HTTP build metadata also picks up `GIT_COMMIT` and `BUILD_DATE` when present.
+- Both work without an explicit logger. If you do pass one, a plain `console`-shaped logger is enough.
 
 ### HTTP authentication
 
@@ -87,10 +95,10 @@ const server = await createDocsServer({
       inputSchema: { type: "object", properties: {} },
       handler: async (_args, context) => ({
         content: [{ type: "text", text: `You are: ${context.authInfo?.clientId ?? "unknown"}` }],
-        isError: false
-      })
-    }
-  ]
+        isError: false,
+      }),
+    },
+  ],
 });
 
 await startHttpServer(server, {
@@ -100,7 +108,7 @@ await startHttpServer(server, {
     if (!token) throw new Error("Missing bearer token");
     // Validate the token and return AuthInfo
     return { token, clientId: "my-client", scopes: ["read"] };
-  }
+  },
 });
 ```
 
@@ -110,17 +118,17 @@ an abort `signal`.
 
 ## Option Reference
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `indexDir` | `string` | *required* | Directory containing `chunks.json` and `metadata.json` from `docs-mcp build`. |
-| `toolPrefix` | `string` | — | Prefix for built-in tool names, e.g. `"acme"` → `acme_search_docs`. Does not affect custom tool names. Alphanumeric, dash, or underscore. |
-| `queryEmbeddingApiKey` | `string` | `OPENAI_API_KEY` env | API key for query-time embeddings. |
-| `queryEmbeddingBaseUrl` | `string` | Provider default | Base URL for the embedding API. Defaults to the provider's official endpoint (e.g. `https://api.openai.com/v1` for OpenAI). Override to use a proxy or compatible API. |
-| `queryEmbeddingBatchSize` | `number` | `128` | Number of texts per embedding API call. Reduce if hitting provider rate or payload limits. Positive integer. |
-| `proximityWeight` | `number` | `1.25` | RRF blend weight for lexical phrase-proximity matches. Higher values boost results where query terms appear close together. Positive. |
-| `phraseSlop` | `number` | `0` | Maximum word distance allowed for phrase matches (0 = exact phrase only, up to 5). |
-| `vectorWeight` | `number` | `1` | RRF blend weight for vector (semantic) search results. Higher values boost semantically similar results. Positive. |
-| `customTools` | `CustomTool[]` | `[]` | Additional tools registered alongside the built-in `search_docs` and `get_doc`. |
+| Field                     | Type           | Default              | Description                                                                                                                                                            |
+| ------------------------- | -------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `indexDir`                | `string`       | _required_           | Directory containing `chunks.json` and `metadata.json` from `docs-mcp build`.                                                                                          |
+| `toolPrefix`              | `string`       | —                    | Prefix for built-in tool names, e.g. `"acme"` → `acme_search_docs`. Does not affect custom tool names. Alphanumeric, dash, or underscore.                              |
+| `queryEmbeddingApiKey`    | `string`       | `OPENAI_API_KEY` env | API key for query-time embeddings.                                                                                                                                     |
+| `queryEmbeddingBaseUrl`   | `string`       | Provider default     | Base URL for the embedding API. Defaults to the provider's official endpoint (e.g. `https://api.openai.com/v1` for OpenAI). Override to use a proxy or compatible API. |
+| `queryEmbeddingBatchSize` | `number`       | `128`                | Number of texts per embedding API call. Reduce if hitting provider rate or payload limits. Positive integer.                                                           |
+| `proximityWeight`         | `number`       | `1.25`               | RRF blend weight for lexical phrase-proximity matches. Higher values boost results where query terms appear close together. Positive.                                  |
+| `phraseSlop`              | `number`       | `0`                  | Maximum word distance allowed for phrase matches (0 = exact phrase only, up to 5).                                                                                     |
+| `vectorWeight`            | `number`       | `1`                  | RRF blend weight for vector (semantic) search results. Higher values boost semantically similar results. Positive.                                                     |
+| `customTools`             | `CustomTool[]` | `[]`                 | Additional tools registered alongside the built-in `search_docs` and `get_doc`.                                                                                        |
 
 The exported `CreateDocsServerOptionsSchema` (Zod) is the canonical machine-readable spec for these options.
 

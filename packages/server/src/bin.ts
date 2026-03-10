@@ -1,30 +1,16 @@
 #!/usr/bin/env node
 
-import { createRequire } from "node:module";
-import stream from "node:stream";
 import { Command } from "commander";
-import {
-  configure,
-  getJsonLinesFormatter,
-  getLogger,
-  getLogLevels,
-  getStreamSink,
-} from "@logtape/logtape";
-import { getPrettyFormatter } from "@logtape/pretty";
 
 import { startStdioServer } from "./stdio.js";
 import { startHttpServer } from "./http.js";
-import { createDocsMcpServerFactory } from "./create.js";
-import { BuildInfo } from "./types.js";
-
-const require = createRequire(import.meta.url);
-const SERVER_VERSION = readPackageVersion();
+import { createDocsServer } from "./create.js";
 
 interface ServerCliOptions {
   indexDir: string;
-  name: string;
+  name?: string;
   toolPrefix?: string;
-  version: string;
+  version?: string;
   queryEmbeddingApiKey?: string;
   queryEmbeddingBaseUrl?: string;
   queryEmbeddingBatchSize?: number;
@@ -46,16 +32,12 @@ program
   .name("docs-mcp-server")
   .description("Run @speakeasy-api/docs-mcp-server")
   .requiredOption("--index-dir <path>", "Directory containing chunks.json and metadata.json")
-  .option(
-    "--name <value>",
-    "MCP server name (env: SERVER_NAME)",
-    process.env["SERVER_NAME"] || "@speakeasy-api/docs-mcp-server",
-  )
+  .option("--name <value>", "MCP server name (env: SERVER_NAME)", process.env["SERVER_NAME"])
   .option("--tool-prefix <value>", "Tool name prefix (e.g. 'acme' produces acme_search_docs)")
   .option(
     "--version <value>",
     "MCP server version (env: SERVER_VERSION)",
-    process.env["SERVER_VERSION"] || SERVER_VERSION,
+    process.env["SERVER_VERSION"],
   )
   .option("--query-embedding-api-key <value>", "Query embedding API key (or set OPENAI_API_KEY)")
   .option("--query-embedding-base-url <value>", "Query embedding API base URL")
@@ -96,22 +78,6 @@ program
     process.env["LOG_LEVEL"] || "info",
   )
   .action(async (options: ServerCliOptions) => {
-    await configureLogging({
-      pretty: options.logPretty,
-      logLevel: options.logLevel,
-    });
-
-    const serverName =
-      options.name === "@speakeasy-api/docs-mcp-server" && options.toolPrefix
-        ? `${options.toolPrefix}-docs-server`
-        : options.name;
-    const buildInfo: BuildInfo = {
-      name: serverName,
-      version: options.version,
-      gitCommit: options.gitCommit,
-      buildDate: options.buildDate,
-    };
-
     const customTools = options.customToolsJson
       ? (
           JSON.parse(options.customToolsJson) as Array<{
@@ -128,35 +94,45 @@ program
         }))
       : [];
 
-    const mcpServerFactory = await createDocsMcpServerFactory(getLogger(["app"]), {
-      serverName,
-      serverVersion: options.version,
-      indexDir: options.indexDir,
-      toolPrefix: options.toolPrefix,
-      queryEmbeddingApiKey: options.queryEmbeddingApiKey,
-      queryEmbeddingBaseUrl: options.queryEmbeddingBaseUrl,
-      queryEmbeddingBatchSize: options.queryEmbeddingBatchSize,
-      proximityWeight: options.proximityWeight,
-      phraseSlop: options.phraseSlop,
-      vectorWeight: options.vectorWeight,
-      ...(customTools.length > 0 ? { customTools } : {}),
-    });
+    const server = await createDocsServer(
+      {
+        ...(options.name ? { serverName: options.name } : {}),
+        ...(options.version ? { serverVersion: options.version } : {}),
+        indexDir: options.indexDir,
+        toolPrefix: options.toolPrefix,
+        queryEmbeddingApiKey: options.queryEmbeddingApiKey,
+        queryEmbeddingBaseUrl: options.queryEmbeddingBaseUrl,
+        queryEmbeddingBatchSize: options.queryEmbeddingBatchSize,
+        proximityWeight: options.proximityWeight,
+        phraseSlop: options.phraseSlop,
+        vectorWeight: options.vectorWeight,
+        ...(customTools.length > 0 ? { customTools } : {}),
+      },
+      {
+        pretty: options.logPretty,
+        logLevel: options.logLevel,
+      },
+    );
 
     if (options.transport === "http") {
-      await startHttpServer(mcpServerFactory, {
-        logger: getLogger(["app", "http"]),
-        buildInfo,
+      await startHttpServer(server, {
         port: options.port,
+        ...(options.gitCommit || options.buildDate
+          ? {
+              buildInfo: {
+                ...server.buildInfo,
+                ...(options.gitCommit ? { gitCommit: options.gitCommit } : {}),
+                ...(options.buildDate ? { buildDate: options.buildDate } : {}),
+              },
+            }
+          : {}),
+        pretty: options.logPretty,
+        logLevel: options.logLevel,
       });
     } else {
-      await startStdioServer(mcpServerFactory);
+      await startStdioServer(server);
     }
   });
-
-function readPackageVersion(): string {
-  const pkg = require("../package.json");
-  return typeof pkg?.version === "string" ? pkg.version : "0.0.0";
-}
 
 void program.parseAsync(process.argv);
 
@@ -174,31 +150,4 @@ function parseIntOption(value: string): number {
     throw new Error(`invalid integer value '${value}'`);
   }
   return parsed;
-}
-
-async function configureLogging(options: { pretty: boolean; logLevel: string }) {
-  const { pretty, logLevel } = options;
-  const lowestLevel = getLogLevels().find((l) => l === logLevel) || "info";
-
-  const formatter = pretty
-    ? getPrettyFormatter({
-        colors: true,
-        icons: true,
-        properties: true,
-        timestampStyle: null,
-        levelStyle: ["bold"],
-        categoryStyle: ["italic"],
-        messageStyle: null,
-      })
-    : getJsonLinesFormatter();
-
-  await configure({
-    sinks: {
-      console: getStreamSink(stream.Writable.toWeb(process.stderr), { formatter }),
-    },
-    loggers: [
-      { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
-      { category: ["app"], lowestLevel, sinks: ["console"] },
-    ],
-  });
 }

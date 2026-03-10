@@ -12,8 +12,21 @@ import {
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Logger } from "@logtape/logtape";
+import type {
+  DocsServer,
+  DocsServerFactory,
+  LoggingOptions,
+  LoggerLike,
+  ResolvedLogger,
+} from "./types.js";
+import { resolveLogger } from "./logging.js";
+import {
+  PACKAGE_SERVER_NAME,
+  PACKAGE_SERVER_VERSION,
+  resolveBuildInfo,
+  resolveServerName,
+  resolveServerVersion,
+} from "./defaults.js";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -116,10 +129,16 @@ const CustomToolSchema = z.object({
 /** Zod schema for `createDocsServer()` options. Consumers can use this to validate config. */
 export const CreateDocsServerOptionsSchema = z.object({
   /** Name of the MCP server. */
-  serverName: z.string().min(1, "serverName must be a non-empty string"),
+  serverName: z
+    .string()
+    .min(1, "serverName must be a non-empty string")
+    .default(PACKAGE_SERVER_NAME),
 
   /** Version of the MCP server. */
-  serverVersion: z.string().min(1, "serverVersion must be a non-empty string"),
+  serverVersion: z
+    .string()
+    .min(1, "serverVersion must be a non-empty string")
+    .default(PACKAGE_SERVER_VERSION),
 
   /** Directory containing chunks.json and metadata.json produced by `docs-mcp build`. */
   indexDir: z.string().min(1, "indexDir must be a non-empty string"),
@@ -180,18 +199,29 @@ export type CreateDocsServerOptionsInput = z.input<typeof CreateDocsServerOption
 /** Resolved options after Zod parse — defaults applied. */
 export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSchema>;
 
+export interface CreateDocsServerRuntimeOptions extends LoggingOptions {}
+
 /**
- * Create a fully-configured `McpDocsServer` from a directory produced by `docs-mcp build`.
+ * Create a fully-configured docs MCP server factory from a directory produced by `docs-mcp build`.
  *
  * This is the primary programmatic entry point. It loads metadata, resolves embedding providers,
- * opens the search engine, and returns a server ready to be passed to `startStdioServer()` or
+ * opens the search engine, and returns a factory ready to be passed to `startStdioServer()` or
  * `startHttpServer()`.
  */
-export async function createDocsMcpServerFactory(
-  rootLogger: Logger,
+export async function createDocsServer(
   input: CreateDocsServerOptionsInput,
-): Promise<() => McpServer> {
+  runtimeOptions: CreateDocsServerRuntimeOptions = {},
+): Promise<DocsServerFactory> {
+  const rootLogger: ResolvedLogger = await resolveLogger(runtimeOptions);
   const options = CreateDocsServerOptionsSchema.parse(input);
+  const serverName =
+    input.serverName === undefined
+      ? resolveServerName(undefined, options.toolPrefix)
+      : resolveServerName(options.serverName);
+  const serverVersion =
+    input.serverVersion === undefined
+      ? resolveServerVersion()
+      : resolveServerVersion(options.serverVersion);
 
   const indexDir = path.resolve(options.indexDir);
   const metadataPath = path.join(indexDir, "metadata.json");
@@ -215,8 +245,9 @@ export async function createDocsMcpServerFactory(
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
+  const initLogger = rootLogger.getChild("init");
   const queryEmbeddingProvider = resolveQueryEmbeddingProvider(
-    rootLogger.getChild("init"),
+    initLogger,
     options,
     metadata.embedding,
   );
@@ -249,13 +280,13 @@ export async function createDocsMcpServerFactory(
     loadInput.vectorWeight = options.vectorWeight;
   }
 
-  const index = await loadSearchEngine(rootLogger.getChild("init"), loadInput);
+  const index = await loadSearchEngine(initLogger, loadInput);
 
-  return () => {
+  const factory = (() => {
     return createMcpServer({
       mcp: {
-        name: options.serverName,
-        version: options.serverVersion,
+        name: serverName,
+        version: serverVersion,
       },
       app: {
         index,
@@ -266,11 +297,52 @@ export async function createDocsMcpServerFactory(
         ...(options.customTools.length > 0 ? { customTools: options.customTools } : {}),
       },
     });
-  };
+  }) as DocsServer;
+
+  factory.buildInfo = resolveBuildInfo({
+    name: serverName,
+    version: serverVersion,
+  });
+
+  return factory;
+}
+
+/** @deprecated Use createDocsServer() instead. */
+export async function createDocsServerFactory(
+  input: CreateDocsServerOptionsInput,
+  runtimeOptions: CreateDocsServerRuntimeOptions = {},
+): Promise<DocsServerFactory> {
+  return createDocsServer(input, runtimeOptions);
+}
+
+export async function createDocsMcpServerFactory(
+  logger: LoggingOptions["logger"],
+  input: CreateDocsServerOptionsInput,
+): Promise<DocsServerFactory>;
+/** @deprecated Use createDocsServer() instead. */
+export async function createDocsMcpServerFactory(
+  input: CreateDocsServerOptionsInput,
+  runtimeOptions?: CreateDocsServerRuntimeOptions,
+): Promise<DocsServerFactory>;
+/** @deprecated Use createDocsServer() instead. */
+export async function createDocsMcpServerFactory(
+  loggerOrInput: LoggingOptions["logger"] | CreateDocsServerOptionsInput,
+  inputOrRuntimeOptions?: CreateDocsServerOptionsInput | CreateDocsServerRuntimeOptions,
+): Promise<DocsServerFactory> {
+  if (looksLikeCreateDocsServerOptions(loggerOrInput)) {
+    return createDocsServer(
+      loggerOrInput,
+      (inputOrRuntimeOptions as CreateDocsServerRuntimeOptions | undefined) ?? {},
+    );
+  }
+
+  return createDocsServer(inputOrRuntimeOptions as CreateDocsServerOptionsInput, {
+    logger: loggerOrInput,
+  });
 }
 
 async function loadSearchEngine(
-  logger: Logger,
+  logger: ResolvedLogger,
   input: {
     lancedbPath: string;
     tableName: string;
@@ -338,7 +410,7 @@ function parseIndexConfig(metadata: Record<string, unknown>): { path: string; ta
 }
 
 function resolveQueryEmbeddingProvider(
-  logger: Logger,
+  logger: ResolvedLogger,
   options: {
     queryEmbeddingApiKey?: string | undefined;
     queryEmbeddingBaseUrl?: string | undefined;
@@ -413,4 +485,10 @@ async function exists(targetPath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function looksLikeCreateDocsServerOptions(
+  value: LoggerLike | CreateDocsServerOptionsInput | undefined,
+): value is CreateDocsServerOptionsInput {
+  return typeof value === "object" && value !== null && "indexDir" in value;
 }
