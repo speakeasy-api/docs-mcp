@@ -1,5 +1,11 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.15.1
+
+### Patch Changes
+
+- 2d1ddc8: Restored missing server build
+
 ## 0.15.0
 
 ### Minor Changes
