@@ -1,5 +1,22 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.15.0
+
+### Minor Changes
+
+- ac6d3a0: Add structured logging for production
+- a669636: Added `GET /healthz` endpoint to server and support for passing build info to server and playground. On the server this build info is included in every http response in the `DOCS-MCP` header and the response body of `GET /healthz`.
+
+  Environment variables are:
+  - `SERVER_NAME`: the name of the MCP server
+  - `SERVER_VERSION`: the version of the MCP server
+  - `GIT_COMMIT`: the git commit hash of the current build
+  - `BUILD_DATE`: the date of the current build
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.15.0
+
 ## 0.14.0
 
 ### Minor Changes
