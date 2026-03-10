@@ -5,7 +5,7 @@ import {
   HandleRequestOptions,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { AuthInfo, BuildInfo, DocsServer, LoggingOptions, ResolvedLogger } from "./types.js";
+import type { AuthInfo, BuildInfo, DocsServer, Logger, LoggingOptions } from "./types.js";
 import {
   H3,
   handleCors,
@@ -51,7 +51,7 @@ export async function startHttpServer(
   factory: (() => McpServer) | DocsServer,
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
-  const logger = await resolveLogger(options, ["app", "http"]);
+  const logger = await resolveLogger(options);
   const buildInfo = resolveBuildInfo(factory, options.buildInfo);
   const port = options.port ?? 20310;
   const sessionManager = new SessionManager();
@@ -166,7 +166,7 @@ function createAuthMiddleware(deps: { handler?: Authenticator }): Middleware {
   };
 }
 
-const createLogMiddleware = (logger: ResolvedLogger): Middleware => {
+const createLogMiddleware = (logger: Logger): Middleware => {
   return async (event, next) => {
     const start = process.hrtime();
     try {
@@ -193,7 +193,7 @@ const createBuildInfoMiddleware = (buildInfo: BuildInfo): Middleware => {
   };
 };
 
-const createErrorMiddleware = (options: { logger: ResolvedLogger }) => {
+const createErrorMiddleware = (options: { logger: Logger }) => {
   return onError((err) => {
     const { logger } = options;
 
@@ -292,7 +292,7 @@ const handleDeleteMCPSession = (deps: {
 };
 
 const handleMCPRPC = (deps: {
-  logger: ResolvedLogger;
+  logger: Logger;
   factory: () => McpServer;
   sessionManager: SessionManager;
   authenticate?: Authenticator | undefined;

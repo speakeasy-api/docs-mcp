@@ -12,7 +12,7 @@ import {
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
-import type { DocsServer, LoggingOptions, ResolvedLogger } from "./types.js";
+import type { DocsServer, Logger, LoggingOptions } from "./types.js";
 import { resolveLogger } from "./logging.js";
 import { resolveBuildInfo, resolveServerName, resolveServerVersion } from "./defaults.js";
 
@@ -194,7 +194,7 @@ export async function createDocsServer(
   input: CreateDocsServerOptionsInput,
   runtimeOptions: CreateDocsServerRuntimeOptions = {},
 ): Promise<DocsServer> {
-  const rootLogger: ResolvedLogger = await resolveLogger(runtimeOptions);
+  const logger = await resolveLogger(runtimeOptions);
   const options = CreateDocsServerOptionsSchema.parse(input);
   const serverName = resolveServerName(options.serverName, options.toolPrefix);
   const serverVersion = resolveServerVersion(options.serverVersion);
@@ -221,12 +221,7 @@ export async function createDocsServer(
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
-  const initLogger = rootLogger.getChild("init");
-  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(
-    initLogger,
-    options,
-    metadata.embedding,
-  );
+  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(logger, options, metadata.embedding);
 
   const loadInput: {
     lancedbPath: string;
@@ -256,7 +251,7 @@ export async function createDocsServer(
     loadInput.vectorWeight = options.vectorWeight;
   }
 
-  const index = await loadSearchEngine(initLogger, loadInput);
+  const index = await loadSearchEngine(logger, loadInput);
 
   const factory = (() => {
     return createMcpServer({
@@ -284,7 +279,7 @@ export async function createDocsServer(
 }
 
 async function loadSearchEngine(
-  logger: ResolvedLogger,
+  logger: Logger,
   input: {
     lancedbPath: string;
     tableName: string;
@@ -352,7 +347,7 @@ function parseIndexConfig(metadata: Record<string, unknown>): { path: string; ta
 }
 
 function resolveQueryEmbeddingProvider(
-  logger: ResolvedLogger,
+  logger: Logger,
   options: {
     queryEmbeddingApiKey?: string | undefined;
     queryEmbeddingBaseUrl?: string | undefined;

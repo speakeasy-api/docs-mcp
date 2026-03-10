@@ -6,12 +6,10 @@ import {
   getLogLevels,
   getStreamSink,
   type LogLevel,
-  type Logger,
 } from "@logtape/logtape";
 import { getPrettyFormatter } from "@logtape/pretty";
-import type { LoggingOptions, LoggerLike, ResolvedLogger } from "./types.js";
+import type { Logger, LoggingOptions } from "./types.js";
 
-const DEFAULT_ROOT_CATEGORY = ["app"];
 const DEFAULT_LOG_LEVEL = () => process.env.LOG_LEVEL ?? "info";
 const DEFAULT_LOG_PRETTY = () => process.env.LOG_PRETTY === "true";
 
@@ -52,7 +50,7 @@ export async function configureDefaultLogger(
     },
     loggers: [
       { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
-      { category: DEFAULT_ROOT_CATEGORY, lowestLevel: logLevel, sinks: ["console"] },
+      { category: ["app"], lowestLevel: logLevel, sinks: ["console"] },
     ],
   });
 
@@ -60,69 +58,12 @@ export async function configureDefaultLogger(
   defaultLoggingConfigKey = configKey;
 }
 
-export async function resolveLogger(
-  options: LoggingOptions = {},
-  category = DEFAULT_ROOT_CATEGORY,
-): Promise<ResolvedLogger> {
+export async function resolveLogger(options: LoggingOptions = {}): Promise<Logger> {
   if (options.logger) {
-    return adaptLogger(options.logger, category);
+    return options.logger;
   }
 
   await configureDefaultLogger(options);
 
-  return adaptLogger(getLogger(category), []);
-}
-
-function adaptLogger(logger: LoggerLike | Logger, category: string[]): ResolvedLogger {
-  const supportsChildren = typeof logger.getChild === "function";
-
-  const format = (message: string, properties?: Record<string, unknown>) => {
-    const prefix = !supportsChildren && category.length > 0 ? `[${category.join(".")}] ` : "";
-    return {
-      message: prefix + message,
-      properties,
-    };
-  };
-
-  return {
-    debug(message: string, properties?: Record<string, unknown>) {
-      const entry = format(message, properties);
-      if (entry.properties === undefined) {
-        logger.debug(entry.message);
-        return;
-      }
-      logger.debug(entry.message, entry.properties);
-    },
-    info(message: string, properties?: Record<string, unknown>) {
-      const entry = format(message, properties);
-      if (entry.properties === undefined) {
-        logger.info(entry.message);
-        return;
-      }
-      logger.info(entry.message, entry.properties);
-    },
-    warn(message: string, properties?: Record<string, unknown>) {
-      const entry = format(message, properties);
-      if (entry.properties === undefined) {
-        logger.warn(entry.message);
-        return;
-      }
-      logger.warn(entry.message, entry.properties);
-    },
-    error(message: string, properties?: Record<string, unknown>) {
-      const entry = format(message, properties);
-      if (entry.properties === undefined) {
-        logger.error(entry.message);
-        return;
-      }
-      logger.error(entry.message, entry.properties);
-    },
-    getChild(name: string) {
-      if (supportsChildren) {
-        return adaptLogger(logger.getChild!(name), []);
-      }
-
-      return adaptLogger(logger, [...category, name]);
-    },
-  };
+  return getLogger(["app"]);
 }

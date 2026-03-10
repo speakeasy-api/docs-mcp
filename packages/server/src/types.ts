@@ -10,20 +10,15 @@ export interface BuildInfo {
   buildDate?: string | undefined;
 }
 
-export type LoggerLike = Pick<typeof console, "debug" | "info" | "warn" | "error"> & {
-  getChild?: (name: string) => LoggerLike;
-};
-
-export interface ResolvedLogger {
+export interface Logger {
   debug: (message: string, properties?: Record<string, unknown>) => void;
   info: (message: string, properties?: Record<string, unknown>) => void;
   warn: (message: string, properties?: Record<string, unknown>) => void;
   error: (message: string, properties?: Record<string, unknown>) => void;
-  getChild: (name: string) => ResolvedLogger;
 }
 
 export interface LoggingOptions {
-  logger?: LoggerLike;
+  logger?: Logger;
   pretty?: boolean;
   logLevel?: string;
 }
