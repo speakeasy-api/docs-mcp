@@ -171,21 +171,21 @@ export function parseSourceRefAttributes(raw: string): SourceRefDirective {
  * the common ancestor of docsDir and the source file.
  */
 function computeRefPath(resolvedSource: string, docsDir: string): string {
-  // Find common ancestor between docsDir and resolvedSource
-  const docsParts = path.resolve(docsDir).split(path.sep);
-  const sourceParts = path.resolve(resolvedSource).split(path.sep);
+  const source = path.resolve(resolvedSource);
+  let ancestor = path.resolve(docsDir);
 
-  let commonLength = 0;
-  for (let i = 0; i < Math.min(docsParts.length, sourceParts.length); i++) {
-    if (docsParts[i] === sourceParts[i]) {
-      commonLength = i + 1;
-    } else {
-      break;
+  while (true) {
+    const relative = path.relative(ancestor, source);
+    if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+      return relative.split(path.sep).join("/");
     }
-  }
 
-  const commonAncestor = docsParts.slice(0, commonLength).join(path.sep);
-  return path.relative(commonAncestor, resolvedSource).split(path.sep).join("/");
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) {
+      return source.split(path.sep).join("/");
+    }
+    ancestor = parent;
+  }
 }
 
 /**

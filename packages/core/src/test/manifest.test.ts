@@ -40,7 +40,8 @@ describe("manifest resolution", () => {
 
     const markdown = [
       "---",
-      "mcp_chunking_hint: file",
+      "mcp_strategy:",
+      "  chunk_by: file",
       "mcp_metadata:",
       "  scope: global-guide",
       "---",

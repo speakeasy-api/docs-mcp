@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -247,5 +247,22 @@ describe("expandSourceRefs", () => {
     });
 
     expect(result).toContain("```yaml");
+  });
+
+  it("computes ref from the filesystem root when that is the only common ancestor", () => {
+    const source = path.resolve("tmp-source-ref-root-common.ts");
+    writeFileSync(source, "export const rootOnly = true;\n");
+
+    try {
+      const md = `<!-- SourceRef path=${path.relative(docsDir, source)} -->`;
+      const result = expandSourceRefs(md, {
+        markdownDir: docsDir,
+        docsDir,
+      });
+
+      expect(result).toContain(`// ref: ${source.slice(1).split(path.sep).join("/")}`);
+    } finally {
+      rmSync(source, { force: true });
+    }
   });
 });

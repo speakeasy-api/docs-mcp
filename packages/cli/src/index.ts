@@ -184,22 +184,22 @@ program
     const sourceRefCache = new Map<string, string>();
     for (const file of files) {
       const rawMarkdown = await readFile(file, "utf8");
-      const markdown = expandSourceRefs(rawMarkdown, {
-        markdownDir: path.dirname(file),
-        docsDir,
-        fileCache: sourceRefCache,
-      });
       const relative = toPosix(path.relative(docsDir, file));
       const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
       const resolved = resolveFileConfig({
         relativeFilePath: relative,
-        markdown,
+        markdown: rawMarkdown,
         ...(manifestContext
           ? {
               manifest: manifestContext.manifest,
               manifestBaseDir: manifestContext.manifestBaseDir,
             }
           : {}),
+      });
+      const markdown = expandSourceRefs(rawMarkdown, {
+        markdownDir: path.dirname(file),
+        docsDir,
+        fileCache: sourceRefCache,
       });
 
       if (!manifestContext) {
@@ -302,18 +302,23 @@ program
         let validated = 0;
         for (const file of files) {
           if (validated >= 10) break;
-          const markdown = await readFile(file, "utf8");
+          const rawMarkdown = await readFile(file, "utf8");
           const relative = toPosix(path.relative(docsDir, file));
           const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
           const resolved = resolveFileConfig({
             relativeFilePath: relative,
-            markdown,
+            markdown: rawMarkdown,
             ...(manifestContext
               ? {
                   manifest: manifestContext.manifest,
                   manifestBaseDir: manifestContext.manifestBaseDir,
                 }
               : {}),
+          });
+          const markdown = expandSourceRefs(rawMarkdown, {
+            markdownDir: path.dirname(file),
+            docsDir,
+            fileCache: sourceRefCache,
           });
 
           const fingerprint = computeChunkFingerprint(
@@ -351,22 +356,22 @@ program
         writeProgress(`Chunking [${fi + 1}/${files.length}]...`);
         const file = files[fi]!;
         const rawMarkdown = await readFile(file, "utf8");
-        const markdown = expandSourceRefs(rawMarkdown, {
-          markdownDir: path.dirname(file),
-          docsDir,
-          fileCache: sourceRefCache,
-        });
         const relative = toPosix(path.relative(docsDir, file));
         const manifestContext = await loadNearestManifest(file, docsDir, manifestCache);
         const resolved = resolveFileConfig({
           relativeFilePath: relative,
-          markdown,
+          markdown: rawMarkdown,
           ...(manifestContext
             ? {
                 manifest: manifestContext.manifest,
                 manifestBaseDir: manifestContext.manifestBaseDir,
               }
             : {}),
+        });
+        const markdown = expandSourceRefs(rawMarkdown, {
+          markdownDir: path.dirname(file),
+          docsDir,
+          fileCache: sourceRefCache,
         });
 
         const fingerprint = computeChunkFingerprint(markdown, resolved.strategy, resolved.metadata);

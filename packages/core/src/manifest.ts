@@ -51,8 +51,6 @@ export function mergeTaxonomyConfigs(
   return merged;
 }
 
-const HTML_HINT_REGEX = /<!--\s*mcp_chunking_hint:\s*(\{[^}]+\})\s*-->/;
-
 export function parseManifest(input: unknown): Manifest {
   if (!input || typeof input !== "object") {
     throw new Error("manifest must be an object");
@@ -151,12 +149,6 @@ export function resolveFileConfig(params: {
   let title: string | undefined;
 
   if (params.markdown) {
-    // HTML comment hints: applied after manifest but before frontmatter
-    const htmlHint = parseHtmlChunkingHint(params.markdown);
-    if (htmlHint) {
-      strategy = { ...strategy, chunk_by: htmlHint.chunk_by };
-    }
-
     // Frontmatter overrides: highest precedence
     const frontmatterOverrides = parseFrontmatterOverrides(params.markdown);
 
@@ -219,10 +211,6 @@ function parseFrontmatterOverrides(markdown: string): {
   let strategy: ChunkingStrategy | undefined;
   if (data.mcp_strategy) {
     strategy = parseStrategy(data.mcp_strategy);
-  } else if (data.mcp_chunking_hint) {
-    strategy = {
-      chunk_by: parseChunkBy(data.mcp_chunking_hint),
-    };
   }
 
   let metadata: Record<string, string> | undefined;
@@ -236,8 +224,7 @@ function parseFrontmatterOverrides(markdown: string): {
     };
   }
 
-  const title =
-    typeof data.title === "string" && data.title.trim() ? data.title.trim() : undefined;
+  const title = typeof data.title === "string" && data.title.trim() ? data.title.trim() : undefined;
 
   const result: {
     strategy?: ChunkingStrategy;
@@ -254,38 +241,6 @@ function parseFrontmatterOverrides(markdown: string): {
     result.title = title;
   }
   return result;
-}
-
-/**
- * Scans markdown for an HTML comment chunking hint of the form:
- *   <!-- mcp_chunking_hint: {"chunk_by": "h3"} -->
- *
- * Returns a partial strategy override (just `chunk_by`) if found and valid,
- * or undefined if no hint is present or parsing fails.
- */
-export function parseHtmlChunkingHint(
-  markdown: string,
-): Pick<ChunkingStrategy, "chunk_by"> | undefined {
-  const match = HTML_HINT_REGEX.exec(markdown);
-  if (!match) {
-    return undefined;
-  }
-
-  const jsonStr = match[1];
-  if (!jsonStr) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-    if (parsed.chunk_by !== undefined) {
-      const chunkBy = parseChunkBy(parsed.chunk_by);
-      return { chunk_by: chunkBy };
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function parseOverrides(value: unknown): ManifestOverride[] {

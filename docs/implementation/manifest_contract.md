@@ -57,7 +57,7 @@ To ensure predictable and fast builds, the chunking and metadata resolution foll
 
 When the indexer evaluates a specific markdown file, it resolves the chunking strategy and metadata from highest priority to lowest:
 
-1.  **YAML Frontmatter (Highest):** If a file contains explicit `mcp_chunking_hint` or metadata keys in its YAML frontmatter, these are merged with precedence over any manifest configurations for that specific file. Frontmatter keys win; manifest keys not present in frontmatter are preserved.
+1.  **YAML Frontmatter (Highest):** If a file contains explicit `mcp_strategy` or metadata keys in its YAML frontmatter, these are merged with precedence over any manifest configurations for that specific file. Frontmatter keys win; manifest keys not present in frontmatter are preserved.
 2.  **Manifest `overrides` Match:** If the file matches a glob `pattern` in the `overrides` array of the nearest manifest.
     - **Merging:** The override `metadata` is merged with the root `metadata` (override keys win). The override `strategy` replaces the root `strategy`.
 3.  **Manifest Baseline:** The root `strategy` and `metadata` fields in the nearest manifest.
