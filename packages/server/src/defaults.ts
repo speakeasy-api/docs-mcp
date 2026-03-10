@@ -11,15 +11,16 @@ export function resolveServerName(serverName?: string, toolPrefix?: string): str
     return serverName;
   }
 
-  if (process.env["SERVER_NAME"]) {
-    return process.env["SERVER_NAME"];
+  const envServerName = readOptionalEnv("SERVER_NAME");
+  if (envServerName) {
+    return envServerName;
   }
 
   return toolPrefix ? `${toolPrefix}-docs-server` : PACKAGE_SERVER_NAME;
 }
 
 export function resolveServerVersion(serverVersion?: string): string {
-  return serverVersion ?? process.env["SERVER_VERSION"] ?? PACKAGE_SERVER_VERSION;
+  return serverVersion ?? readOptionalEnv("SERVER_VERSION") ?? PACKAGE_SERVER_VERSION;
 }
 
 export function resolveBuildInfo(input: {
@@ -31,9 +32,14 @@ export function resolveBuildInfo(input: {
   return {
     name: input.name,
     version: input.version,
-    gitCommit: input.gitCommit ?? process.env["GIT_COMMIT"],
-    buildDate: input.buildDate ?? process.env["BUILD_DATE"],
+    gitCommit: input.gitCommit ?? readOptionalEnv("GIT_COMMIT"),
+    buildDate: input.buildDate ?? readOptionalEnv("BUILD_DATE"),
   };
+}
+
+function readOptionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
 }
 
 function readPackageVersion(): string {
