@@ -17,7 +17,7 @@ export interface Logger {
   error: (message: string, properties?: Record<string, unknown>) => void;
 }
 
-export interface LoggingOptions {
+export interface CreateDocsServerRuntimeOptions {
   logger?: Logger;
   pretty?: boolean;
   logLevel?: string;

@@ -12,7 +12,7 @@ import {
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
-import type { DocsServer, Logger, LoggingOptions } from "./types.js";
+import type { CreateDocsServerRuntimeOptions, DocsServer, Logger } from "./types.js";
 import { resolveLogger } from "./logging.js";
 import { resolveBuildInfo, resolveServerName, resolveServerVersion } from "./defaults.js";
 
@@ -180,8 +180,6 @@ export type CreateDocsServerOptionsInput = z.input<typeof CreateDocsServerOption
 
 /** Resolved options after Zod parse. */
 export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSchema>;
-
-export interface CreateDocsServerRuntimeOptions extends LoggingOptions {}
 
 /**
  * Create a fully-configured docs MCP server from a directory produced by `docs-mcp build`.

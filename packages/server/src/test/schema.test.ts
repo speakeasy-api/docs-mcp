@@ -158,8 +158,8 @@ describe("CreateDocsServerOptionsSchema", () => {
       indexDir: "./x",
     });
     const _tools: unknown[] = parsed.customTools;
-    const _serverName: string | undefined = parsed.serverName;
-    const _serverVersion: string | undefined = parsed.serverVersion;
     expect(_tools).toEqual([]);
+    expect(parsed.serverName).toBeUndefined();
+    expect(parsed.serverVersion).toBeUndefined();
   });
 });

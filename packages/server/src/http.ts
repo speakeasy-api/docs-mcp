@@ -5,7 +5,13 @@ import {
   HandleRequestOptions,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { AuthInfo, BuildInfo, DocsServer, Logger, LoggingOptions } from "./types.js";
+import type {
+  AuthInfo,
+  BuildInfo,
+  CreateDocsServerRuntimeOptions,
+  DocsServer,
+  Logger,
+} from "./types.js";
 import {
   H3,
   handleCors,
@@ -30,7 +36,10 @@ const DOCS_MCP_HEADER = "DOCS-MCP";
 
 export type Authenticator = (request: { headers: Headers }) => AuthInfo | Promise<AuthInfo>;
 
-export interface StartHttpServerOptions extends LoggingOptions {
+export interface StartHttpServerOptions extends Pick<
+  CreateDocsServerRuntimeOptions,
+  "logger" | "pretty" | "logLevel"
+> {
   buildInfo?: BuildInfo;
   port?: number;
   /**

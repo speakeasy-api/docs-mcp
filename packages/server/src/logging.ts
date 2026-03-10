@@ -8,7 +8,7 @@ import {
   type LogLevel,
 } from "@logtape/logtape";
 import { getPrettyFormatter } from "@logtape/pretty";
-import type { Logger, LoggingOptions } from "./types.js";
+import type { CreateDocsServerRuntimeOptions, Logger } from "./types.js";
 
 const DEFAULT_LOG_LEVEL = () => process.env.LOG_LEVEL ?? "info";
 const DEFAULT_LOG_PRETTY = () => process.env.LOG_PRETTY === "true";
@@ -17,7 +17,7 @@ let defaultLoggingConfigured = false;
 let defaultLoggingConfigKey: string | undefined;
 
 export async function configureDefaultLogger(
-  options: Pick<LoggingOptions, "pretty" | "logLevel"> = {},
+  options: Pick<CreateDocsServerRuntimeOptions, "pretty" | "logLevel"> = {},
 ): Promise<void> {
   const logLevel = (getLogLevels().find((level) => level === options.logLevel) ??
     getLogLevels().find((level) => level === DEFAULT_LOG_LEVEL()) ??
@@ -58,7 +58,7 @@ export async function configureDefaultLogger(
   defaultLoggingConfigKey = configKey;
 }
 
-export async function resolveLogger(options: LoggingOptions = {}): Promise<Logger> {
+export async function resolveLogger(options: CreateDocsServerRuntimeOptions = {}): Promise<Logger> {
   if (options.logger) {
     return options.logger;
   }
