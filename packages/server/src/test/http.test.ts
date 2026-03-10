@@ -336,11 +336,9 @@ describe("MCP HTTP transport resources", () => {
     await client.connect(transport);
 
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(2);
-    const sorted = [...resources].sort((a, b) => a.uri.localeCompare(b.uri));
-    expect(sorted[0]?.uri).toEqual("docs:///guides/global.md");
-    expect(sorted[1]?.uri).toEqual("docs:///guides/ts.md");
-    for (const r of sorted) {
+    expect(resources).toHaveLength(1);
+    expect(resources[0]?.uri).toEqual("docs:///guides/ts.md");
+    for (const r of resources) {
       expect(r.mimeType).toEqual("text/markdown");
     }
 
@@ -359,6 +357,18 @@ describe("MCP HTTP transport resources", () => {
 
     assert(parsed.contents[0] && "text" in parsed.contents[0]);
     expect(parsed.contents[0].text).toContain("TypeScript retry");
+
+    await client.close();
+  });
+
+  it("rejects unmarked resources via MCP protocol", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${resourceBaseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    await expect(client.readResource({ uri: "docs:///guides/global.md" })).rejects.toThrow(
+      /Resource not found/,
+    );
 
     await client.close();
   });

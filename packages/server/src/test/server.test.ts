@@ -270,7 +270,30 @@ describe("McpDocsServer with toolPrefix", () => {
 });
 
 describe("McpDocsServer resources", () => {
-  it("lists all documents as resources", async () => {
+  const metadataWithResources = normalizeMetadata({
+    metadata_version: "1.1.0",
+    corpus_description: "Speakeasy SDK docs",
+    taxonomy: {
+      language: {
+        description: "Filter results by programming language.",
+        values: ["python", "typescript"],
+      },
+      scope: {
+        values: ["global-guide", "sdk-specific"],
+        properties: {
+          "global-guide": { mcp_resource: true },
+        },
+      },
+    },
+    stats: {
+      total_chunks: 2,
+      total_files: 2,
+      indexed_at: "2026-02-22T00:00:00Z",
+    },
+    embedding: null,
+  });
+
+  it("lists no resources when no taxonomy values are marked for MCP resources", async () => {
     await using pair = await createTestServer({
       app: {
         index: new DocsIndex(chunks),
@@ -280,17 +303,27 @@ describe("McpDocsServer resources", () => {
     const { client } = pair;
 
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(2);
-    const uris = resources.map((r) => r.uri).sort();
-    expect(uris).toEqual(["docs:///guides/global.md", "docs:///guides/ts.md"]);
-    // Without files metadata, name falls back to filepath
-    for (const r of resources) {
-      expect(r.name).toBe(r.description);
-      expect(r.mimeType).toBe("text/markdown");
-    }
+    expect(resources).toEqual([]);
   });
 
-  it("uses title from files metadata as resource name", async () => {
+  it("lists only documents whose taxonomy values are marked as MCP resources", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithResources,
+      },
+    });
+    const { client } = pair;
+
+    const { resources } = await client.listResources();
+    expect(resources).toHaveLength(1);
+    expect(resources[0]?.uri).toBe("docs:///guides/global.md");
+    expect(resources[0]?.name).toBe("guides/global.md");
+    expect(resources[0]?.description).toBe("guides/global.md");
+    expect(resources[0]?.mimeType).toBe("text/markdown");
+  });
+
+  it("uses title from files metadata as resource title", async () => {
     const metadataWithFiles = normalizeMetadata({
       metadata_version: "1.1.0",
       corpus_description: "Speakeasy SDK docs",
@@ -298,6 +331,9 @@ describe("McpDocsServer resources", () => {
         language: {
           description: "Filter results by programming language.",
           values: ["python", "typescript"],
+          properties: {
+            typescript: { mcp_resource: true },
+          },
         },
         scope: {
           values: ["global-guide", "sdk-specific"],
@@ -323,24 +359,40 @@ describe("McpDocsServer resources", () => {
     const { client } = pair;
 
     const { resources } = await client.listResources();
-    expect(resources).toHaveLength(2);
+    expect(resources).toHaveLength(1);
 
-    const tsResource = resources.find((r) => r.uri === "docs:///guides/ts.md");
+    const tsResource = resources[0];
     expect(tsResource?.name).toBe("guides/ts.md");
     expect(tsResource?.title).toBe("Guides / TypeScript Guide");
     expect(tsResource?.description).toBe("guides/ts.md");
-
-    const globalResource = resources.find((r) => r.uri === "docs:///guides/global.md");
-    expect(globalResource?.name).toBe("guides/global.md");
-    expect(globalResource?.title).toBe("Guides / Global");
-    expect(globalResource?.description).toBe("guides/global.md");
   });
 
-  it("reads a resource and returns file content", async () => {
+  it("reads a marked resource and returns file content", async () => {
     await using pair = await createTestServer({
       app: {
         index: new DocsIndex(chunks),
-        metadata,
+        metadata: normalizeMetadata({
+          metadata_version: "1.1.0",
+          corpus_description: "Speakeasy SDK docs",
+          taxonomy: {
+            language: {
+              description: "Filter results by programming language.",
+              values: ["python", "typescript"],
+              properties: {
+                typescript: { mcp_resource: true },
+              },
+            },
+            scope: {
+              values: ["global-guide", "sdk-specific"],
+            },
+          },
+          stats: {
+            total_chunks: 2,
+            total_files: 2,
+            indexed_at: "2026-02-22T00:00:00Z",
+          },
+          embedding: null,
+        }),
       },
     });
     const { client } = pair;
@@ -351,11 +403,25 @@ describe("McpDocsServer resources", () => {
     expect(result.contents[0].mimeType).toBe("text/markdown");
   });
 
+  it("throws for unmarked resources", async () => {
+    await using pair = await createTestServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata: metadataWithResources,
+      },
+    });
+    const { client } = pair;
+
+    await expect(client.readResource({ uri: "docs:///guides/ts.md" })).rejects.toThrow(
+      /Resource not found/,
+    );
+  });
+
   it("throws for nonexistent resource", async () => {
     await using pair = await createTestServer({
       app: {
         index: new DocsIndex(chunks),
-        metadata,
+        metadata: metadataWithResources,
       },
     });
     const { client } = pair;
