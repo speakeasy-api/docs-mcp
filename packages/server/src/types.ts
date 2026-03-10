@@ -1,4 +1,5 @@
 export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
@@ -7,6 +8,24 @@ export interface BuildInfo {
   version: string;
   gitCommit?: string | undefined;
   buildDate?: string | undefined;
+}
+
+export interface Logger {
+  debug: (message: string, properties?: Record<string, unknown>) => void;
+  info: (message: string, properties?: Record<string, unknown>) => void;
+  warn: (message: string, properties?: Record<string, unknown>) => void;
+  error: (message: string, properties?: Record<string, unknown>) => void;
+}
+
+export interface CreateDocsServerRuntimeOptions {
+  logger?: Logger;
+  pretty?: boolean;
+  logLevel?: string;
+}
+
+export interface DocsServer {
+  (): McpServer;
+  buildInfo: BuildInfo;
 }
 
 export interface ToolCallContext {

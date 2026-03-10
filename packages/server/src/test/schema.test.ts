@@ -7,15 +7,13 @@ import {
 
 describe("CreateDocsServerOptionsSchema", () => {
   it("validates a minimal config with just indexDir", () => {
-    const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
-      indexDir: "./my-index",
-    });
+    const result = CreateDocsServerOptionsSchema.safeParse({ indexDir: "./my-index" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.indexDir).toBe("./my-index");
       expect(result.data.customTools).toEqual([]);
+      expect(result.data.serverName).toBeUndefined();
+      expect(result.data.serverVersion).toBeUndefined();
     }
   });
 
@@ -57,8 +55,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects empty indexDir", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "",
     });
     expect(result.success).toBe(false);
@@ -66,8 +62,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects invalid toolPrefix characters", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       toolPrefix: "bad prefix!",
     });
@@ -76,16 +70,12 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects phraseSlop out of range", () => {
     const high = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       phraseSlop: 10,
     });
     expect(high.success).toBe(false);
 
     const negative = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       phraseSlop: -1,
     });
@@ -94,8 +84,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects non-positive proximityWeight", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       proximityWeight: 0,
     });
@@ -104,8 +92,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects non-positive vectorWeight", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       vectorWeight: -1,
     });
@@ -114,8 +100,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects custom tool with invalid name", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       customTools: [
         {
@@ -131,8 +115,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects custom tool with non-object inputSchema", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       customTools: [
         {
@@ -148,8 +130,6 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("rejects custom tool with empty description", () => {
     const result = CreateDocsServerOptionsSchema.safeParse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
       customTools: [
         {
@@ -165,10 +145,8 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("allows omitting defaulted fields in input type", () => {
     // This is a compile-time check — if CreateDocsServerOptionsInput requires
-    // customTools, this won't compile.
+    // customTools/serverName/serverVersion, this won't compile.
     const input: CreateDocsServerOptionsInput = {
-      serverName: "test-server",
-      serverVersion: "1.0.0",
       indexDir: "./x",
     };
     const result = CreateDocsServerOptionsSchema.parse(input);
@@ -177,12 +155,11 @@ describe("CreateDocsServerOptionsSchema", () => {
 
   it("has required fields after parse in output type", () => {
     const parsed: CreateDocsServerOptions = CreateDocsServerOptionsSchema.parse({
-      serverName: "test",
-      serverVersion: "1.0.0",
       indexDir: "./x",
     });
-    // These are always present after parse due to .default()
     const _tools: unknown[] = parsed.customTools;
     expect(_tools).toEqual([]);
+    expect(parsed.serverName).toBeUndefined();
+    expect(parsed.serverVersion).toBeUndefined();
   });
 });

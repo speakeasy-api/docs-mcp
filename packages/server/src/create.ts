@@ -12,8 +12,9 @@ import {
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Logger } from "@logtape/logtape";
+import type { CreateDocsServerRuntimeOptions, DocsServer, Logger } from "./types.js";
+import { resolveLogger } from "./logging.js";
+import { resolveBuildInfo, resolveServerName, resolveServerVersion } from "./defaults.js";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -116,10 +117,10 @@ const CustomToolSchema = z.object({
 /** Zod schema for `createDocsServer()` options. Consumers can use this to validate config. */
 export const CreateDocsServerOptionsSchema = z.object({
   /** Name of the MCP server. */
-  serverName: z.string().min(1, "serverName must be a non-empty string"),
+  serverName: z.string().min(1, "serverName must be a non-empty string").optional(),
 
   /** Version of the MCP server. */
-  serverVersion: z.string().min(1, "serverVersion must be a non-empty string"),
+  serverVersion: z.string().min(1, "serverVersion must be a non-empty string").optional(),
 
   /** Directory containing chunks.json and metadata.json produced by `docs-mcp build`. */
   indexDir: z.string().min(1, "indexDir must be a non-empty string"),
@@ -177,21 +178,24 @@ export const CreateDocsServerOptionsSchema = z.object({
 /** What consumers pass to `createDocsServer()` — defaults are optional. */
 export type CreateDocsServerOptionsInput = z.input<typeof CreateDocsServerOptionsSchema>;
 
-/** Resolved options after Zod parse — defaults applied. */
+/** Resolved options after Zod parse. */
 export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSchema>;
 
 /**
- * Create a fully-configured `McpDocsServer` from a directory produced by `docs-mcp build`.
+ * Create a fully-configured docs MCP server from a directory produced by `docs-mcp build`.
  *
  * This is the primary programmatic entry point. It loads metadata, resolves embedding providers,
  * opens the search engine, and returns a server ready to be passed to `startStdioServer()` or
  * `startHttpServer()`.
  */
-export async function createDocsMcpServerFactory(
-  rootLogger: Logger,
+export async function createDocsServer(
   input: CreateDocsServerOptionsInput,
-): Promise<() => McpServer> {
+  runtimeOptions: CreateDocsServerRuntimeOptions = {},
+): Promise<DocsServer> {
+  const logger = await resolveLogger(runtimeOptions);
   const options = CreateDocsServerOptionsSchema.parse(input);
+  const serverName = resolveServerName(options.serverName, options.toolPrefix);
+  const serverVersion = resolveServerVersion(options.serverVersion);
 
   const indexDir = path.resolve(options.indexDir);
   const metadataPath = path.join(indexDir, "metadata.json");
@@ -215,11 +219,7 @@ export async function createDocsMcpServerFactory(
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
-  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(
-    rootLogger.getChild("init"),
-    options,
-    metadata.embedding,
-  );
+  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(logger, options, metadata.embedding);
 
   const loadInput: {
     lancedbPath: string;
@@ -249,13 +249,13 @@ export async function createDocsMcpServerFactory(
     loadInput.vectorWeight = options.vectorWeight;
   }
 
-  const index = await loadSearchEngine(rootLogger.getChild("init"), loadInput);
+  const index = await loadSearchEngine(logger, loadInput);
 
-  return () => {
+  const factory = (() => {
     return createMcpServer({
       mcp: {
-        name: options.serverName,
-        version: options.serverVersion,
+        name: serverName,
+        version: serverVersion,
       },
       app: {
         index,
@@ -266,7 +266,14 @@ export async function createDocsMcpServerFactory(
         ...(options.customTools.length > 0 ? { customTools: options.customTools } : {}),
       },
     });
-  };
+  }) as DocsServer;
+
+  factory.buildInfo = resolveBuildInfo({
+    name: serverName,
+    version: serverVersion,
+  });
+
+  return factory;
 }
 
 async function loadSearchEngine(
