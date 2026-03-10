@@ -8,9 +8,6 @@ import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
 import type { CustomTool, ToolCallContext } from "../types.js";
 import { createTestServer } from "./mcp.helper.js";
-import { getLogger } from "@logtape/logtape";
-
-const logger = getLogger(["test"]);
 
 const chunks: Chunk[] = [
   {
@@ -190,11 +187,10 @@ describe("McpDocsServer context threading", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
-          const auth = headers.get("authorization");
+          const auth = headers.authorization;
           const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
           return { token, clientId: "c1", scopes: ["read"] };
         },
@@ -218,9 +214,7 @@ describe("McpDocsServer context threading", () => {
 
       expect(receivedArgs).toEqual({ foo: "bar" });
       expect(receivedCtx?.signal).toBeInstanceOf(AbortSignal);
-      expect(receivedCtx?.authInfo).toEqual(
-        expect.objectContaining({ token: "tok", clientId: "c1", scopes: ["read"] }),
-      );
+      expect(receivedCtx?.authInfo).toEqual({ token: "tok", clientId: "c1", scopes: ["read"] });
       expect(receivedCtx?.headers).toMatchObject({ authorization: "Bearer tok" });
       expect(receivedCtx?.clientInfo).toEqual({ name: "test", version: "1.0" });
 
@@ -322,7 +316,6 @@ describe("Custom tools over HTTP transport", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -419,11 +412,10 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async ({ headers }) => {
-          const auth = headers.get("authorization");
+          const auth = headers.authorization;
           const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
           if (!token) throw new Error("Missing token");
           return { token, clientId: "test-client-id", scopes: ["read"] };
@@ -470,7 +462,6 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
         authenticate: async () => {
@@ -539,7 +530,6 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -597,7 +587,6 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -645,7 +634,6 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },
@@ -698,7 +686,6 @@ describe("HTTP authentication", () => {
           },
         }),
       {
-        logger,
         buildInfo: { name: "test-server", version: "0.1.0" },
         port: 0,
       },

@@ -13,7 +13,6 @@ import {
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { Logger } from "@logtape/logtape";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -188,7 +187,6 @@ export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSch
  * `startHttpServer()`.
  */
 export async function createDocsMcpServerFactory(
-  rootLogger: Logger,
   input: CreateDocsServerOptionsInput,
 ): Promise<() => McpServer> {
   const options = CreateDocsServerOptionsSchema.parse(input);
@@ -215,11 +213,7 @@ export async function createDocsMcpServerFactory(
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
-  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(
-    rootLogger.getChild("init"),
-    options,
-    metadata.embedding,
-  );
+  const queryEmbeddingProvider = resolveQueryEmbeddingProvider(options, metadata.embedding);
 
   const loadInput: {
     lancedbPath: string;
@@ -249,7 +243,7 @@ export async function createDocsMcpServerFactory(
     loadInput.vectorWeight = options.vectorWeight;
   }
 
-  const index = await loadSearchEngine(rootLogger.getChild("init"), loadInput);
+  const index = await loadSearchEngine(loadInput);
 
   return () => {
     return createMcpServer({
@@ -269,19 +263,16 @@ export async function createDocsMcpServerFactory(
   };
 }
 
-async function loadSearchEngine(
-  logger: Logger,
-  input: {
-    lancedbPath: string;
-    tableName: string;
-    metadataKeys: string[];
-    collapseKeys: string[];
-    queryEmbeddingProvider?: EmbeddingProvider;
-    proximityWeight?: number;
-    phraseSlop?: number;
-    vectorWeight?: number;
-  },
-): Promise<SearchEngine> {
+async function loadSearchEngine(input: {
+  lancedbPath: string;
+  tableName: string;
+  metadataKeys: string[];
+  collapseKeys: string[];
+  queryEmbeddingProvider?: EmbeddingProvider;
+  proximityWeight?: number;
+  phraseSlop?: number;
+  vectorWeight?: number;
+}): Promise<SearchEngine> {
   if (!(await exists(input.lancedbPath))) {
     throw new Error(
       `LanceDB index not found at '${input.lancedbPath}'. Re-run docs-mcp build to generate the index.`,
@@ -303,7 +294,7 @@ async function loadSearchEngine(
     tableName: input.tableName,
     metadataKeys: input.metadataKeys,
     ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {}),
-    onWarning: (message: string) => logger.warn(message),
+    onWarning: (message: string) => console.warn(`warn: ${message}`),
   };
   if (input.queryEmbeddingProvider !== undefined) {
     openInput.queryEmbeddingProvider = input.queryEmbeddingProvider;
@@ -338,7 +329,6 @@ function parseIndexConfig(metadata: Record<string, unknown>): { path: string; ta
 }
 
 function resolveQueryEmbeddingProvider(
-  logger: Logger,
   options: {
     queryEmbeddingApiKey?: string | undefined;
     queryEmbeddingBaseUrl?: string | undefined;
@@ -352,9 +342,9 @@ function resolveQueryEmbeddingProvider(
   }
 
   if (provider !== "hash" && provider !== "openai") {
-    logger.warn("embedding provider is not supported at runtime; falling back to FTS-only search", {
-      provider: metadataEmbedding?.provider,
-    });
+    console.warn(
+      `warn: embedding provider '${metadataEmbedding?.provider}' is not supported at runtime; falling back to FTS-only search`,
+    );
     return undefined;
   }
 
@@ -393,7 +383,8 @@ function resolveQueryEmbeddingProvider(
   try {
     return createEmbeddingProvider(input);
   } catch (error) {
-    logger.warn("query embedding disabled", { error });
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`warn: query embedding disabled: ${message}`);
     return undefined;
   }
 }

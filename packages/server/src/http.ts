@@ -1,32 +1,11 @@
 import crypto from "node:crypto";
 import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  HandleRequestOptions,
-  WebStandardStreamableHTTPServerTransport,
-} from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo, BuildInfo } from "./types.js";
-import {
-  H3,
-  handleCors,
-  onError,
-  toNodeHandler,
-  noContent,
-  Middleware,
-  H3Event,
-  defineHandler,
-  toResponse,
-  bodyLimit,
-} from "h3";
-import { Logger } from "@logtape/logtape";
-
-const AUTH_INFO = Symbol("authInfo");
-const DOCS_MCP_HEADER = "DOCS-MCP";
-
-export type Authenticator = (request: { headers: Headers }) => AuthInfo | Promise<AuthInfo>;
 
 export interface StartHttpServerOptions {
-  logger: Logger;
   buildInfo: BuildInfo;
   port?: number;
   /**
@@ -34,61 +13,26 @@ export interface StartHttpServerOptions {
    * Receives the HTTP request; return AuthInfo to attach to the request context,
    * or throw to reject with 401.
    */
-  authenticate?: Authenticator;
+  authenticate?: (request: {
+    headers: Record<string, string | string[] | undefined>;
+  }) => AuthInfo | Promise<AuthInfo>;
 }
 
 export interface HttpServerHandle {
   httpServer: http.Server;
-  fetch: (request: Request) => Response | Promise<Response>;
   port: number;
-}
-
-export async function startHttpServer(
-  factory: () => McpServer,
-  options: StartHttpServerOptions,
-): Promise<HttpServerHandle> {
-  const { logger } = options;
-  const port = options.port ?? 20310;
-  const sessionManager = new SessionManager();
-
-  const app = new H3()
-    .use(bodyLimit(50 * 1024 * 1024))
-    .use(createLogMiddleware(logger))
-    .use(createBuildInfoMiddleware(options.buildInfo))
-    .use(createErrorMiddleware({ logger }))
-    .use(createCORSMiddleware())
-    .get("/healthz", handleHealthCheck(options.buildInfo))
-    .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
-    .post(
-      "/mcp",
-      handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate }),
-    );
-
-  const httpServer = http.createServer(toNodeHandler(app));
-  httpServer.on("close", () => {
-    sessionManager.closeAll();
-  });
-
-  const actualPort = await listenOnAvailablePort(httpServer, port);
-  logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
-
-  return { httpServer, fetch: app.fetch, port: actualPort };
 }
 
 interface SessionEntry {
   server: McpServer;
-  transport: WebStandardStreamableHTTPServerTransport;
+  transport: StreamableHTTPServerTransport;
 }
 
 class SessionManager {
   private static readonly MAX_SESSIONS = 10_000;
   private sessions = new Map<string, SessionEntry>();
 
-  add(
-    sessionId: string,
-    server: McpServer,
-    transport: WebStandardStreamableHTTPServerTransport,
-  ): void {
+  add(sessionId: string, server: McpServer, transport: StreamableHTTPServerTransport): void {
     if (this.sessions.size >= SessionManager.MAX_SESSIONS) {
       const oldest = this.sessions.keys().next().value;
       if (oldest) this.evict(oldest);
@@ -122,8 +66,8 @@ class SessionManager {
 function createStatefulTransport(
   server: McpServer,
   sessionManager: SessionManager,
-): WebStandardStreamableHTTPServerTransport {
-  const transport = new WebStandardStreamableHTTPServerTransport({
+): StreamableHTTPServerTransport {
+  const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (sid: string) => {
       sessionManager.add(sid, server, transport);
@@ -136,228 +80,207 @@ function createStatefulTransport(
   return transport;
 }
 
-function createAuthMiddleware(deps: { handler?: Authenticator }): Middleware {
-  const { handler } = deps;
-  return async (event, next) => {
-    if (handler == null) {
-      return await next();
-    }
+export async function startHttpServer(
+  factory: () => McpServer,
+  options: StartHttpServerOptions,
+): Promise<HttpServerHandle> {
+  const port = options.port ?? 20310;
+  const sessionManager = new SessionManager();
 
+  const httpServer = http.createServer(async (req, res) => {
     try {
-      const authInfo = await handler({ headers: event.req.headers });
-      event.context.authInfo = { ...authInfo, [AUTH_INFO]: true };
+      await handleRequest(factory, req, res, options, sessionManager);
     } catch (error) {
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: error instanceof Error ? error.message : "Unauthorized" },
-          id: null,
-        }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    return await next();
-  };
-}
-
-const createLogMiddleware = (logger: Logger): Middleware => {
-  return async (event, next) => {
-    const start = process.hrtime();
-    try {
-      logger.debug("request", {
-        method: event.req.method,
-        path: event.url.pathname,
-      });
-      return await next();
-    } finally {
-      const duration = process.hrtime(start);
-      const ms = duration[0] * 1000 + duration[1] / 1_000_000;
-      logger.info("response", {
-        method: event.req.method,
-        path: event.url.pathname,
-        duration_ms: Number(ms.toFixed(2)),
-      });
-    }
-  };
-};
-
-const createBuildInfoMiddleware = (buildInfo: BuildInfo): Middleware => {
-  return (event) => {
-    event.res.headers.set(DOCS_MCP_HEADER, makeBuildInfoHeader(buildInfo));
-  };
-};
-
-const createErrorMiddleware = (options: { logger: Logger }) => {
-  return onError((err) => {
-    const { logger } = options;
-
-    logger.error("unhandled error", { error: err });
-    const body = JSON.stringify({
-      jsonrpc: "2.0",
-      error: { code: -32603, message: "Internal server error" },
-      id: null,
-    });
-    return new Response(body, {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  });
-};
-
-const createCORSMiddleware = (): Middleware => {
-  return async (event) => {
-    const corsRes = handleCors(event, {
-      origin: "*",
-      allowHeaders: "*",
-      methods: ["POST", "DELETE", "OPTIONS"],
-      exposeHeaders: [DOCS_MCP_HEADER],
-      maxAge: "86400",
-      preflight: {
-        statusCode: 204,
-      },
-    });
-    if (corsRes !== false) {
-      return corsRes;
-    }
-  };
-};
-
-function createDisposeMiddleware(): Middleware {
-  return async (event, next) => {
-    const disposeCallbacks: Array<() => Promise<void>> = [];
-    event.context.disposeCallbacks = disposeCallbacks;
-    event.context.queueDispose = (cb: () => Promise<void>) => disposeCallbacks.push(cb);
-
-    let response: Response;
-    try {
-      const result = await next();
-      response = await toResponse(result, event);
-    } finally {
-      await Promise.allSettled(disposeCallbacks.map((cb) => cb()));
-    }
-
-    return response;
-  };
-}
-
-function queueDispose(event: H3Event, func: () => Promise<void>) {
-  const { queueDispose } = event.context;
-  if (typeof queueDispose !== "function") {
-    throw new Error("Dispose queue not found in event context");
-  }
-
-  queueDispose(func);
-}
-
-const handleHealthCheck = (buildInfo: BuildInfo) => {
-  return defineHandler(() => {
-    return { build: buildInfo };
-  });
-};
-
-const handleDeleteMCPSession = (deps: {
-  sessionManager: SessionManager;
-  authenticate?: Authenticator | undefined;
-}) => {
-  return defineHandler({
-    middleware: [createAuthMiddleware({ handler: deps.authenticate })],
-    handler: async (event) => {
-      const { req } = event;
-      const authInfo = pullAuthInfo(event);
-      const sessionId = req.headers.get("mcp-session-id");
-      if (!sessionId) {
-        return noContent();
-      }
-      const entry = deps.sessionManager.get(sessionId);
-      if (!entry) {
-        return noContent();
-      }
-
-      const mcpRes = await entry.transport.handleRequest(req, { authInfo });
-      if (mcpRes.ok) {
-        deps.sessionManager.evict(sessionId);
-      }
-
-      return mcpRes;
-    },
-  });
-};
-
-const handleMCPRPC = (deps: {
-  logger: Logger;
-  factory: () => McpServer;
-  sessionManager: SessionManager;
-  authenticate?: Authenticator | undefined;
-}) => {
-  return defineHandler({
-    middleware: [createDisposeMiddleware(), createAuthMiddleware({ handler: deps.authenticate })],
-    handler: async (event) => {
-      const { logger } = deps;
-      const { req } = event;
-
-      const authInfo = pullAuthInfo(event);
-      const sessionId = req.headers.get("mcp-session-id");
-
-      if (sessionId) {
-        const entry = deps.sessionManager.get(sessionId);
-        if (entry) {
-          return await entry.transport.handleRequest(req, { authInfo });
-        }
-
-        logger.warn("no session state found for session id", { session_id: sessionId });
-        const { response, dispose } = await handleWithStatelessServer(deps.factory, req, {
-          authInfo,
-        });
-        queueDispose(event, dispose);
-        return response;
-      }
-
-      const server = deps.factory();
-      const transport = createStatefulTransport(server, deps.sessionManager);
-      try {
-        await server.connect(transport);
-        return await transport.handleRequest(req, { authInfo });
-      } catch (error) {
-        logger.error("error handling mcp request", { error });
-
-        await transport.close().catch(() => {});
-        await server.close().catch(() => {});
-
-        return new Response(
+      console.error("Unhandled error in request handler:", error);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
           JSON.stringify({
             jsonrpc: "2.0",
             error: { code: -32603, message: "Internal server error" },
             id: null,
           }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          },
         );
+      } else if (!res.writableEnded) {
+        res.end();
       }
-    },
+    }
   });
+
+  httpServer.on("close", () => {
+    sessionManager.closeAll();
+  });
+
+  const actualPort = await listenOnAvailablePort(httpServer, port);
+  console.error(`MCP HTTP server listening on http://localhost:${actualPort}/mcp`);
+
+  return { httpServer, port: actualPort };
+}
+
+const DOCS_MCP_HEADER = "DOCS-MCP";
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Expose-Headers": [DOCS_MCP_HEADER].join(", "),
+  "Access-Control-Max-Age": "86400",
 };
+
+function setCorsHeaders(res: http.ServerResponse): void {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    res.setHeader(key, value);
+  }
+}
+
+async function handleRequest(
+  factory: () => McpServer,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  options: StartHttpServerOptions,
+  sessionManager: SessionManager,
+): Promise<void> {
+  const url = new URL(req.url ?? "/", "http://localhost");
+  const { buildInfo } = options;
+  res.setHeader(DOCS_MCP_HEADER, makeBuildInfoHeader(buildInfo));
+
+  if (req.method === "GET" && url.pathname === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ build: buildInfo }, null, 2));
+    return;
+  }
+
+  if (url.pathname !== "/mcp") {
+    res.writeHead(405, { "Content-Type": "text/plain" });
+    res.end("Method Not Allowed");
+    return;
+  }
+
+  setCorsHeaders(res);
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method === "GET") {
+    res.writeHead(405, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32000, message: "Method not allowed." },
+        id: null,
+      }),
+    );
+    return;
+  }
+
+  if (options.authenticate) {
+    try {
+      const authInfo = await options.authenticate({ headers: req.headers });
+      Object.assign(req, { auth: authInfo });
+    } catch (error) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32000, message: error instanceof Error ? error.message : "Unauthorized" },
+          id: null,
+        }),
+      );
+      return;
+    }
+  }
+
+  // MCP states clients should send DELETE requests for clean shutdown.
+  if (req.method === "DELETE") {
+    const sessionId = getHeaderValue(req.headers["mcp-session-id"]);
+    if (!sessionId) {
+      // Idempotent
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    const entry = sessionManager.get(sessionId);
+    if (!entry) {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    await entry.transport.handleRequest(req, res);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      sessionManager.evict(sessionId);
+    }
+    return;
+  }
+
+  const sessionId = getHeaderValue(req.headers["mcp-session-id"]);
+
+  let parsed: unknown;
+  try {
+    const body = await readBody(req);
+    parsed = JSON.parse(body);
+  } catch {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32700, message: "Parse error" },
+        id: null,
+      }),
+    );
+    return;
+  }
+
+  if (sessionId) {
+    const entry = sessionManager.get(sessionId);
+    if (entry) {
+      await entry.transport.handleRequest(req, res, parsed);
+      return;
+    }
+    await handleWithStatelessServer(factory, req, res, parsed);
+    return;
+  }
+
+  const server = factory();
+  const transport = createStatefulTransport(server, sessionManager);
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res, parsed);
+  } catch (error) {
+    console.error("Error handling MCP request:", error);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        }),
+      );
+    }
+
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
+  }
+}
 
 async function handleWithStatelessServer(
   factory: () => McpServer,
-  req: Request,
-  options?: HandleRequestOptions,
-): Promise<{ response: Response; dispose: () => Promise<void> }> {
-  const transport = new WebStandardStreamableHTTPServerTransport();
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  parsed: unknown,
+): Promise<void> {
+  const transport = new StreamableHTTPServerTransport();
   const server = factory();
 
-  await server.connect(transport);
-  return {
-    response: await transport.handleRequest(req, options),
-    dispose: async () => {
-      await transport.close().catch(() => {});
-      await server.close().catch(() => {});
-    },
-  };
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res, parsed);
+  } finally {
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
+  }
 }
 
 const MAX_PORT_ATTEMPTS = 10;
@@ -399,6 +322,30 @@ function listenOnAvailablePort(server: http.Server, startPort: number): Promise<
   });
 }
 
+const MAX_BODY_BYTES = 50 * 1024 * 1024; // 50 MB
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let totalLength = 0;
+    req.on("data", (chunk: Buffer) => {
+      totalLength += chunk.length;
+      if (totalLength > MAX_BODY_BYTES) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+    req.on("error", reject);
+  });
+}
+
+function getHeaderValue(header: string | string[] | undefined): string | undefined {
+  return typeof header === "string" ? header : undefined;
+}
+
 function makeBuildInfoHeader(buildInfo: BuildInfo): string {
   const arr: string[] = [];
   arr.push(`name=${buildInfo.name}`);
@@ -407,13 +354,4 @@ function makeBuildInfoHeader(buildInfo: BuildInfo): string {
   if (buildInfo.buildDate) arr.push(`date=${buildInfo.buildDate}`);
 
   return arr.join(" ");
-}
-
-function pullAuthInfo(event: H3Event): AuthInfo | undefined {
-  const { authInfo } = event.context;
-  if (authInfo == null || typeof authInfo !== "object" || !(AUTH_INFO in authInfo)) {
-    return undefined;
-  }
-
-  return authInfo as unknown as AuthInfo;
 }

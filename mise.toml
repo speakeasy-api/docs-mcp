@@ -7,9 +7,6 @@ node = "24.13.1"
 pkl = "0.30.2"
 pnpm = "10.30.2"
 
-[env]
-LOG_PRETTY = "true"
-
 [tasks."index-fixtures"]
 description = "Build test fixture index from tests/fixtures/docs"
 run = "node packages/cli/dist/index.js build --docs-dir tests/fixtures/docs --out tests/fixtures/index --embedding-provider hash"
@@ -41,12 +38,12 @@ depends = ["index-fixtures"]
 
 [tasks.playground]
 description = "Start playground (MCP server + Vite dev server)"
-run = 'mprocs "mise exec -- pnpm --filter ./packages/server dev" "cd packages/playground && mise exec -- npx vite"'
+run = 'mprocs "pnpm --filter ./packages/server dev" "cd packages/playground && npx vite"'
 depends = ["index-fixtures"]
 
 [tasks."playground:no-gram"]
 description = "Start playground without GRAM_API_KEY (chat disabled)"
-run = 'GRAM_API_KEY= mprocs "mise exec -- pnpm --filter ./packages/server dev" "cd packages/playground && mise exec -- npx vite"'
+run = 'GRAM_API_KEY= mprocs "pnpm --filter ./packages/server dev" "cd packages/playground && npx vite"'
 depends = ["index-fixtures"]
 
 [tasks."playground:server"]
