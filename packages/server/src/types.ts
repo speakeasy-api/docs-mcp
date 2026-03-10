@@ -33,8 +33,6 @@ export interface DocsServer {
   buildInfo: BuildInfo;
 }
 
-export type DocsServerFactory = DocsServer;
-
 export interface ToolCallContext {
   /** Validated auth info from transport middleware (HTTP only). */
   authInfo?: AuthInfo;

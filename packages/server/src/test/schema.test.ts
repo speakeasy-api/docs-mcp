@@ -12,8 +12,8 @@ describe("CreateDocsServerOptionsSchema", () => {
     if (result.success) {
       expect(result.data.indexDir).toBe("./my-index");
       expect(result.data.customTools).toEqual([]);
-      expect(result.data.serverName).toBe("@speakeasy-api/docs-mcp-server");
-      expect(result.data.serverVersion).toBeTruthy();
+      expect(result.data.serverName).toBeUndefined();
+      expect(result.data.serverVersion).toBeUndefined();
     }
   });
 
@@ -157,10 +157,9 @@ describe("CreateDocsServerOptionsSchema", () => {
     const parsed: CreateDocsServerOptions = CreateDocsServerOptionsSchema.parse({
       indexDir: "./x",
     });
-    // These are always present after parse due to .default().
     const _tools: unknown[] = parsed.customTools;
-    const _serverName: string = parsed.serverName;
-    const _serverVersion: string = parsed.serverVersion;
+    const _serverName: string | undefined = parsed.serverName;
+    const _serverVersion: string | undefined = parsed.serverVersion;
     expect(_tools).toEqual([]);
   });
 });

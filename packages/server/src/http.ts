@@ -5,13 +5,7 @@ import {
   HandleRequestOptions,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type {
-  AuthInfo,
-  BuildInfo,
-  DocsServerFactory,
-  LoggingOptions,
-  ResolvedLogger,
-} from "./types.js";
+import type { AuthInfo, BuildInfo, DocsServer, LoggingOptions, ResolvedLogger } from "./types.js";
 import {
   H3,
   handleCors,
@@ -54,7 +48,7 @@ export interface HttpServerHandle {
 }
 
 export async function startHttpServer(
-  factory: (() => McpServer) | DocsServerFactory,
+  factory: (() => McpServer) | DocsServer,
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const logger = await resolveLogger(options, ["app", "http"]);
@@ -430,7 +424,7 @@ function pullAuthInfo(event: H3Event): AuthInfo | undefined {
 }
 
 function resolveBuildInfo(
-  factory: (() => McpServer) | DocsServerFactory,
+  factory: (() => McpServer) | DocsServer,
   buildInfo?: BuildInfo,
 ): BuildInfo {
   if (buildInfo) {

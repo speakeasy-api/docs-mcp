@@ -7,7 +7,7 @@ import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
 import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { getLogger } from "@logtape/logtape";
-import type { DocsServerFactory } from "../types.js";
+import type { DocsServer } from "../types.js";
 
 const logger = getLogger(["test"]);
 const buildInfo = { name: "test-server", version: "0.1.0" };
@@ -736,9 +736,9 @@ describe("HTTP built-in request retry consistency", () => {
 });
 
 describe("DOCS-MCP build header", () => {
-  it("defaults build info from the server factory without requiring a logger", async () => {
+  it("defaults build info from the docs server without requiring a logger", async () => {
     const factory = (() =>
-      createMcpServer({ app: { index: new DocsIndex(chunks), metadata } })) as DocsServerFactory;
+      createMcpServer({ app: { index: new DocsIndex(chunks), metadata } })) as DocsServer;
     factory.buildInfo = {
       name: "default-server",
       version: "9.9.9",

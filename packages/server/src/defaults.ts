@@ -31,8 +31,8 @@ export function resolveBuildInfo(input: {
   return {
     name: input.name,
     version: input.version,
-    gitCommit: input.gitCommit ?? process.env["GIT_COMMIT"] ?? undefined,
-    buildDate: input.buildDate ?? process.env["BUILD_DATE"] ?? undefined,
+    gitCommit: input.gitCommit ?? process.env["GIT_COMMIT"],
+    buildDate: input.buildDate ?? process.env["BUILD_DATE"],
   };
 }
 

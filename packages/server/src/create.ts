@@ -12,21 +12,9 @@ import {
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
-import type {
-  DocsServer,
-  DocsServerFactory,
-  LoggingOptions,
-  LoggerLike,
-  ResolvedLogger,
-} from "./types.js";
+import type { DocsServer, LoggingOptions, ResolvedLogger } from "./types.js";
 import { resolveLogger } from "./logging.js";
-import {
-  PACKAGE_SERVER_NAME,
-  PACKAGE_SERVER_VERSION,
-  resolveBuildInfo,
-  resolveServerName,
-  resolveServerVersion,
-} from "./defaults.js";
+import { resolveBuildInfo, resolveServerName, resolveServerVersion } from "./defaults.js";
 
 const TaxonomyFieldSchema = z
   .object({
@@ -129,16 +117,10 @@ const CustomToolSchema = z.object({
 /** Zod schema for `createDocsServer()` options. Consumers can use this to validate config. */
 export const CreateDocsServerOptionsSchema = z.object({
   /** Name of the MCP server. */
-  serverName: z
-    .string()
-    .min(1, "serverName must be a non-empty string")
-    .default(PACKAGE_SERVER_NAME),
+  serverName: z.string().min(1, "serverName must be a non-empty string").optional(),
 
   /** Version of the MCP server. */
-  serverVersion: z
-    .string()
-    .min(1, "serverVersion must be a non-empty string")
-    .default(PACKAGE_SERVER_VERSION),
+  serverVersion: z.string().min(1, "serverVersion must be a non-empty string").optional(),
 
   /** Directory containing chunks.json and metadata.json produced by `docs-mcp build`. */
   indexDir: z.string().min(1, "indexDir must be a non-empty string"),
@@ -196,32 +178,26 @@ export const CreateDocsServerOptionsSchema = z.object({
 /** What consumers pass to `createDocsServer()` — defaults are optional. */
 export type CreateDocsServerOptionsInput = z.input<typeof CreateDocsServerOptionsSchema>;
 
-/** Resolved options after Zod parse — defaults applied. */
+/** Resolved options after Zod parse. */
 export type CreateDocsServerOptions = z.output<typeof CreateDocsServerOptionsSchema>;
 
 export interface CreateDocsServerRuntimeOptions extends LoggingOptions {}
 
 /**
- * Create a fully-configured docs MCP server factory from a directory produced by `docs-mcp build`.
+ * Create a fully-configured docs MCP server from a directory produced by `docs-mcp build`.
  *
  * This is the primary programmatic entry point. It loads metadata, resolves embedding providers,
- * opens the search engine, and returns a factory ready to be passed to `startStdioServer()` or
+ * opens the search engine, and returns a server ready to be passed to `startStdioServer()` or
  * `startHttpServer()`.
  */
 export async function createDocsServer(
   input: CreateDocsServerOptionsInput,
   runtimeOptions: CreateDocsServerRuntimeOptions = {},
-): Promise<DocsServerFactory> {
+): Promise<DocsServer> {
   const rootLogger: ResolvedLogger = await resolveLogger(runtimeOptions);
   const options = CreateDocsServerOptionsSchema.parse(input);
-  const serverName =
-    input.serverName === undefined
-      ? resolveServerName(undefined, options.toolPrefix)
-      : resolveServerName(options.serverName);
-  const serverVersion =
-    input.serverVersion === undefined
-      ? resolveServerVersion()
-      : resolveServerVersion(options.serverVersion);
+  const serverName = resolveServerName(options.serverName, options.toolPrefix);
+  const serverVersion = resolveServerVersion(options.serverVersion);
 
   const indexDir = path.resolve(options.indexDir);
   const metadataPath = path.join(indexDir, "metadata.json");
@@ -305,40 +281,6 @@ export async function createDocsServer(
   });
 
   return factory;
-}
-
-/** @deprecated Use createDocsServer() instead. */
-export async function createDocsServerFactory(
-  input: CreateDocsServerOptionsInput,
-  runtimeOptions: CreateDocsServerRuntimeOptions = {},
-): Promise<DocsServerFactory> {
-  return createDocsServer(input, runtimeOptions);
-}
-
-export async function createDocsMcpServerFactory(
-  logger: LoggingOptions["logger"],
-  input: CreateDocsServerOptionsInput,
-): Promise<DocsServerFactory>;
-/** @deprecated Use createDocsServer() instead. */
-export async function createDocsMcpServerFactory(
-  input: CreateDocsServerOptionsInput,
-  runtimeOptions?: CreateDocsServerRuntimeOptions,
-): Promise<DocsServerFactory>;
-/** @deprecated Use createDocsServer() instead. */
-export async function createDocsMcpServerFactory(
-  loggerOrInput: LoggingOptions["logger"] | CreateDocsServerOptionsInput,
-  inputOrRuntimeOptions?: CreateDocsServerOptionsInput | CreateDocsServerRuntimeOptions,
-): Promise<DocsServerFactory> {
-  if (looksLikeCreateDocsServerOptions(loggerOrInput)) {
-    return createDocsServer(
-      loggerOrInput,
-      (inputOrRuntimeOptions as CreateDocsServerRuntimeOptions | undefined) ?? {},
-    );
-  }
-
-  return createDocsServer(inputOrRuntimeOptions as CreateDocsServerOptionsInput, {
-    logger: loggerOrInput,
-  });
 }
 
 async function loadSearchEngine(
@@ -485,10 +427,4 @@ async function exists(targetPath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function looksLikeCreateDocsServerOptions(
-  value: LoggerLike | CreateDocsServerOptionsInput | undefined,
-): value is CreateDocsServerOptionsInput {
-  return typeof value === "object" && value !== null && "indexDir" in value;
 }
