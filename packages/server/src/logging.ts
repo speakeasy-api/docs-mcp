@@ -1,10 +1,9 @@
-import stream from "node:stream";
 import {
   configure,
+  getConsoleSink,
   getJsonLinesFormatter,
   getLogger,
   getLogLevels,
-  getStreamSink,
   type LogLevel,
 } from "@logtape/logtape";
 import { getPrettyFormatter } from "@logtape/pretty";
@@ -43,10 +42,7 @@ export async function configureDefaultLogger(
 
   await configure({
     sinks: {
-      console: getStreamSink(
-        stream.Writable.toWeb(process.stderr) as unknown as WritableStream<Uint8Array>,
-        { formatter },
-      ),
+      console: getConsoleSink({ formatter }),
     },
     loggers: [
       { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
