@@ -52,6 +52,7 @@ export interface StartHttpServerOptions extends Pick<
 
 export interface HttpServerHandle {
   httpServer: http.Server;
+  shutdown: () => Promise<void>;
   fetch: (request: Request) => Response | Promise<Response>;
   port: number;
 }
@@ -86,7 +87,21 @@ export async function startHttpServer(
   const actualPort = await listenOnAvailablePort(httpServer, port);
   logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
 
-  return { httpServer, fetch: app.fetch, port: actualPort };
+  const shutdown = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      logger.info("shutting down http server");
+
+      httpServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  };
+
+  return { httpServer, fetch: app.fetch, port: actualPort, shutdown };
 }
 
 interface SessionEntry {

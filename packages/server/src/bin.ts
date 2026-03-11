@@ -115,7 +115,7 @@ program
     );
 
     if (options.transport === "http") {
-      await startHttpServer(server, {
+      const { shutdown } = await startHttpServer(server, {
         port: options.port,
         ...(options.gitCommit || options.buildDate
           ? {
@@ -129,8 +129,10 @@ program
         pretty: options.logPretty,
         logLevel: options.logLevel,
       });
+      registerShutdown(shutdown);
     } else {
-      await startStdioServer(server);
+      const { shutdown } = await startStdioServer(server);
+      registerShutdown(shutdown);
     }
   });
 
@@ -150,4 +152,32 @@ function parseIntOption(value: string): number {
     throw new Error(`invalid integer value '${value}'`);
   }
   return parsed;
+}
+
+function registerShutdown(cleanup: () => Promise<void>): void {
+  let shuttingDown = false;
+
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+
+    try {
+      await cleanup();
+    } catch (error) {
+      const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      process.stderr.write(`Failed to shut down on ${signal}: ${message}\n`);
+      process.exitCode = 1;
+    } finally {
+      process.exit();
+    }
+  };
+
+  process.once("SIGINT", () => {
+    shutdown("SIGINT");
+  });
+  process.once("SIGTERM", () => {
+    shutdown("SIGTERM");
+  });
 }
