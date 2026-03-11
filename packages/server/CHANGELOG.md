@@ -1,5 +1,12 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.16.3
+
+### Patch Changes
+
+- 1dc7b7d: Register SIGINT and SIGTERM handlers so the server closes its active transport before exiting. This lets HTTP and stdio deployments stop cleanly in containers instead of hanging on shutdown.
+  - @speakeasy-api/docs-mcp-core@0.16.3
+
 ## 0.16.2
 
 ### Patch Changes
