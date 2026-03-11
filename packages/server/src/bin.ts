@@ -157,7 +157,7 @@ function parseIntOption(value: string): number {
 function registerShutdown(cleanup: () => Promise<void>): void {
   let shuttingDown = false;
 
-  const shutdown = async (signal: NodeJS.Signals) => {
+  const shutdown = async (signal: string) => {
     if (shuttingDown) {
       return;
     }
