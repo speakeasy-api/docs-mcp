@@ -19,6 +19,7 @@ interface ServerCliOptions {
   vectorWeight?: number;
   transport: "stdio" | "http";
   port: number;
+  stateless: boolean;
   customToolsJson?: string;
   gitCommit?: string;
   buildDate?: string;
@@ -51,6 +52,11 @@ program
     "HTTP server port (only used with --transport http)",
     parseIntOption,
     20310,
+  )
+  .option(
+    "--stateless",
+    "Serve each HTTP request without MCP sessions (env: STATELESS)",
+    process.env["STATELESS"] === "true",
   )
   .option(
     "--custom-tools-json <json>",
@@ -117,6 +123,7 @@ program
     if (options.transport === "http") {
       const { shutdown } = await startHttpServer(server, {
         port: options.port,
+        stateless: options.stateless,
         ...(options.gitCommit || options.buildDate
           ? {
               buildInfo: {

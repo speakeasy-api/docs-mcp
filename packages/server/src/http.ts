@@ -48,6 +48,12 @@ export interface StartHttpServerOptions extends Pick<
    * or throw to reject with 401.
    */
   authenticate?: Authenticator;
+  /**
+   * Serve every request with a fresh server and transport. No sessions are
+   * created, the mcp-session-id request header is ignored and no
+   * Mcp-Session-Id response header is issued.
+   */
+  stateless?: boolean;
 }
 
 export interface HttpServerHandle {
@@ -64,7 +70,7 @@ export async function startHttpServer(
   const logger = await resolveLogger(options);
   const buildInfo = resolveBuildInfo(factory, options.buildInfo);
   const port = options.port ?? 20310;
-  const sessionManager = new SessionManager();
+  const sessionManager = options.stateless ? undefined : new SessionManager();
 
   const app = new H3()
     .use(bodyLimit(50 * 1024 * 1024))
@@ -73,15 +79,22 @@ export async function startHttpServer(
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
     .get("/healthz", handleHealthCheck(buildInfo))
-    .delete("/mcp", handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate }))
+    .delete(
+      "/mcp",
+      sessionManager
+        ? handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate })
+        : handleDeleteMCPSessionStateless(),
+    )
     .post(
       "/mcp",
-      handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate }),
+      sessionManager
+        ? handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate })
+        : handleMCPRPCStateless({ factory, authenticate: options.authenticate }),
     );
 
   const httpServer = http.createServer(toNodeHandler(app));
   httpServer.on("close", () => {
-    sessionManager.closeAll();
+    sessionManager?.closeAll();
   });
 
   const actualPort = await listenOnAvailablePort(httpServer, port);
@@ -315,6 +328,12 @@ const handleDeleteMCPSession = (deps: {
   });
 };
 
+const handleDeleteMCPSessionStateless = () => {
+  return defineHandler(() => {
+    return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  });
+};
+
 const handleMCPRPC = (deps: {
   logger: Logger;
   factory: () => McpServer;
@@ -367,6 +386,23 @@ const handleMCPRPC = (deps: {
           },
         );
       }
+    },
+  });
+};
+
+const handleMCPRPCStateless = (deps: {
+  factory: () => McpServer;
+  authenticate?: Authenticator | undefined;
+}) => {
+  return defineHandler({
+    middleware: [createDisposeMiddleware(), createAuthMiddleware({ handler: deps.authenticate })],
+    handler: async (event) => {
+      const authInfo = pullAuthInfo(event);
+      const { response, dispose } = await handleWithStatelessServer(deps.factory, event.req, {
+        authInfo,
+      });
+      queueDispose(event, dispose);
+      return response;
     },
   });
 };
