@@ -576,6 +576,112 @@ describe("HTTP session management", () => {
   });
 });
 
+describe("HTTP stateless mode", () => {
+  let statelessHttpServer: http.Server;
+  let statelessBaseUrl: string;
+
+  beforeAll(async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0, stateless: true },
+    );
+    statelessHttpServer = handle.httpServer;
+    const addr = statelessHttpServer.address();
+    const port = typeof addr === "object" && addr ? addr.port : handle.port;
+    statelessBaseUrl = `http://localhost:${port}`;
+  });
+
+  afterAll(async () => {
+    if (statelessHttpServer) {
+      await new Promise<void>((resolve) => statelessHttpServer.close(() => resolve()));
+    }
+  });
+
+  async function postMcp(
+    request: Record<string, unknown>,
+    headers: Record<string, string> = {},
+  ): Promise<{ res: Response; body: Record<string, unknown> }> {
+    const res = await fetch(`${statelessBaseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        ...headers,
+      },
+      body: JSON.stringify(request),
+    });
+    const text = await res.text();
+    const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+    expect(lines.length).toBeGreaterThan(0);
+    const body = JSON.parse(lines[0]?.slice(6) || "{}");
+    return { res, body };
+  }
+
+  it("initializes without issuing a session ID", async () => {
+    const { res, body } = await postMcp({
+      jsonrpc: "2.0",
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "0.1.0" },
+      },
+      id: 1,
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("mcp-session-id")).toBeNull();
+    expect(body).toHaveProperty("result.serverInfo");
+  });
+
+  it("serves follow-up requests without a session ID", async () => {
+    const { res, body } = await postMcp({
+      jsonrpc: "2.0",
+      method: "tools/list",
+      params: {},
+      id: 2,
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("mcp-session-id")).toBeNull();
+    expect((body["result"] as { tools: unknown[] }).tools.length).toBeGreaterThan(0);
+  });
+
+  it("ignores an unknown mcp-session-id header", async () => {
+    const { res, body } = await postMcp(
+      {
+        jsonrpc: "2.0",
+        method: "tools/list",
+        params: {},
+        id: 3,
+      },
+      { "mcp-session-id": "bogus-session-id" },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("mcp-session-id")).toBeNull();
+    expect((body["result"] as { tools: unknown[] }).tools.length).toBeGreaterThan(0);
+  });
+
+  it("completes SDK client handshake and tool calls", async () => {
+    const transport = new StreamableHTTPClientTransport(new URL(`${statelessBaseUrl}/mcp`));
+    const client = new Client({ name: "test-client", version: "0.1.0" });
+    await client.connect(transport);
+
+    expect(transport.sessionId).toBeUndefined();
+
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name)).toContain("search_docs");
+
+    await client.close();
+  });
+
+  it("responds 405 to DELETE", async () => {
+    const res = await fetch(`${statelessBaseUrl}/mcp`, {
+      method: "DELETE",
+      headers: { "mcp-session-id": "bogus-session-id" },
+    });
+    expect(res.status).toBe(405);
+  });
+});
+
 describe("HTTP built-in request retry consistency", () => {
   function builtInRequests(): Record<string, unknown>[] {
     return [

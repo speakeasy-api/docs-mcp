@@ -116,6 +116,14 @@ Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
 `clientInfo` (best-effort; may be missing in stateless/degraded handling), and
 an abort `signal`.
 
+### Stateless HTTP mode
+
+Pass `stateless: true` (CLI: `--stateless`, env: `STATELESS=true`) to serve
+every request with a fresh server and transport. No sessions are created, the
+`mcp-session-id` request header is ignored, no `Mcp-Session-Id` response header
+is issued, and `DELETE /mcp` responds 405. Use this when requests may hit
+different replicas, e.g. behind a load balancer.
+
 ## Option Reference
 
 | Field                     | Type           | Default              | Description                                                                                                                                                            |
