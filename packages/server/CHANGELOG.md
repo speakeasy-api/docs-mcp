@@ -1,5 +1,17 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.17.0
+
+### Minor Changes
+
+- 53b3e50: Add a stateless HTTP mode via `startHttpServer({ stateless: true })` and the `--stateless` CLI flag (env: `STATELESS`).
+
+  When enabled, every request is served by a fresh server and transport: no sessions are created, the `mcp-session-id` request header is ignored, no `Mcp-Session-Id` response header is issued, and `DELETE /mcp` responds 405.
+
+### Patch Changes
+
+- @speakeasy-api/docs-mcp-core@0.17.0
+
 ## 0.16.3
 
 ### Patch Changes
