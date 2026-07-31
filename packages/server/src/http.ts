@@ -21,7 +21,6 @@ import {
   Middleware,
   H3Event,
   defineHandler,
-  toResponse,
   bodyLimit,
 } from "h3";
 import { resolveLogger } from "./logging.js";
@@ -267,31 +266,54 @@ const createCORSMiddleware = (): Middleware => {
   };
 };
 
-function createDisposeMiddleware(): Middleware {
-  return async (event, next) => {
-    const disposeCallbacks: Array<() => Promise<void>> = [];
-    event.context.disposeCallbacks = disposeCallbacks;
-    event.context.queueDispose = (cb: () => Promise<void>) => disposeCallbacks.push(cb);
-
-    let response: Response;
-    try {
-      const result = await next();
-      response = await toResponse(result, event);
-    } finally {
-      await Promise.allSettled(disposeCallbacks.map((cb) => cb()));
-    }
-
+/**
+ * Ties per-request server/transport disposal to the response body lifecycle.
+ * Streamable HTTP responses resolve before the JSON-RPC result is written to
+ * the SSE stream, so disposing when the handler returns truncates async tool
+ * results. Disposal must wait until the body finishes, errors, or the client
+ * cancels.
+ */
+function disposeOnBodyComplete(response: Response, dispose: () => Promise<void>): Response {
+  const body = response.body;
+  if (!body) {
+    void dispose();
     return response;
-  };
-}
-
-function queueDispose(event: H3Event, func: () => Promise<void>) {
-  const { queueDispose } = event.context;
-  if (typeof queueDispose !== "function") {
-    throw new Error("Dispose queue not found in event context");
   }
 
-  queueDispose(func);
+  let disposed = false;
+  const disposeOnce = async (): Promise<void> => {
+    if (disposed) return;
+    disposed = true;
+    await dispose();
+  };
+
+  const reader = body.getReader();
+  const monitored = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          await disposeOnce();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (error) {
+        await disposeOnce();
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason).catch(() => {});
+      await disposeOnce();
+    },
+  });
+
+  return new Response(monitored, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 const handleHealthCheck = (buildInfo: BuildInfo) => {
@@ -341,7 +363,7 @@ const handleMCPRPC = (deps: {
   authenticate?: Authenticator | undefined;
 }) => {
   return defineHandler({
-    middleware: [createDisposeMiddleware(), createAuthMiddleware({ handler: deps.authenticate })],
+    middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
       const { logger } = deps;
       const { req } = event;
@@ -356,11 +378,7 @@ const handleMCPRPC = (deps: {
         }
 
         logger.warn("no session state found for session id", { session_id: sessionId });
-        const { response, dispose } = await handleWithStatelessServer(deps.factory, req, {
-          authInfo,
-        });
-        queueDispose(event, dispose);
-        return response;
+        return await handleWithStatelessServer(deps.factory, req, { authInfo });
       }
 
       const server = deps.factory();
@@ -395,14 +413,10 @@ const handleMCPRPCStateless = (deps: {
   authenticate?: Authenticator | undefined;
 }) => {
   return defineHandler({
-    middleware: [createDisposeMiddleware(), createAuthMiddleware({ handler: deps.authenticate })],
+    middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
       const authInfo = pullAuthInfo(event);
-      const { response, dispose } = await handleWithStatelessServer(deps.factory, event.req, {
-        authInfo,
-      });
-      queueDispose(event, dispose);
-      return response;
+      return await handleWithStatelessServer(deps.factory, event.req, { authInfo });
     },
   });
 };
@@ -411,18 +425,22 @@ async function handleWithStatelessServer(
   factory: () => McpServer,
   req: Request,
   options?: HandleRequestOptions,
-): Promise<{ response: Response; dispose: () => Promise<void> }> {
+): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport();
   const server = factory();
-
-  await server.connect(transport);
-  return {
-    response: await transport.handleRequest(req, options),
-    dispose: async () => {
-      await transport.close().catch(() => {});
-      await server.close().catch(() => {});
-    },
+  const dispose = async (): Promise<void> => {
+    await transport.close().catch(() => {});
+    await server.close().catch(() => {});
   };
+
+  try {
+    await server.connect(transport);
+    const response = await transport.handleRequest(req, options);
+    return disposeOnBodyComplete(response, dispose);
+  } catch (error) {
+    await dispose();
+    throw error;
+  }
 }
 
 const MAX_PORT_ATTEMPTS = 10;

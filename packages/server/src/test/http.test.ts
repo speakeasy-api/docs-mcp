@@ -903,3 +903,99 @@ describe("DOCS-MCP build header", () => {
     }
   });
 });
+
+describe("HTTP transport disposal with async tools", () => {
+  function createDelayedToolServer() {
+    return createMcpServer({
+      app: {
+        index: new DocsIndex(chunks),
+        metadata,
+        customTools: [
+          {
+            name: "delayed_echo",
+            description: "Echoes after an async delay",
+            inputSchema: { type: "object", properties: {} },
+            handler: async () => {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              return {
+                content: [{ type: "text" as const, text: "delayed-ok" }],
+                isError: false,
+              };
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  async function callDelayedEcho(
+    port: number,
+    headers: Record<string, string> = {},
+  ): Promise<{ res: Response; text: string }> {
+    const res = await fetch(`http://localhost:${port}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        ...headers,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { name: "delayed_echo", arguments: {} },
+        id: 1,
+      }),
+    });
+    const text = await res.text();
+    return { res, text };
+  }
+
+  function expectDelayedEchoResult(text: string): void {
+    const lines = text.split("\n").filter((l) => l.startsWith("data: "));
+    expect(lines.length).toBeGreaterThan(0);
+    const body = JSON.parse(lines[0]?.slice(6) || "{}") as Record<string, unknown>;
+    expect(body).toHaveProperty("result");
+    expect(JSON.stringify(body["result"])).toContain("delayed-ok");
+  }
+
+  it("stateless mode streams async tool results before disposing the transport", async () => {
+    const handle = await startHttpServer(createDelayedToolServer, {
+      logger,
+      buildInfo,
+      port: 0,
+      stateless: true,
+    });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      const { res, text } = await callDelayedEcho(port);
+      expect(res.status).toBe(200);
+      expectDelayedEchoResult(text);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("stateful stale-session fallback streams async tool results before disposing", async () => {
+    const handle = await startHttpServer(createDelayedToolServer, {
+      logger,
+      buildInfo,
+      port: 0,
+    });
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      const { res, text } = await callDelayedEcho(port, {
+        "mcp-session-id": "stale-session-id",
+      });
+      expect(res.status).toBe(200);
+      expectDelayedEchoResult(text);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+});
