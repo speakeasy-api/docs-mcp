@@ -1,5 +1,21 @@
 # @speakeasy-api/docs-mcp-server
 
+## 0.19.0
+
+### Minor Changes
+
+- 87e67c6: Answer protocol errors with the specification's JSON-RPC codes and validate `Origin` as the Streamable HTTP transport requires:
+  - Unknown tool, unknown prompt, missing required prompt argument, invalid resource URI and missing resource answer `-32602` (Invalid params). Previously an unknown tool was a tool result with `isError` and the others were `-32603`. Tool execution failures, including rejected tool arguments and errors thrown by custom tool handlers, remain `isError` results.
+  - The `Origin` header is validated on every HTTP request; a present, disallowed `Origin` answers `403` with a JSON-RPC error body. Localhost origins are allowed by default; `allowedOrigins` (CLI `--allowed-origins`, env `ALLOWED_ORIGINS`) replaces that list.
+  - New `host` option (CLI `--host`, env `HOST`) selects the bind address. A loopback bind also validates the `Host` header against localhost names. `mise run serve:http` now binds `127.0.0.1`.
+
+### Patch Changes
+
+- 8134a58: Protocol hygiene for servers that never change and never notify:
+  - End every 2026-07-28 `subscriptions/listen` subscription immediately over HTTP: acknowledge with an empty filter, then complete the request and close the stream. This server never emits change notifications, so holding the stream open only pinned a connection per client.
+  - Declare the `prompts` capability only when the corpus defines prompts and the `resources` capability only when a taxonomy value is marked as an MCP resource. Requests for an undeclared capability answer "Method not found" instead of an empty list, and clients that respect declared capabilities stop sending them.
+  - @speakeasy-api/docs-mcp-core@0.19.0
+
 ## 0.18.0
 
 ### Minor Changes
