@@ -1,7 +1,6 @@
 import { describe, expect, assert, it } from "vitest";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createTestServer } from "./mcp.helper.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const chunks: Chunk[] = [
   {
@@ -114,7 +113,7 @@ describe("McpDocsServer", () => {
         language: "typescript",
       },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toBe(false);
     assert(parsed.content[0]?.type === "text");
@@ -139,7 +138,7 @@ describe("McpDocsServer", () => {
         cursor: "bad-cursor",
       },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
@@ -162,7 +161,7 @@ describe("McpDocsServer", () => {
         unsupported: "x",
       },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
@@ -185,7 +184,7 @@ describe("McpDocsServer", () => {
         limit: 0,
       },
     });
-    const badLimit = CallToolResultSchema.parse(limitResult);
+    const badLimit = limitResult;
     expect(badLimit.isError).toBe(true);
     assert(badLimit.content[0]?.type === "text");
     expect(badLimit.content[0].text).toMatch(/limit must be between 1 and 50/);
@@ -197,7 +196,7 @@ describe("McpDocsServer", () => {
         context: 6,
       },
     });
-    const badContext = CallToolResultSchema.parse(contextResult);
+    const badContext = contextResult;
     expect(badContext.isError).toBe(true);
     assert(badContext.content[0]?.type === "text");
     expect(badContext.content[0].text).toMatch(/context must be between 0 and 5/);
@@ -240,7 +239,7 @@ describe("McpDocsServer with toolPrefix", () => {
         language: "typescript",
       },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toBe(false);
     assert(parsed.content[0]?.type === "text");
@@ -262,7 +261,7 @@ describe("McpDocsServer with toolPrefix", () => {
       name: "search_docs",
       arguments: { query: "retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Unknown tool/);

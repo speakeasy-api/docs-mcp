@@ -41,13 +41,14 @@
     "lint": "eslint src"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/mustache": "^4.2.6",
     "tsx": "^4.19.0"
   },
   "dependencies": {
     "@logtape/logtape": "^2.0.4",
     "@logtape/pretty": "^2.0.4",
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@speakeasy-api/docs-mcp-core": "workspace:*",
     "change-case": "^5.4.4",
     "commander": "^13.1.0",

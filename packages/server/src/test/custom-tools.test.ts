@@ -1,8 +1,6 @@
 import { afterAll, assert, beforeAll, describe, expect, it, vi } from "vitest";
 import type http from "node:http";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
@@ -98,7 +96,7 @@ describe("McpDocsServer custom tools", () => {
       name: "submit_feedback",
       arguments: { chunk_id: "guides/ts.md#retry", rating: 5 },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
     expect(parsed.isError).toBe(false);
     assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toBe("Feedback received: 5");
@@ -118,7 +116,7 @@ describe("McpDocsServer custom tools", () => {
       name: "always_throws",
       arguments: {},
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toBe("Something went wrong");
@@ -138,7 +136,7 @@ describe("McpDocsServer custom tools", () => {
       name: "search_docs",
       arguments: { query: "retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
     expect(parsed.isError).toBe(false);
   });
 
@@ -156,7 +154,7 @@ describe("McpDocsServer custom tools", () => {
       name: "nonexistent",
       arguments: {},
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
     expect(parsed.content[0].text).toMatch(/Unknown tool/);
@@ -217,6 +215,76 @@ describe("McpDocsServer context threading", () => {
       await client.callTool({ name: "ctx_echo", arguments: { foo: "bar" } });
 
       expect(receivedArgs).toEqual({ foo: "bar" });
+      expect(receivedCtx?.signal).toBeInstanceOf(AbortSignal);
+      expect(receivedCtx?.authInfo).toEqual(
+        expect.objectContaining({ token: "tok", clientId: "c1", scopes: ["read"] }),
+      );
+      expect(receivedCtx?.headers).toMatchObject({ authorization: "Bearer tok" });
+      expect(receivedCtx?.clientInfo).toEqual({ name: "test", version: "1.0" });
+
+      await client.close();
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+});
+
+describe("McpDocsServer context threading on 2026-07-28", () => {
+  it("passes auth, headers and envelope client info through to custom handler", async () => {
+    let receivedCtx: ToolCallContext | undefined;
+
+    const contextTool: CustomTool = {
+      name: "ctx_echo",
+      description: "Echoes context",
+      inputSchema: { type: "object", properties: {} },
+      handler: async (_args, ctx) => {
+        receivedCtx = ctx;
+        return { content: [{ type: "text" as const, text: "ok" }], isError: false };
+      },
+    };
+
+    const handle = await startHttpServer(
+      () =>
+        createMcpServer({
+          mcp: { includeClientInfo: true },
+          app: {
+            index: new DocsIndex(chunks),
+            metadata,
+            customTools: [contextTool],
+          },
+        }),
+      {
+        logger,
+        buildInfo: { name: "test-server", version: "0.1.0" },
+        port: 0,
+        stateless: true,
+        authenticate: async ({ headers }) => {
+          const auth = headers.get("authorization");
+          const token = typeof auth === "string" ? auth.replace("Bearer ", "") : "";
+          return { token, clientId: "c1", scopes: ["read"] };
+        },
+      },
+    );
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      const url = new URL(`http://localhost:${port}/mcp`);
+
+      const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: {
+          headers: { Authorization: "Bearer tok" },
+        },
+      });
+      const client = new Client(
+        { name: "test", version: "1.0" },
+        { versionNegotiation: { mode: "auto" } },
+      );
+      await client.connect(transport);
+      expect(client.getProtocolEra()).toBe("modern");
+
+      await client.callTool({ name: "ctx_echo", arguments: { foo: "bar" } });
+
       expect(receivedCtx?.signal).toBeInstanceOf(AbortSignal);
       expect(receivedCtx?.authInfo).toEqual(
         expect.objectContaining({ token: "tok", clientId: "c1", scopes: ["read"] }),
@@ -360,7 +428,7 @@ describe("Custom tools over HTTP transport", () => {
       name: "submit_feedback",
       arguments: { chunk_id: "guides/ts.md#retry", rating: 4 },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toEqual(false);
     assert(parsed.content[0]?.type === "text");
@@ -378,7 +446,7 @@ describe("Custom tools over HTTP transport", () => {
       name: "always_throws",
       arguments: {},
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toBe(true);
     assert(parsed.content[0]?.type === "text");
@@ -448,7 +516,7 @@ describe("HTTP authentication", () => {
         name: "auth_echo",
         arguments: {},
       });
-      const parsed = CallToolResultSchema.parse(result);
+      const parsed = result;
 
       expect(parsed.isError).toEqual(false);
       assert(parsed.content[0]?.type === "text");
@@ -562,7 +630,7 @@ describe("HTTP authentication", () => {
         name: "header_echo",
         arguments: {},
       });
-      const parsed = CallToolResultSchema.parse(result);
+      const parsed = result;
 
       expect(parsed.isError).toEqual(false);
       assert(parsed.content[0]?.type === "text");

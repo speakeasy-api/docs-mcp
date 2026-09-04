@@ -1,10 +1,16 @@
 import crypto from "node:crypto";
 import http from "node:http";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  HandleRequestOptions,
+  createMcpHandler,
+  isLegacyRequest,
+  legacyStatelessFallback,
   WebStandardStreamableHTTPServerTransport,
-} from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+  type LegacyHttpHandler,
+  type McpHandlerRequestOptions,
+  type McpHttpHandler,
+  type McpServerFactory,
+  type Server,
+} from "@modelcontextprotocol/server";
 import type {
   AuthInfo,
   BuildInfo,
@@ -48,9 +54,10 @@ export interface StartHttpServerOptions extends Pick<
    */
   authenticate?: Authenticator;
   /**
-   * Serve every request with a fresh server and transport. No sessions are
-   * created, the mcp-session-id request header is ignored and no
-   * Mcp-Session-Id response header is issued.
+   * Serve every 2025-era request with a fresh server and transport. No
+   * sessions are created, the mcp-session-id request header is ignored and no
+   * Mcp-Session-Id response header is issued. Requests on the 2026-07-28
+   * revision are always served per request, in either mode.
    */
   stateless?: boolean;
 }
@@ -63,13 +70,28 @@ export interface HttpServerHandle {
 }
 
 export async function startHttpServer(
-  factory: (() => McpServer) | DocsServer,
+  factory: (() => Server) | DocsServer,
   options: StartHttpServerOptions = {},
 ): Promise<HttpServerHandle> {
   const logger = await resolveLogger(options);
   const buildInfo = resolveBuildInfo(factory, options.buildInfo);
   const port = options.port ?? 20310;
   const sessionManager = options.stateless ? undefined : new SessionManager();
+  const serverFactory: McpServerFactory = () => factory();
+  const onerror = (error: Error) => {
+    logger.warn("mcp handler error", { error });
+  };
+
+  // The 2026-07-28 revision is served per request from the same factory in
+  // both modes. In stateless mode the handler also serves 2025-era requests
+  // per request. In session mode 2025-era requests keep the sessionful
+  // serving below, so the handler is strict and only ever sees requests
+  // carrying the per-request `_meta` envelope.
+  const modern = createMcpHandler(serverFactory, {
+    legacy: sessionManager ? "reject" : "stateless",
+    onerror,
+  });
+  const legacyFallback = legacyStatelessFallback(serverFactory, onerror);
 
   const app = new H3()
     .use(bodyLimit(50 * 1024 * 1024))
@@ -78,6 +100,7 @@ export async function startHttpServer(
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
     .get("/healthz", handleHealthCheck(buildInfo))
+    .get("/mcp", handleGetMCPStream({ allow: sessionManager ? "POST, DELETE" : "POST" }))
     .delete(
       "/mcp",
       sessionManager
@@ -87,13 +110,21 @@ export async function startHttpServer(
     .post(
       "/mcp",
       sessionManager
-        ? handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate })
-        : handleMCPRPCStateless({ factory, authenticate: options.authenticate }),
+        ? handleMCPRPC({
+            logger,
+            factory,
+            sessionManager,
+            modern,
+            legacyFallback,
+            authenticate: options.authenticate,
+          })
+        : handleMCPRPCStateless({ modern, authenticate: options.authenticate }),
     );
 
   const httpServer = http.createServer(toNodeHandler(app));
   httpServer.on("close", () => {
     sessionManager?.closeAll();
+    void modern.close();
   });
 
   const actualPort = await listenOnAvailablePort(httpServer, port);
@@ -117,7 +148,7 @@ export async function startHttpServer(
 }
 
 interface SessionEntry {
-  server: McpServer;
+  server: Server;
   transport: WebStandardStreamableHTTPServerTransport;
 }
 
@@ -127,7 +158,7 @@ class SessionManager {
 
   add(
     sessionId: string,
-    server: McpServer,
+    server: Server,
     transport: WebStandardStreamableHTTPServerTransport,
   ): void {
     if (this.sessions.size >= SessionManager.MAX_SESSIONS) {
@@ -161,7 +192,7 @@ class SessionManager {
 }
 
 function createStatefulTransport(
-  server: McpServer,
+  server: Server,
   sessionManager: SessionManager,
 ): WebStandardStreamableHTTPServerTransport {
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -266,59 +297,24 @@ const createCORSMiddleware = (): Middleware => {
   };
 };
 
-/**
- * Ties per-request server/transport disposal to the response body lifecycle.
- * Streamable HTTP responses resolve before the JSON-RPC result is written to
- * the SSE stream, so disposing when the handler returns truncates async tool
- * results. Disposal must wait until the body finishes, errors, or the client
- * cancels.
- */
-function disposeOnBodyComplete(response: Response, dispose: () => Promise<void>): Response {
-  const body = response.body;
-  if (!body) {
-    void dispose();
-    return response;
-  }
-
-  let disposed = false;
-  const disposeOnce = async (): Promise<void> => {
-    if (disposed) return;
-    disposed = true;
-    await dispose();
-  };
-
-  const reader = body.getReader();
-  const monitored = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          await disposeOnce();
-          return;
-        }
-        controller.enqueue(value);
-      } catch (error) {
-        await disposeOnce();
-        controller.error(error);
-      }
-    },
-    async cancel(reason) {
-      await reader.cancel(reason).catch(() => {});
-      await disposeOnce();
-    },
-  });
-
-  return new Response(monitored, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
-}
-
 const handleHealthCheck = (buildInfo: BuildInfo) => {
   return defineHandler(() => {
     return { build: buildInfo };
+  });
+};
+
+/**
+ * This server never opens the 2025-era standalone server-to-client SSE
+ * stream, so a GET on the MCP endpoint is answered with 405 and an Allow
+ * header as the Streamable HTTP transport spec requires. Without an explicit
+ * route the request would fall through to the router's 404, which is not a
+ * JSON-RPC response and echoes the bound URL back to the caller. The
+ * 2026-07-28 revision has no GET at all: change notifications ride
+ * `subscriptions/listen`, a POST.
+ */
+const handleGetMCPStream = (deps: { allow: string }) => {
+  return defineHandler(() => {
+    return new Response(null, { status: 405, headers: { Allow: deps.allow } });
   });
 };
 
@@ -330,7 +326,7 @@ const handleDeleteMCPSession = (deps: {
     middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
       const { req } = event;
-      const authInfo = pullAuthInfo(event);
+      const requestOptions = mcpRequestOptions(event);
       const sessionId = req.headers.get("mcp-session-id");
       if (!sessionId) {
         return noContent();
@@ -340,7 +336,7 @@ const handleDeleteMCPSession = (deps: {
         return noContent();
       }
 
-      const mcpRes = await entry.transport.handleRequest(req, { authInfo });
+      const mcpRes = await entry.transport.handleRequest(req, requestOptions);
       if (mcpRes.ok) {
         deps.sessionManager.evict(sessionId);
       }
@@ -358,8 +354,10 @@ const handleDeleteMCPSessionStateless = () => {
 
 const handleMCPRPC = (deps: {
   logger: Logger;
-  factory: () => McpServer;
+  factory: () => Server;
   sessionManager: SessionManager;
+  modern: McpHttpHandler;
+  legacyFallback: LegacyHttpHandler;
   authenticate?: Authenticator | undefined;
 }) => {
   return defineHandler({
@@ -367,25 +365,32 @@ const handleMCPRPC = (deps: {
     handler: async (event) => {
       const { logger } = deps;
       const { req } = event;
+      const requestOptions = mcpRequestOptions(event);
 
-      const authInfo = pullAuthInfo(event);
+      // Requests carrying the 2026-07-28 per-request envelope never belong to
+      // a session; everything else is a 2025-era request and keeps the
+      // sessionful serving.
+      if (!(await isLegacyRequest(req))) {
+        return await deps.modern.fetch(req, requestOptions);
+      }
+
       const sessionId = req.headers.get("mcp-session-id");
 
       if (sessionId) {
         const entry = deps.sessionManager.get(sessionId);
         if (entry) {
-          return await entry.transport.handleRequest(req, { authInfo });
+          return await entry.transport.handleRequest(req, requestOptions);
         }
 
         logger.warn("no session state found for session id", { session_id: sessionId });
-        return await handleWithStatelessServer(deps.factory, req, { authInfo });
+        return await deps.legacyFallback(req, requestOptions);
       }
 
       const server = deps.factory();
       const transport = createStatefulTransport(server, deps.sessionManager);
       try {
         await server.connect(transport);
-        return await transport.handleRequest(req, { authInfo });
+        return await transport.handleRequest(req, requestOptions);
       } catch (error) {
         logger.error("error handling mcp request", { error });
 
@@ -409,39 +414,16 @@ const handleMCPRPC = (deps: {
 };
 
 const handleMCPRPCStateless = (deps: {
-  factory: () => McpServer;
+  modern: McpHttpHandler;
   authenticate?: Authenticator | undefined;
 }) => {
   return defineHandler({
     middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
-      const authInfo = pullAuthInfo(event);
-      return await handleWithStatelessServer(deps.factory, event.req, { authInfo });
+      return await deps.modern.fetch(event.req, mcpRequestOptions(event));
     },
   });
 };
-
-async function handleWithStatelessServer(
-  factory: () => McpServer,
-  req: Request,
-  options?: HandleRequestOptions,
-): Promise<Response> {
-  const transport = new WebStandardStreamableHTTPServerTransport();
-  const server = factory();
-  const dispose = async (): Promise<void> => {
-    await transport.close().catch(() => {});
-    await server.close().catch(() => {});
-  };
-
-  try {
-    await server.connect(transport);
-    const response = await transport.handleRequest(req, options);
-    return disposeOnBodyComplete(response, dispose);
-  } catch (error) {
-    await dispose();
-    throw error;
-  }
-}
 
 const MAX_PORT_ATTEMPTS = 10;
 
@@ -462,23 +444,31 @@ function listenOnAvailablePort(server: http.Server, startPort: number): Promise<
     });
   }
 
-  let attempt = 0;
   return new Promise((resolve, reject) => {
-    const tryPort = (port: number) => {
-      server.once("error", (err: { code?: string }) => {
+    let attempt = 0;
+
+    const tryListen = (port: number) => {
+      const onError = (err: Error & { code?: string }) => {
+        server.removeListener("listening", onListening);
         if (err.code === "EADDRINUSE" && attempt < MAX_PORT_ATTEMPTS) {
           attempt++;
-          tryPort(port + 1);
+          tryListen(port + 1);
         } else {
           reject(err);
         }
-      });
-      server.listen(port, () => {
-        server.removeAllListeners("error");
+      };
+
+      const onListening = () => {
+        server.removeListener("error", onError);
         resolve(port);
-      });
+      };
+
+      server.once("error", onError);
+      server.once("listening", onListening);
+      server.listen(port);
     };
-    tryPort(startPort);
+
+    tryListen(startPort);
   });
 }
 
@@ -492,6 +482,11 @@ function makeBuildInfoHeader(buildInfo: BuildInfo): string {
   return arr.join(" ");
 }
 
+function mcpRequestOptions(event: H3Event): McpHandlerRequestOptions {
+  const authInfo = pullAuthInfo(event);
+  return authInfo ? { authInfo } : {};
+}
+
 function pullAuthInfo(event: H3Event): AuthInfo | undefined {
   const { authInfo } = event.context;
   if (authInfo == null || typeof authInfo !== "object" || !(AUTH_INFO in authInfo)) {
@@ -501,18 +496,13 @@ function pullAuthInfo(event: H3Event): AuthInfo | undefined {
   return authInfo as unknown as AuthInfo;
 }
 
-function resolveBuildInfo(
-  factory: (() => McpServer) | DocsServer,
-  buildInfo?: BuildInfo,
-): BuildInfo {
+function resolveBuildInfo(factory: (() => Server) | DocsServer, buildInfo?: BuildInfo): BuildInfo {
   if (buildInfo) {
     return buildInfo;
   }
-
   if ("buildInfo" in factory) {
     return factory.buildInfo;
   }
-
   return {
     ...resolveDefaultBuildInfo({
       name: resolveServerName(),

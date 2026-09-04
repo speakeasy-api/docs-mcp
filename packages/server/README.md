@@ -20,6 +20,17 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
 
+## Protocol revisions
+
+Both transports serve the `2026-07-28` MCP revision (per-request `_meta` envelope,
+`server/discover`, no `initialize` handshake) and every 2025-era revision from
+`2024-11-05` to `2025-11-25` (the `initialize` handshake) from the same server.
+Over HTTP a 2026-07-28 request is always served per request; 2025-era requests
+use sessions unless [stateless mode](#stateless-http-mode) is on. Over stdio the
+opening message pins the connection to one era. List results on 2026-07-28
+carry cache hints (`ttlMs`, `cacheScope`); see `cacheHints` in `createMcpServer`
+to change the defaults.
+
 ## Programmatic Usage
 
 ### Boot with defaults
@@ -113,16 +124,19 @@ await startHttpServer(server, {
 ```
 
 Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
-`clientInfo` (best-effort; may be missing in stateless/degraded handling), and
-an abort `signal`.
+`clientInfo` (from the `initialize` handshake on 2025-era connections or the
+per-request envelope on 2026-07-28; best-effort and may be missing in
+stateless/degraded handling), and an abort `signal`.
 
 ### Stateless HTTP mode
 
 Pass `stateless: true` (CLI: `--stateless`, env: `STATELESS=true`) to serve
-every request with a fresh server and transport. No sessions are created, the
-`mcp-session-id` request header is ignored, no `Mcp-Session-Id` response header
-is issued, and `DELETE /mcp` responds 405. Use this when requests may hit
-different replicas, e.g. behind a load balancer.
+every 2025-era request with a fresh server and transport. No sessions are
+created, the `mcp-session-id` request header is ignored, no `Mcp-Session-Id`
+response header is issued, and `DELETE /mcp` responds 405. Use this when
+requests may hit different replicas, e.g. behind a load balancer. `GET /mcp`
+responds 405 in both modes: the server never opens the 2025-era standalone
+notification stream.
 
 ## Option Reference
 

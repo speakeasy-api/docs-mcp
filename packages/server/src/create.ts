@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ListToolsResult } from "@modelcontextprotocol/server";
 import {
   LanceDbSearchEngine,
   createEmbeddingProvider,
@@ -94,13 +94,15 @@ const MetadataDocumentSchema = z
 
 type ToolInputSchema = ListToolsResult["tools"][number]["inputSchema"];
 
-const ToolInputSchemaSchema: z.ZodType<ToolInputSchema> = z
+// The SDK types a tool's input schema as a JSON document; this shape checks
+// the structural minimum (an object schema) and passes the rest through.
+const ToolInputSchemaSchema = z
   .object({
     type: z.literal("object"),
     properties: z.record(z.string(), z.object({}).passthrough()).optional(),
     required: z.array(z.string()).optional(),
   })
-  .passthrough();
+  .passthrough() as unknown as z.ZodType<ToolInputSchema>;
 
 const CustomToolSchema = z.object({
   name: z

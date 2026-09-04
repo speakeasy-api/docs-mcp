@@ -79,8 +79,8 @@ program
     process.env["LOG_PRETTY"] && process.env["LOG_PRETTY"] === "true",
   )
   .option(
-    "--log-level",
-    "Logging level (debug, info, warn, error)",
+    "--log-level <level>",
+    "Logging level (debug, info, warn, error) (env: LOG_LEVEL)",
     process.env["LOG_LEVEL"] || "info",
   )
   .action(async (options: ServerCliOptions) => {
