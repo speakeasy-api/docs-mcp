@@ -150,14 +150,10 @@ describe("McpDocsServer custom tools", () => {
     });
     const { client } = pair;
 
-    const result = await client.callTool({
-      name: "nonexistent",
-      arguments: {},
+    await expect(client.callTool({ name: "nonexistent", arguments: {} })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringMatching(/Unknown tool/),
     });
-    const parsed = result;
-    expect(parsed.isError).toBe(true);
-    assert(parsed.content[0]?.type === "text");
-    expect(parsed.content[0].text).toMatch(/Unknown tool/);
   });
 });
 
