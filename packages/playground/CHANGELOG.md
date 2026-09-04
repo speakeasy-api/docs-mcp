@@ -1,5 +1,7 @@
 # @speakeasy-api/docs-mcp-playground
 
+## 0.18.0
+
 ## 0.17.1
 
 ## 0.17.0
