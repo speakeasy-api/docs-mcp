@@ -48,10 +48,12 @@ are tool results with `isError: true` so the model can recover.
 
 `tools` is always declared. `prompts` is declared only when the corpus defines
 prompts and `resources` only when a taxonomy value is marked with
-`mcp_resource: true`; a request for an undeclared capability answers JSON-RPC
-`-32601` (Method not found). `subscriptions/listen` on the 2026-07-28 revision
-is acknowledged with an empty filter and completed at once, because the server
-never emits change notifications.
+`mcp_resource: true`. `prompts/list`, `resources/list` and
+`resources/templates/list` still answer an empty list when their capability is
+not declared, for clients that ask without checking; `prompts/get` and
+`resources/read` answer `-32602` for anything not listed. `subscriptions/listen`
+on the 2026-07-28 revision is acknowledged with an empty filter and completed
+at once, because the server never emits change notifications.
 
 ## Protocol revisions
 

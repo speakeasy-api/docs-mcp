@@ -550,12 +550,13 @@ describe("McpDocsServer capability advertising", () => {
     expect(capabilities?.prompts).toBeUndefined();
     expect(capabilities?.resources).toBeUndefined();
 
-    await expect(client.request({ method: "prompts/list", params: {} })).rejects.toMatchObject({
-      code: -32601,
+    // Undeclared, but a client that asks anyway gets an empty list rather
+    // than the 404 some clients mistake for a lost session.
+    expect(await client.request({ method: "prompts/list", params: {} })).toEqual({ prompts: [] });
+    expect(await client.request({ method: "resources/list", params: {} })).toEqual({
+      resources: [],
     });
-    await expect(client.request({ method: "resources/list", params: {} })).rejects.toMatchObject({
-      code: -32601,
-    });
+    await expect(client.getPrompt({ name: "guides/none" })).rejects.toMatchObject({ code: -32602 });
   });
 
   it("declares prompts and resources when the corpus provides them", async () => {
