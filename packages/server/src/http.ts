@@ -2,8 +2,12 @@ import crypto from "node:crypto";
 import http from "node:http";
 import {
   createMcpHandler,
+  hostHeaderValidationResponse,
   isLegacyRequest,
   legacyStatelessFallback,
+  localhostAllowedHostnames,
+  localhostAllowedOrigins,
+  originValidationResponse,
   PROTOCOL_VERSION_META_KEY,
   SERVER_INFO_META_KEY,
   SUBSCRIPTION_ID_META_KEY,
@@ -52,6 +56,23 @@ export interface StartHttpServerOptions extends Pick<
   buildInfo?: BuildInfo;
   port?: number;
   /**
+   * Address to bind. Defaults to every interface, which suits containers and
+   * reverse proxies. The spec recommends binding only to localhost when the
+   * server runs locally; pass `"127.0.0.1"` for that. A loopback bind also
+   * turns on Host header validation, so a page that resolves its own domain
+   * to 127.0.0.1 (DNS rebinding) cannot reach the server.
+   */
+  host?: string;
+  /**
+   * Hostnames whose `Origin` header is accepted. The spec requires servers to
+   * validate `Origin` on every request and answer 403 when it is present and
+   * not allowed, so this is always on: requests without an `Origin` header
+   * (non-browser clients) pass, and by default only localhost origins are
+   * allowed. Set this to the hostnames of browser-served clients that should
+   * be able to call the server; it replaces the localhost default.
+   */
+  allowedOrigins?: string[];
+  /**
    * Async hook called before each request is processed.
    * Receives the HTTP request; return AuthInfo to attach to the request context,
    * or throw to reject with 401.
@@ -80,6 +101,7 @@ export async function startHttpServer(
   const logger = await resolveLogger(options);
   const buildInfo = resolveBuildInfo(factory, options.buildInfo);
   const port = options.port ?? 20310;
+  const host = options.host;
   const sessionManager = options.stateless ? undefined : new SessionManager();
   const serverFactory: McpServerFactory = () => factory();
   const onerror = (error: Error) => {
@@ -111,6 +133,8 @@ export async function startHttpServer(
     .use(createBuildInfoMiddleware(buildInfo))
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
+    .use(createOriginValidationMiddleware(options.allowedOrigins ?? localhostAllowedOrigins()))
+    .use(createHostValidationMiddleware(host))
     .get("/healthz", handleHealthCheck(buildInfo))
     .get("/mcp", handleGetMCPStream({ allow: sessionManager ? "POST, DELETE" : "POST" }))
     .delete(
@@ -139,8 +163,11 @@ export async function startHttpServer(
     void modern.close();
   });
 
-  const actualPort = await listenOnAvailablePort(httpServer, port);
-  logger.info("started mcp server", { url: `http://localhost:${actualPort}/mcp` });
+  const actualPort = await listenOnAvailablePort(httpServer, port, host);
+  logger.info("started mcp server", {
+    url: `http://${host ?? "localhost"}:${actualPort}/mcp`,
+    ...(host ? {} : { bind: "all interfaces" }),
+  });
 
   const shutdown = async (): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -308,6 +335,34 @@ const createCORSMiddleware = (): Middleware => {
     }
   };
 };
+
+/**
+ * Streamable HTTP security requirement: validate `Origin` on every request and
+ * answer 403 when it is present and not allowed. Requests without an `Origin`
+ * header pass. The response body is the SDK's JSON-RPC error without an id.
+ */
+const createOriginValidationMiddleware = (allowedOriginHostnames: string[]): Middleware => {
+  return (event) => originValidationResponse(event.req, allowedOriginHostnames);
+};
+
+/**
+ * Host header validation for loopback binds. A server reachable only on
+ * localhost is the DNS rebinding target the spec describes; refusing any
+ * other `Host` closes that door. Off for other binds, where the `Host` header
+ * legitimately names the service (containers, reverse proxies).
+ */
+const createHostValidationMiddleware = (host: string | undefined): Middleware => {
+  if (!host || !isLoopbackAddress(host)) {
+    return () => undefined;
+  }
+  const allowed = localhostAllowedHostnames();
+  return (event) => hostHeaderValidationResponse(event.req, allowed);
+};
+
+function isLoopbackAddress(host: string): boolean {
+  const bare = host.replace(/^\[|\]$/g, "");
+  return bare === "localhost" || bare === "::1" || /^127(\.\d{1,3}){3}$/.test(bare);
+}
 
 const SUBSCRIPTIONS_LISTEN_METHOD = "subscriptions/listen";
 
@@ -548,11 +603,15 @@ const MAX_PORT_ATTEMPTS = 10;
  * startPort+1, startPort+2, etc. up to MAX_PORT_ATTEMPTS.
  * Port 0 is passed through directly (OS picks an ephemeral port).
  */
-function listenOnAvailablePort(server: http.Server, startPort: number): Promise<number> {
+function listenOnAvailablePort(
+  server: http.Server,
+  startPort: number,
+  host?: string,
+): Promise<number> {
   if (startPort === 0) {
     return new Promise((resolve, reject) => {
       server.once("error", reject);
-      server.listen(0, () => {
+      server.listen(0, host, () => {
         server.removeListener("error", reject);
         const addr = server.address();
         resolve(typeof addr === "object" && addr ? addr.port : 0);
@@ -581,7 +640,7 @@ function listenOnAvailablePort(server: http.Server, startPort: number): Promise<
 
       server.once("error", onError);
       server.once("listening", onListening);
-      server.listen(port);
+      server.listen(port, host);
     };
 
     tryListen(startPort);

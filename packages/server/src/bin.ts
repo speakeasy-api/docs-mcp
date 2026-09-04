@@ -19,6 +19,8 @@ interface ServerCliOptions {
   vectorWeight?: number;
   transport: "stdio" | "http";
   port: number;
+  host?: string;
+  allowedOrigins?: string;
   stateless: boolean;
   customToolsJson?: string;
   gitCommit?: string;
@@ -52,6 +54,16 @@ program
     "HTTP server port (only used with --transport http)",
     parseIntOption,
     20310,
+  )
+  .option(
+    "--host <address>",
+    "Address to bind for --transport http; defaults to all interfaces, use 127.0.0.1 when running locally (env: HOST)",
+    process.env["HOST"],
+  )
+  .option(
+    "--allowed-origins <hostnames>",
+    "Comma-separated hostnames accepted in the Origin header; defaults to localhost origins (env: ALLOWED_ORIGINS)",
+    process.env["ALLOWED_ORIGINS"],
   )
   .option(
     "--stateless",
@@ -124,6 +136,8 @@ program
       const { shutdown } = await startHttpServer(server, {
         port: options.port,
         stateless: options.stateless,
+        ...(options.host ? { host: options.host } : {}),
+        ...(options.allowedOrigins ? { allowedOrigins: parseList(options.allowedOrigins) } : {}),
         ...(options.gitCommit || options.buildDate
           ? {
               buildInfo: {
@@ -144,6 +158,13 @@ program
   });
 
 void program.parseAsync(process.argv);
+
+function parseList(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
 
 function parseNumberOption(value: string): number {
   const parsed = Number(value);

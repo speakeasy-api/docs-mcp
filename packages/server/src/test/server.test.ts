@@ -1,5 +1,6 @@
 import { describe, expect, assert, it } from "vitest";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
+import { ResourceNotFoundError } from "@modelcontextprotocol/client";
 import { createTestServer } from "./mcp.helper.js";
 
 const chunks: Chunk[] = [
@@ -257,14 +258,9 @@ describe("McpDocsServer with toolPrefix", () => {
     });
     const { client } = pair;
 
-    const result = await client.callTool({
-      name: "search_docs",
-      arguments: { query: "retry" },
-    });
-    const parsed = result;
-    expect(parsed.isError).toBe(true);
-    assert(parsed.content[0]?.type === "text");
-    expect(parsed.content[0].text).toMatch(/Unknown tool/);
+    await expect(
+      client.callTool({ name: "search_docs_typo", arguments: { query: "retry" } }),
+    ).rejects.toMatchObject({ code: -32602, message: expect.stringMatching(/Unknown tool/) });
   });
 });
 
@@ -425,9 +421,10 @@ describe("McpDocsServer resources", () => {
     });
     const { client } = pair;
 
-    await expect(client.readResource({ uri: "docs:///nonexistent.md" })).rejects.toThrow(
-      /Resource not found/,
-    );
+    const notFound = client.readResource({ uri: "docs:///nonexistent.md" });
+    await expect(notFound).rejects.toThrow(/Resource not found/);
+    await expect(notFound).rejects.toBeInstanceOf(ResourceNotFoundError);
+    await expect(notFound).rejects.toMatchObject({ code: -32602 });
   });
 
   it("throws for malformed URI", async () => {
@@ -439,9 +436,9 @@ describe("McpDocsServer resources", () => {
     });
     const { client } = pair;
 
-    await expect(client.readResource({ uri: "invalid://uri" })).rejects.toThrow(
-      /Invalid URI scheme/,
-    );
+    const invalid = client.readResource({ uri: "invalid://uri" });
+    await expect(invalid).rejects.toThrow(/Invalid URI scheme/);
+    await expect(invalid).rejects.toMatchObject({ code: -32602 });
   });
 });
 
@@ -531,9 +528,13 @@ describe("McpDocsServer prompts", () => {
     });
     const { client } = pair;
 
-    await expect(client.getPrompt({ name: "guides/auth-integration" })).rejects.toThrow(
-      /Missing required prompt argument 'auth_method'/,
-    );
+    const missing = client.getPrompt({ name: "guides/auth-integration" });
+    await expect(missing).rejects.toThrow(/Missing required prompt argument 'auth_method'/);
+    await expect(missing).rejects.toMatchObject({ code: -32602 });
+    await expect(client.getPrompt({ name: "guides/does-not-exist" })).rejects.toMatchObject({
+      code: -32602,
+      message: expect.stringMatching(/not found/),
+    });
   });
 });
 

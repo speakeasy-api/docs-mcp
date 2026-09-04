@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, assert } from "vitest";
 import type http from "node:http";
+import nodeHttp from "node:http";
 import {
   CLIENT_CAPABILITIES_META_KEY,
   Client,
@@ -212,11 +213,9 @@ describe("MCP HTTP transport compliance", () => {
     const client = new Client({ name: "test-client", version: "0.1.0" });
     await client.connect(transport);
 
-    const result = await client.callTool({
-      name: "nonexistent",
-      arguments: {},
+    await expect(client.callTool({ name: "nonexistent", arguments: {} })).rejects.toMatchObject({
+      code: -32602,
     });
-    expect(result.isError).toBe(true);
 
     await client.close();
   });
@@ -1190,4 +1189,85 @@ describe("HTTP protocol revisions", () => {
       });
     });
   }
+});
+
+// fetch() derives Host from the URL and ignores an explicit Host header, so
+// the rebinding cases go through node:http, which sends whatever it is given.
+function requestWith(
+  port: number,
+  headers: Record<string, string>,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = nodeHttp.request(
+      { host: "127.0.0.1", port, path: "/healthz", method: "GET", headers },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk: string) => (body += chunk));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+describe("HTTP Origin and Host validation", () => {
+  it("accepts requests without an Origin and from localhost origins, refuses other origins", async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0 },
+    );
+    try {
+      const port = handle.port;
+      expect((await requestWith(port, {})).status).toBe(200);
+      expect((await requestWith(port, { Origin: "http://localhost:5173" })).status).toBe(200);
+      expect((await requestWith(port, { Origin: "http://127.0.0.1:5173" })).status).toBe(200);
+
+      const rejected = await requestWith(port, { Origin: "https://attacker.example" });
+      expect(rejected.status).toBe(403);
+      expect(JSON.parse(rejected.body)).toMatchObject({ jsonrpc: "2.0", id: null });
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("allowedOrigins replaces the localhost default", async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0, allowedOrigins: ["app.example"] },
+    );
+    try {
+      const port = handle.port;
+      expect((await requestWith(port, { Origin: "https://app.example" })).status).toBe(200);
+      expect((await requestWith(port, { Origin: "http://localhost:5173" })).status).toBe(403);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("validates the Host header only on a loopback bind", async () => {
+    const loopback = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0, host: "127.0.0.1" },
+    );
+    try {
+      expect((await requestWith(loopback.port, { Host: "localhost" })).status).toBe(200);
+      expect((await requestWith(loopback.port, { Host: "attacker.example" })).status).toBe(403);
+    } finally {
+      await new Promise<void>((resolve) => loopback.httpServer.close(() => resolve()));
+    }
+
+    const anyInterface = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0 },
+    );
+    try {
+      expect((await requestWith(anyInterface.port, { Host: "docs-mcp.internal" })).status).toBe(
+        200,
+      );
+    } finally {
+      await new Promise<void>((resolve) => anyInterface.httpServer.close(() => resolve()));
+    }
+  });
 });
