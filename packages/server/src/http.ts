@@ -5,6 +5,10 @@ import {
   HandleRequestOptions,
   WebStandardStreamableHTTPServerTransport,
 } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import {
+  LATEST_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "@modelcontextprotocol/sdk/types.js";
 import type {
   AuthInfo,
   BuildInfo,
@@ -32,6 +36,8 @@ import {
 
 const AUTH_INFO = Symbol("authInfo");
 const DOCS_MCP_HEADER = "DOCS-MCP";
+const MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
+const PROTOCOL_VERSION_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type Authenticator = (request: { headers: Headers }) => AuthInfo | Promise<AuthInfo>;
 
@@ -78,17 +84,18 @@ export async function startHttpServer(
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
     .get("/healthz", handleHealthCheck(buildInfo))
+    .get("/mcp", handleGetMCPStream({ allow: sessionManager ? "POST, DELETE" : "POST" }))
     .delete(
       "/mcp",
       sessionManager
-        ? handleDeleteMCPSession({ sessionManager, authenticate: options.authenticate })
+        ? handleDeleteMCPSession({ logger, sessionManager, authenticate: options.authenticate })
         : handleDeleteMCPSessionStateless(),
     )
     .post(
       "/mcp",
       sessionManager
         ? handleMCPRPC({ logger, factory, sessionManager, authenticate: options.authenticate })
-        : handleMCPRPCStateless({ factory, authenticate: options.authenticate }),
+        : handleMCPRPCStateless({ logger, factory, authenticate: options.authenticate }),
     );
 
   const httpServer = http.createServer(toNodeHandler(app));
@@ -322,7 +329,49 @@ const handleHealthCheck = (buildInfo: BuildInfo) => {
   });
 };
 
+/**
+ * This server never opens the standalone server-to-client SSE stream, so a
+ * GET on the MCP endpoint is answered with 405 and an Allow header as the
+ * Streamable HTTP transport spec requires. Without an explicit route the
+ * request would fall through to the router's 404, which is not a JSON-RPC
+ * response and echoes the bound URL back to the caller.
+ */
+const handleGetMCPStream = (deps: { allow: string }) => {
+  return defineHandler(() => {
+    return new Response(null, { status: 405, headers: { Allow: deps.allow } });
+  });
+};
+
+/**
+ * The transport rejects any MCP-Protocol-Version header value outside the
+ * SDK's supported set with 400. A client or proxy built against a newer
+ * specification revision than the bundled SDK still speaks a wire format
+ * this server can serve: the request and response shapes it relies on have
+ * stayed backward compatible across revisions, and answering at the newest
+ * supported revision is what initialize negotiation with that client would
+ * have produced. Such declarations are rewritten to the newest supported
+ * revision before the transport validates them. Malformed values and
+ * revisions older than the supported set are left untouched so the
+ * transport's own validation still applies.
+ */
+function downgradeNewerProtocolVersion(req: Request, logger: Logger): void {
+  const declared = req.headers.get(MCP_PROTOCOL_VERSION_HEADER);
+  if (declared === null || SUPPORTED_PROTOCOL_VERSIONS.includes(declared)) {
+    return;
+  }
+  if (!PROTOCOL_VERSION_DATE.test(declared) || declared <= LATEST_PROTOCOL_VERSION) {
+    return;
+  }
+
+  req.headers.set(MCP_PROTOCOL_VERSION_HEADER, LATEST_PROTOCOL_VERSION);
+  logger.debug("serving newer protocol version declaration at latest supported revision", {
+    declared,
+    served: LATEST_PROTOCOL_VERSION,
+  });
+}
+
 const handleDeleteMCPSession = (deps: {
+  logger: Logger;
   sessionManager: SessionManager;
   authenticate?: Authenticator | undefined;
 }) => {
@@ -330,6 +379,7 @@ const handleDeleteMCPSession = (deps: {
     middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
       const { req } = event;
+      downgradeNewerProtocolVersion(req, deps.logger);
       const authInfo = pullAuthInfo(event);
       const sessionId = req.headers.get("mcp-session-id");
       if (!sessionId) {
@@ -367,6 +417,7 @@ const handleMCPRPC = (deps: {
     handler: async (event) => {
       const { logger } = deps;
       const { req } = event;
+      downgradeNewerProtocolVersion(req, logger);
 
       const authInfo = pullAuthInfo(event);
       const sessionId = req.headers.get("mcp-session-id");
@@ -409,12 +460,14 @@ const handleMCPRPC = (deps: {
 };
 
 const handleMCPRPCStateless = (deps: {
+  logger: Logger;
   factory: () => McpServer;
   authenticate?: Authenticator | undefined;
 }) => {
   return defineHandler({
     middleware: [createAuthMiddleware({ handler: deps.authenticate })],
     handler: async (event) => {
+      downgradeNewerProtocolVersion(event.req, deps.logger);
       const authInfo = pullAuthInfo(event);
       return await handleWithStatelessServer(deps.factory, event.req, { authInfo });
     },

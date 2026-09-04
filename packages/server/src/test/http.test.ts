@@ -5,12 +5,20 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
-import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolResultSchema,
+  LATEST_PROTOCOL_VERSION,
+  ReadResourceResultSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { getLogger } from "@logtape/logtape";
 import type { DocsServer } from "../types.js";
 
 const logger = getLogger(["test"]);
 const buildInfo = { name: "test-server", version: "0.1.0" };
+
+// A revision date one year past the SDK's newest supported revision: the shape
+// a client built against a newer specification would declare.
+const NEWER_PROTOCOL_VERSION = `${Number(LATEST_PROTOCOL_VERSION.slice(0, 4)) + 1}-01-01`;
 
 const chunks: Chunk[] = [
   {
@@ -219,6 +227,119 @@ describe("MCP HTTP transport compliance", () => {
   it("returns 404 for non-/mcp paths", async () => {
     const res = await fetch(`${baseUrl}/other`, { method: "POST" });
     expect(res.status).toBe(404);
+  });
+
+  it("responds 405 with Allow to GET /mcp", async () => {
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: "GET",
+      headers: { Accept: "text/event-stream" },
+    });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST, DELETE");
+    expect(await res.text()).toBe("");
+  });
+
+  it("serves requests declaring a protocol version newer than the SDK supports", async () => {
+    const init = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: NEWER_PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "0.1.0" },
+        },
+        id: 1,
+      }),
+    });
+    expect(init.status).toBe(200);
+    const sessionId = init.headers.get("mcp-session-id");
+    assert(sessionId);
+    const initText = await init.text();
+    const initBody = JSON.parse(
+      initText
+        .split("\n")
+        .find((l) => l.startsWith("data: "))
+        ?.slice(6) || "{}",
+    );
+    expect(initBody.result.protocolVersion).toBe(LATEST_PROTOCOL_VERSION);
+
+    const res = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        "mcp-session-id": sessionId,
+        "mcp-protocol-version": NEWER_PROTOCOL_VERSION,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", params: {}, id: 2 }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const body = JSON.parse(
+      text
+        .split("\n")
+        .find((l) => l.startsWith("data: "))
+        ?.slice(6) || "{}",
+    );
+    expect(body.result.tools.length).toBeGreaterThan(0);
+
+    const del = await fetch(`${baseUrl}/mcp`, {
+      method: "DELETE",
+      headers: { "mcp-session-id": sessionId, "mcp-protocol-version": NEWER_PROTOCOL_VERSION },
+    });
+    expect(del.status).toBe(200);
+  });
+
+  it("still rejects malformed and unsupported older protocol version declarations", async () => {
+    const init = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        params: {
+          protocolVersion: LATEST_PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "test-client", version: "0.1.0" },
+        },
+        id: 1,
+      }),
+    });
+    expect(init.status).toBe(200);
+    await init.text();
+    const sessionId = init.headers.get("mcp-session-id");
+    assert(sessionId);
+
+    for (const declared of ["not-a-version", "2020-01-01"]) {
+      const res = await fetch(`${baseUrl}/mcp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+          "mcp-session-id": sessionId,
+          "mcp-protocol-version": declared,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", params: {}, id: 3 }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { message: string } };
+      expect(body.error.message).toContain(declared);
+    }
+
+    const del = await fetch(`${baseUrl}/mcp`, {
+      method: "DELETE",
+      headers: { "mcp-session-id": sessionId },
+    });
+    expect(del.status).toBe(200);
   });
 
   it("serves /healthz with build info", async () => {
@@ -679,6 +800,38 @@ describe("HTTP stateless mode", () => {
       headers: { "mcp-session-id": "bogus-session-id" },
     });
     expect(res.status).toBe(405);
+  });
+
+  it("responds 405 with Allow to GET", async () => {
+    const res = await fetch(`${statelessBaseUrl}/mcp`, {
+      method: "GET",
+      headers: { Accept: "text/event-stream" },
+    });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST");
+    expect(await res.text()).toBe("");
+  });
+
+  it("serves requests declaring a protocol version newer than the SDK supports", async () => {
+    const { res, body } = await postMcp(
+      { jsonrpc: "2.0", method: "tools/list", params: {}, id: 4 },
+      { "mcp-protocol-version": NEWER_PROTOCOL_VERSION },
+    );
+    expect(res.status).toBe(200);
+    expect((body["result"] as { tools: unknown[] }).tools.length).toBeGreaterThan(0);
+  });
+
+  it("still rejects malformed protocol version declarations", async () => {
+    const res = await fetch(`${statelessBaseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "not-a-version",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", params: {}, id: 5 }),
+    });
+    expect(res.status).toBe(400);
   });
 });
 
