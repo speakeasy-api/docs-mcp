@@ -77,40 +77,67 @@ export interface McpServerOptions {
 }
 
 /**
- * Builds the low-level MCP `Server` for a docs corpus. Every request handler
- * is installed here because the tool, prompt and resource surfaces are
- * derived from the corpus metadata at runtime rather than registered
- * statically. The same instance serves both protocol eras: the 2025-era
- * `initialize` handshake and the 2026-07-28 per-request envelope.
+ * The low-level `Server` with the advertised capabilities narrowed to what
+ * the corpus actually offers.
  *
- * Capabilities follow the spec's rule that a server declares a capability
- * only when it supports it. Tools are always present. `prompts` is declared
- * only when the corpus defines prompts and `resources` only when some
- * taxonomy value is marked as an MCP resource; otherwise the corresponding
- * requests are not handled and answer "Method not found", and clients that
- * respect the declared capabilities never send them.
+ * The spec's rule is that a server declares a capability only when it
+ * supports it, so `prompts` and `resources` are advertised only when the
+ * corpus defines prompts or marks resources. The list methods are still
+ * handled either way and answer an empty list: some clients call
+ * `prompts/list` and `resources/list` without checking the declared
+ * capabilities, and the 404 the spec prescribes for an unimplemented method
+ * is read by at least one widely deployed client as a lost session, which
+ * takes down every request after it. An empty list is a harmless, well-formed
+ * answer, and clients that respect the declared capabilities never ask.
+ *
+ * The SDK refuses to register a handler for a capability that is not set, so
+ * every capability is set on the instance and the narrowing happens in
+ * `getCapabilities()`, the single source for both the `initialize` result and
+ * `server/discover`.
+ */
+class DocsMcpServer extends Server {
+  constructor(
+    serverInfo: { name: string; version: string },
+    options: ConstructorParameters<typeof Server>[1],
+    private readonly advertised: ServerCapabilities,
+  ) {
+    super(serverInfo, options);
+  }
+
+  override getCapabilities(): ServerCapabilities {
+    return { ...this.advertised };
+  }
+}
+
+/**
+ * Builds the MCP `Server` for a docs corpus. Every request handler is
+ * installed here because the tool, prompt and resource surfaces are derived
+ * from the corpus metadata at runtime rather than registered statically. The
+ * same instance serves both protocol eras: the 2025-era `initialize`
+ * handshake and the 2026-07-28 per-request envelope.
  */
 export function createMcpServer(options: McpServerOptions): Server {
   const app = new DocsServer(options.app);
 
   const instructions = app.getInstructions();
-  const capabilities: ServerCapabilities = { tools: {} };
+  const advertised: ServerCapabilities = { tools: {} };
   if (app.hasPrompts()) {
-    capabilities.prompts = {};
+    advertised.prompts = {};
   }
   if (app.hasResources()) {
-    capabilities.resources = {};
+    advertised.resources = {};
   }
-  const server = new Server(
+  const server = new DocsMcpServer(
     {
       name: options.mcp?.name ?? "@speakeasy-api/docs-mcp-server",
       version: options.mcp?.version ?? PKG_VERSION,
     },
     {
-      capabilities,
+      capabilities: { tools: {}, prompts: {}, resources: {} },
       cacheHints: options.mcp?.cacheHints ?? DEFAULT_CACHE_HINTS,
       ...(instructions ? { instructions } : {}),
     },
+    advertised,
   );
 
   server.setRequestHandler("tools/list", async () => {
@@ -136,32 +163,28 @@ export function createMcpServer(options: McpServerOptions): Server {
     return app.callTool(request.params.name, request.params.arguments ?? {}, context);
   });
 
-  if (capabilities.resources) {
-    server.setRequestHandler("resources/list", async () => {
-      const res = await app.getResources();
-      return res satisfies ListResourcesResult;
-    });
+  server.setRequestHandler("resources/list", async () => {
+    const res = await app.getResources();
+    return res satisfies ListResourcesResult;
+  });
 
-    server.setRequestHandler("resources/templates/list", async () => {
-      return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
-    });
+  server.setRequestHandler("resources/templates/list", async () => {
+    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
+  });
 
-    server.setRequestHandler("resources/read", async (request) => {
-      const result = await app.readResource(request.params.uri);
-      return result satisfies ReadResourceResult;
-    });
-  }
+  server.setRequestHandler("resources/read", async (request) => {
+    const result = await app.readResource(request.params.uri);
+    return result satisfies ReadResourceResult;
+  });
 
-  if (capabilities.prompts) {
-    server.setRequestHandler("prompts/list", async () => {
-      return app.getPrompts() satisfies ListPromptsResult;
-    });
+  server.setRequestHandler("prompts/list", async () => {
+    return app.getPrompts() satisfies ListPromptsResult;
+  });
 
-    server.setRequestHandler("prompts/get", async (request) => {
-      const result = await app.getPrompt(request.params.name, request.params.arguments);
-      return result satisfies GetPromptResult;
-    });
-  }
+  server.setRequestHandler("prompts/get", async (request) => {
+    const result = await app.getPrompt(request.params.name, request.params.arguments);
+    return result satisfies GetPromptResult;
+  });
 
   return server;
 }

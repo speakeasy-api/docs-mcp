@@ -1073,6 +1073,35 @@ describe("HTTP protocol revisions", () => {
         await client.close();
       });
 
+      it("answers resources/list with an empty list on the modern path even though undeclared", async () => {
+        const res = await fetch(mcpUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2026-07-28",
+            "Mcp-Method": "resources/list",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 7,
+            method: "resources/list",
+            params: {
+              _meta: {
+                [PROTOCOL_VERSION_META_KEY]: "2026-07-28",
+                [CLIENT_CAPABILITIES_META_KEY]: {},
+              },
+            },
+          }),
+        });
+        expect(res.status).toBe(200);
+        const text = await res.text();
+        const payload = JSON.parse(
+          text.startsWith("event:") ? (text.split("data: ")[1] ?? "{}") : text,
+        );
+        expect(payload.result.resources).toEqual([]);
+      });
+
       it("serves a client pinned to 2026-07-28", async () => {
         const client = new Client(
           { name: "test-client", version: "0.1.0" },
