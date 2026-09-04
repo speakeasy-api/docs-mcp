@@ -1,0 +1,28 @@
+# Scenarios expected to fail for the 2026-07-28 requirement set. One per line: name # reason
+# Reference-server fixtures: the suite calls prompts, resources and tools that only the
+# conformance "everything" server defines.
+prompts-get-simple                            # expects prompt test_simple_prompt
+prompts-get-with-args                         # expects prompt test_prompt_with_args
+prompts-get-embedded-resource                 # expects prompt with an embedded resource
+prompts-get-with-image                        # expects prompt with image content
+resources-read-text                           # expects test: resource URIs
+resources-read-binary                         # expects test: resource URIs
+resources-templates-read                      # expects test: resource templates
+tools-call-image                              # expects a tool returning image content
+tools-call-audio                              # expects a tool returning audio content
+tools-call-embedded-resource                  # expects a tool returning an embedded resource
+tools-call-mixed-content                      # expects a tool returning mixed content
+tools-call-with-progress                      # expects a tool emitting progress notifications
+input-required-result-basic-elicitation       # expects a tool that returns input_required
+input-required-result-basic-sampling          # expects a tool that returns input_required
+input-required-result-basic-list-roots        # expects a tool that returns input_required
+input-required-result-request-state           # expects a tool that returns input_required
+input-required-result-multiple-input-requests # expects a tool that returns input_required
+input-required-result-multi-round             # expects a tool that returns input_required
+input-required-result-non-tool-request        # expects prompt test_input_required_result_prompt
+input-required-result-result-type             # expects a tool that returns input_required
+input-required-result-tampered-state          # expects a tool that returns input_required
+input-required-result-capability-check        # expects a tool that requires a client capability
+server-stateless                              # envelope checks pass; the undeclared-capability checks need a tool that requires one
+# Features this server does not offer.
+completion-complete                           # completion/complete is not implemented

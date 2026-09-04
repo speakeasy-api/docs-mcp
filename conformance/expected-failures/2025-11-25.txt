@@ -1,0 +1,25 @@
+# Scenarios expected to fail for the 2025-11-25 requirement set. One per line: name # reason
+# Reference-server fixtures: the suite calls prompts, resources and tools that only the
+# conformance "everything" server defines.
+prompts-get-simple                # expects prompt test_simple_prompt
+prompts-get-with-args             # expects prompt test_prompt_with_args
+prompts-get-embedded-resource     # expects prompt with an embedded resource
+prompts-get-with-image            # expects prompt with image content
+resources-read-text               # expects test: resource URIs
+resources-read-binary             # expects test: resource URIs
+resources-templates-read          # expects test: resource templates
+tools-call-image                  # expects a tool returning image content
+tools-call-audio                  # expects a tool returning audio content
+tools-call-embedded-resource      # expects a tool returning an embedded resource
+tools-call-mixed-content          # expects a tool returning mixed content
+tools-call-with-progress          # expects a tool emitting progress notifications
+tools-call-with-logging           # expects a tool emitting log notifications
+tools-call-sampling               # expects a tool that samples the client
+tools-call-elicitation            # expects a tool that elicits input
+elicitation-sep1034-defaults      # expects a tool that elicits input
+elicitation-sep1330-enums         # expects a tool that elicits input
+# Features this server does not offer.
+completion-complete               # completion/complete is not implemented
+logging-set-level                 # logging is not offered; the feature is deprecated as of 2026-07-28
+resources-subscribe               # resource subscriptions are not offered
+resources-unsubscribe             # resource subscriptions are not offered

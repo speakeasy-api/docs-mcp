@@ -12,23 +12,18 @@ import type {
 import { sentenceCase } from "change-case";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
 import { properCase } from "./strings.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
-  CallToolRequestSchema,
-  CallToolResult,
-  GetPromptRequestSchema,
-  GetPromptResult,
-  ListPromptsRequestSchema,
-  ListPromptsResult,
-  ListResourcesRequestSchema,
-  ListResourcesResult,
-  ListResourceTemplatesRequestSchema,
-  ListResourceTemplatesResult,
-  ListToolsRequestSchema,
-  ListToolsResult,
-  ReadResourceRequestSchema,
-  ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+  Server,
+  type CacheHint,
+  type CallToolResult,
+  type GetPromptResult,
+  type ListPromptsResult,
+  type ListResourcesResult,
+  type ListResourceTemplatesResult,
+  type ListToolsResult,
+  type ReadResourceResult,
+  type ServerContext,
+} from "@modelcontextprotocol/server";
 import { createRequire } from "node:module";
 import { CustomTool, ToolCallContext } from "./types.js";
 
@@ -36,20 +31,59 @@ const require = createRequire(import.meta.url);
 const PKG_VERSION = readPackageVersion();
 Mustache.escape = (value: string) => value;
 
+/** Cache hints stamped on 2026-07-28 cacheable results, keyed by method. */
+export type CacheHints = Partial<
+  Record<
+    | "tools/list"
+    | "prompts/list"
+    | "resources/list"
+    | "resources/read"
+    | "resources/templates/list",
+    CacheHint
+  >
+>;
+
+/**
+ * Cache policy advertised on 2026-07-28 list results. The tool, prompt and
+ * resource-template lists are fixed for the lifetime of the process and
+ * identical for every caller, so shared caches may hold them briefly. The
+ * resource list and resource contents keep the SDK's conservative default
+ * (`ttlMs: 0`, `cacheScope: "private"`) because an `authenticate` hook may
+ * gate them per caller.
+ */
+export const DEFAULT_CACHE_HINTS: CacheHints = {
+  "tools/list": { ttlMs: 60_000, cacheScope: "public" },
+  "prompts/list": { ttlMs: 60_000, cacheScope: "public" },
+  "resources/templates/list": { ttlMs: 60_000, cacheScope: "public" },
+};
+
 export interface McpServerOptions {
   mcp?: {
     name?: string;
     version?: string;
     includeClientInfo?: boolean;
+    /**
+     * Cache hints stamped on 2026-07-28 cacheable results, keyed by method.
+     * Defaults to {@link DEFAULT_CACHE_HINTS}; pass `{}` to fall back to the
+     * SDK's conservative defaults for every method.
+     */
+    cacheHints?: CacheHints;
   };
   app: DocsServerOptions;
 }
 
-export function createMcpServer(options: McpServerOptions): McpServer {
+/**
+ * Builds the low-level MCP `Server` for a docs corpus. Every request handler
+ * is installed here because the tool, prompt and resource surfaces are
+ * derived from the corpus metadata at runtime rather than registered
+ * statically. The same instance serves both protocol eras: the 2025-era
+ * `initialize` handshake and the 2026-07-28 per-request envelope.
+ */
+export function createMcpServer(options: McpServerOptions): Server {
   const app = new DocsServer(options.app);
 
   const instructions = app.getInstructions();
-  const server = new McpServer(
+  const server = new Server(
     {
       name: options.mcp?.name ?? "@speakeasy-api/docs-mcp-server",
       version: options.mcp?.version ?? PKG_VERSION,
@@ -60,55 +94,84 @@ export function createMcpServer(options: McpServerOptions): McpServer {
         resources: {},
         prompts: {},
       },
+      cacheHints: options.mcp?.cacheHints ?? DEFAULT_CACHE_HINTS,
       ...(instructions ? { instructions } : {}),
     },
   );
 
-  server.server.setRequestHandler(ListToolsRequestSchema, async () => {
+  server.setRequestHandler("tools/list", async () => {
     return app.getTools();
   });
 
-  server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const context: ToolCallContext = { signal: extra.signal };
-    if (extra.authInfo) {
-      context.authInfo = extra.authInfo;
+  server.setRequestHandler("tools/call", async (request, ctx) => {
+    const context: ToolCallContext = { signal: ctx.mcpReq.signal };
+    const authInfo = ctx.http?.authInfo;
+    if (authInfo) {
+      context.authInfo = authInfo;
     }
-    if (extra.requestInfo?.headers) {
-      context.headers = extra.requestInfo.headers;
+    const headers = ctx.http?.req?.headers;
+    if (headers) {
+      context.headers = Object.fromEntries(headers);
     }
     if (options.mcp?.includeClientInfo) {
-      const clientVersion = server.server.getClientVersion();
-      if (clientVersion) {
-        context.clientInfo = { name: clientVersion.name, version: clientVersion.version };
+      const clientInfo = resolveClientInfo(server, ctx);
+      if (clientInfo) {
+        context.clientInfo = clientInfo;
       }
     }
     return app.callTool(request.params.name, request.params.arguments ?? {}, context);
   });
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  server.setRequestHandler("resources/list", async () => {
     const res = await app.getResources();
     return res satisfies ListResourcesResult;
   });
 
-  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  server.setRequestHandler("resources/templates/list", async () => {
     return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
   });
 
-  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler("resources/read", async (request) => {
     const result = await app.readResource(request.params.uri);
     return result satisfies ReadResourceResult;
   });
 
-  server.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  server.setRequestHandler("prompts/list", async () => {
     return app.getPrompts() satisfies ListPromptsResult;
   });
 
-  server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler("prompts/get", async (request) => {
     const result = await app.getPrompt(request.params.name, request.params.arguments);
     return result satisfies GetPromptResult;
   });
 
   return server;
+}
+
+/**
+ * The client identity comes from the `initialize` handshake on a 2025-era
+ * connection and from the per-request `_meta` envelope on the 2026-07-28
+ * revision, where no handshake exists. Both are best-effort: the envelope
+ * `clientInfo` key is a SHOULD, and a stateless 2025-era request has no
+ * handshake to remember.
+ */
+function resolveClientInfo(
+  server: Server,
+  ctx: ServerContext,
+): { name: string; version: string } | undefined {
+  const envelope = ctx.mcpReq.envelope as
+    | { clientInfo?: { name?: unknown; version?: unknown } }
+    | undefined;
+  const fromEnvelope = envelope?.clientInfo;
+  if (typeof fromEnvelope?.name === "string" && typeof fromEnvelope.version === "string") {
+    return { name: fromEnvelope.name, version: fromEnvelope.version };
+  }
+  // 2025-era connections still negotiate the client identity through initialize.
+  const negotiated = server.getClientVersion();
+  if (negotiated) {
+    return { name: negotiated.name, version: negotiated.version };
+  }
+  return undefined;
 }
 
 export interface DocsServerOptions {

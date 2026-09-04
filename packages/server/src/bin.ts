@@ -20,6 +20,7 @@ interface ServerCliOptions {
   transport: "stdio" | "http";
   port: number;
   stateless: boolean;
+  allowedHosts?: string;
   customToolsJson?: string;
   gitCommit?: string;
   buildDate?: string;
@@ -59,6 +60,11 @@ program
     process.env["STATELESS"] === "true",
   )
   .option(
+    "--allowed-hosts <hosts>",
+    "Comma-separated hostnames accepted in the Host header; other hosts get 403 (env: ALLOWED_HOSTS)",
+    process.env["ALLOWED_HOSTS"],
+  )
+  .option(
     "--custom-tools-json <json>",
     "JSON array of custom tool definitions [{name, description, inputSchema}], each registered with an echo handler",
   )
@@ -79,8 +85,8 @@ program
     process.env["LOG_PRETTY"] && process.env["LOG_PRETTY"] === "true",
   )
   .option(
-    "--log-level",
-    "Logging level (debug, info, warn, error)",
+    "--log-level <level>",
+    "Logging level (debug, info, warn, error) (env: LOG_LEVEL)",
     process.env["LOG_LEVEL"] || "info",
   )
   .action(async (options: ServerCliOptions) => {
@@ -124,6 +130,7 @@ program
       const { shutdown } = await startHttpServer(server, {
         port: options.port,
         stateless: options.stateless,
+        ...(options.allowedHosts ? { allowedHosts: parseHostList(options.allowedHosts) } : {}),
         ...(options.gitCommit || options.buildDate
           ? {
               buildInfo: {
@@ -144,6 +151,13 @@ program
   });
 
 void program.parseAsync(process.argv);
+
+function parseHostList(value: string): string[] {
+  return value
+    .split(",")
+    .map((host) => host.trim())
+    .filter((host) => host.length > 0);
+}
 
 function parseNumberOption(value: string): number {
   const parsed = Number(value);

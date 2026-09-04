@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@modelcontextprotocol/conformance": "0.2.0-alpha.11",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.13.10",
     "@types/picomatch": "^4.0.2",

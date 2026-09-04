@@ -62,7 +62,18 @@ The project includes [mise](https://mise.jdx.dev/) tasks for common workflows:
 mise run serve:http      # Start HTTP MCP server on port 20310
 mise run playground      # Start the interactive playground
 mise run inspect:http    # Open MCP Inspector
+mise run conformance     # Run the MCP conformance suite for every supported spec revision
 ```
+
+### Protocol conformance
+
+`mise run conformance` builds the packages, indexes the test fixtures, starts the
+server in both HTTP modes and runs the official
+[MCP conformance suite](https://github.com/modelcontextprotocol/conformance) with the
+requirement set of each spec revision listed in `conformance/expected-failures/`.
+Scenarios that exercise the reference server's fixtures are allowlisted there with a
+reason; any other failure fails the run, and CI runs the same matrix on every pull
+request. See `conformance/expected-failures/README.md`.
 
 ## Submitting Changes
 

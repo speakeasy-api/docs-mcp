@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, assert } from "vitest";
 import type http from "node:http";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import nodeHttp from "node:http";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
-import { CallToolResultSchema, ReadResourceResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { getLogger } from "@logtape/logtape";
 import type { DocsServer } from "../types.js";
 
@@ -143,7 +142,7 @@ describe("MCP HTTP transport compliance", () => {
       name: "search_docs",
       arguments: { query: "retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toEqual(false);
     assert(parsed.content[0]?.type === "text");
@@ -162,7 +161,7 @@ describe("MCP HTTP transport compliance", () => {
       name: "get_doc",
       arguments: { chunk_id: "guides/ts.md#retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toEqual(false);
     assert(parsed.content[0]?.type === "text");
@@ -353,7 +352,7 @@ describe("MCP HTTP transport resources", () => {
     const result = await client.readResource({
       uri: "docs:///guides/ts.md",
     });
-    const parsed = ReadResourceResultSchema.parse(result);
+    const parsed = result;
 
     assert(parsed.contents[0] && "text" in parsed.contents[0]);
     expect(parsed.contents[0].text).toContain("TypeScript retry");
@@ -440,7 +439,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
       name: "acme_search_docs",
       arguments: { query: "retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toEqual(false);
     assert(parsed.content[0]?.type === "text");
@@ -459,7 +458,7 @@ describe("MCP HTTP transport with toolPrefix", () => {
       name: "acme_get_doc",
       arguments: { chunk_id: "guides/ts.md#retry" },
     });
-    const parsed = CallToolResultSchema.parse(result);
+    const parsed = result;
 
     expect(parsed.isError).toEqual(false);
     assert(parsed.content[0]?.type === "text");
@@ -994,6 +993,154 @@ describe("HTTP transport disposal with async tools", () => {
       });
       expect(res.status).toBe(200);
       expectDelayedEchoResult(text);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+});
+
+describe("HTTP protocol revisions", () => {
+  for (const stateless of [false, true]) {
+    describe(stateless ? "stateless mode" : "session mode", () => {
+      let revisionServer: http.Server;
+      let mcpUrl: URL;
+
+      beforeAll(async () => {
+        const handle = await startHttpServer(
+          () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+          { logger, buildInfo, port: 0, stateless },
+        );
+        revisionServer = handle.httpServer;
+        const addr = revisionServer.address();
+        const port = typeof addr === "object" && addr ? addr.port : handle.port;
+        mcpUrl = new URL(`http://localhost:${port}/mcp`);
+      });
+
+      afterAll(async () => {
+        await new Promise<void>((resolve) => revisionServer.close(() => resolve()));
+      });
+
+      it("serves a client that negotiates 2026-07-28 through server/discover", async () => {
+        const client = new Client(
+          { name: "test-client", version: "0.1.0" },
+          { versionNegotiation: { mode: "auto" } },
+        );
+        await client.connect(new StreamableHTTPClientTransport(mcpUrl));
+        expect(client.getProtocolEra()).toBe("modern");
+
+        const { tools } = await client.listTools();
+        expect(tools.map((t) => t.name)).toEqual(["search_docs", "get_doc"]);
+
+        const result = await client.callTool({
+          name: "search_docs",
+          arguments: { query: "retry" },
+        });
+        expect(result.isError).toBe(false);
+        assert(result.content[0]?.type === "text");
+        expect(JSON.parse(result.content[0].text)).toHaveProperty("hits");
+
+        const { prompts } = await client.listPrompts();
+        expect(prompts.map((p) => p.name)).toEqual(["guides/auth-integration"]);
+
+        const prompt = await client.getPrompt({
+          name: "guides/auth-integration",
+          arguments: { auth_method: "oauth" },
+        });
+        assert(prompt.messages[0]?.content.type === "text");
+        expect(prompt.messages[0].content.text).toBe("Use oauth for this integration.");
+
+        await client.close();
+      });
+
+      it("serves a client pinned to 2026-07-28", async () => {
+        const client = new Client(
+          { name: "test-client", version: "0.1.0" },
+          { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+        );
+        await client.connect(new StreamableHTTPClientTransport(mcpUrl));
+        expect(client.getProtocolEra()).toBe("modern");
+
+        const { tools } = await client.listTools();
+        expect(tools.length).toBe(2);
+
+        await client.close();
+      });
+
+      it("still serves a 2025-era client through the initialize handshake", async () => {
+        const client = new Client({ name: "test-client", version: "0.1.0" });
+        await client.connect(new StreamableHTTPClientTransport(mcpUrl));
+        expect(client.getProtocolEra()).toBe("legacy");
+        expect(client.getServerVersion()?.name).toBe("@speakeasy-api/docs-mcp-server");
+
+        const result = await client.callTool({
+          name: "get_doc",
+          arguments: { chunk_id: "guides/ts.md#retry" },
+        });
+        expect(result.isError).toBe(false);
+
+        await client.close();
+      });
+
+      it("answers GET /mcp with 405 and an Allow header", async () => {
+        const res = await fetch(mcpUrl, {
+          method: "GET",
+          headers: { Accept: "text/event-stream" },
+        });
+        expect(res.status).toBe(405);
+        expect(res.headers.get("allow")).toBe(stateless ? "POST" : "POST, DELETE");
+        expect(await res.text()).toBe("");
+      });
+    });
+  }
+});
+
+// fetch() derives Host from the URL and ignores an explicit header, so the
+// rebinding case goes through node:http, which sends whatever Host it is given.
+function requestWithHost(port: number, host: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = nodeHttp.request(
+      { host: "127.0.0.1", port, path: "/healthz", method: "GET", headers: { Host: host } },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode ?? 0));
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+describe("HTTP host header validation", () => {
+  it("refuses hosts outside the allowlist before reaching the MCP handler", async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0, allowedHosts: ["localhost", "127.0.0.1"] },
+    );
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+
+      const allowed = await fetch(`http://127.0.0.1:${port}/healthz`);
+      expect(allowed.status).toBe(200);
+
+      const rebinding = await requestWithHost(port, "attacker.example");
+      expect(rebinding).toBe(403);
+    } finally {
+      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
+    }
+  });
+
+  it("accepts every host when no allowlist is configured", async () => {
+    const handle = await startHttpServer(
+      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
+      { logger, buildInfo, port: 0 },
+    );
+
+    try {
+      const addr = handle.httpServer.address();
+      const port = typeof addr === "object" && addr ? addr.port : handle.port;
+      expect(await requestWithHost(port, "docs-mcp.internal")).toBe(200);
     } finally {
       await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
     }

@@ -127,3 +127,8 @@ for port in 20310 3000; do
   fi
 done
 '''
+
+[tasks.conformance]
+description = "Run the MCP conformance suite for every spec revision in conformance/expected-failures"
+run = "node scripts/conformance.ts"
+depends = ["index-fixtures"]

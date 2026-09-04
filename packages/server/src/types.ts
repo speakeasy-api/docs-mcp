@@ -1,7 +1,10 @@
-export type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult, ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type {
+  AuthInfo,
+  CallToolResult,
+  ListToolsResult,
+  Server,
+} from "@modelcontextprotocol/server";
+export type { AuthInfo };
 
 export interface BuildInfo {
   name: string;
@@ -24,7 +27,7 @@ export interface CreateDocsServerRuntimeOptions {
 }
 
 export interface DocsServer {
-  (): McpServer;
+  (): Server;
   buildInfo: BuildInfo;
 }
 
@@ -33,7 +36,11 @@ export interface ToolCallContext {
   authInfo?: AuthInfo;
   /** HTTP request headers (HTTP transport only). */
   headers?: Record<string, string | string[] | undefined>;
-  /** Client name/version from MCP init handshake. Best-effort and may be absent in stateless/degraded handling. */
+  /**
+   * Client name/version, from the `initialize` handshake on 2025-era
+   * connections or the per-request `_meta` envelope on the 2026-07-28
+   * revision. Best-effort and may be absent in stateless/degraded handling.
+   */
   clientInfo?: { name: string; version: string };
   /** Abort signal for request cancellation. */
   signal: AbortSignal;

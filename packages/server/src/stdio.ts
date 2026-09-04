@@ -1,25 +1,24 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type { Server } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 
 export interface StdioServerHandle {
-  server: McpServer;
-  transport: StdioServerTransport;
   shutdown: () => Promise<void>;
 }
 
-export async function startStdioServer(factory: () => McpServer): Promise<StdioServerHandle> {
-  const transport = new StdioServerTransport();
-  const server = factory();
-  await server.connect(transport);
+/**
+ * Serves the factory over stdio. The opening exchange on the connection
+ * selects the protocol era: a 2025-era `initialize` pins a legacy instance,
+ * a 2026-07-28 enveloped request pins a modern one. One instance from the
+ * factory serves the whole connection either way.
+ */
+export async function startStdioServer(factory: () => Server): Promise<StdioServerHandle> {
+  const handle = serveStdio(() => factory(), { legacy: "serve" });
 
   const shutdown = async () => {
-    await transport.close().catch((err) => {
-      if (err) console.error("Failed to close transport:", err);
-    });
-    await server.close().catch((err) => {
-      if (err) console.error("Failed to close mcp server:", err);
+    await handle.close().catch((err) => {
+      if (err) console.error("Failed to close stdio server:", err);
     });
   };
 
-  return { server, transport, shutdown };
+  return { shutdown };
 }
