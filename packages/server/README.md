@@ -20,6 +20,15 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
 
+## Capabilities
+
+`tools` is always declared. `prompts` is declared only when the corpus defines
+prompts and `resources` only when a taxonomy value is marked with
+`mcp_resource: true`; a request for an undeclared capability answers JSON-RPC
+`-32601` (Method not found). `subscriptions/listen` on the 2026-07-28 revision
+is acknowledged with an empty filter and completed at once, because the server
+never emits change notifications.
+
 ## Protocol revisions
 
 Both transports serve the `2026-07-28` MCP revision (per-request `_meta` envelope,
