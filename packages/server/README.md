@@ -20,6 +20,30 @@ docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
 
+## Security
+
+Every request's `Origin` header is validated, as the Streamable HTTP transport
+requires: a request without one (any non-browser client) passes, a request
+whose `Origin` is not allowed is answered with `403` and a JSON-RPC error body.
+By default only localhost origins are allowed. Browser-served clients on other
+origins need `allowedOrigins` (CLI: `--allowed-origins app.example,...`, env:
+`ALLOWED_ORIGINS`), which replaces the localhost default.
+
+The server binds every interface by default, which suits containers and
+reverse proxies. When running locally, bind loopback as the spec recommends
+(`host: "127.0.0.1"`, CLI: `--host 127.0.0.1`, env: `HOST`); a loopback bind
+also validates the `Host` header, so a page that resolves its own domain to
+`127.0.0.1` (DNS rebinding) cannot reach the server.
+
+## Errors
+
+Protocol errors are JSON-RPC errors: an unknown tool, an unknown prompt, a
+missing required prompt argument, an invalid resource URI and a missing
+resource all answer `-32602` (Invalid params); a method outside the declared
+capabilities answers `-32601` (Method not found). Tool execution failures,
+including rejected tool arguments and errors thrown by custom tool handlers,
+are tool results with `isError: true` so the model can recover.
+
 ## Capabilities
 
 `tools` is always declared. `prompts` is declared only when the corpus defines

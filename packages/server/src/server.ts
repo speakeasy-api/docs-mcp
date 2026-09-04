@@ -13,6 +13,9 @@ import { sentenceCase } from "change-case";
 import { buildGetDocSchema, buildSearchDocsSchema } from "./schema.js";
 import { properCase } from "./strings.js";
 import {
+  INVALID_PARAMS,
+  ProtocolError,
+  ResourceNotFoundError,
   Server,
   type CacheHint,
   type CallToolResult,
@@ -323,7 +326,10 @@ class DocsServer {
 
       const value = argumentsByName[argument.name];
       if (typeof value !== "string" || !value.trim()) {
-        throw new Error(`Missing required prompt argument '${argument.name}'`);
+        throw new ProtocolError(
+          INVALID_PARAMS,
+          `Missing required prompt argument '${argument.name}'`,
+        );
       }
     }
 
@@ -357,7 +363,10 @@ class DocsServer {
       }
     }
 
-    return errorResult(`Unknown tool '${name}'.`);
+    // An unknown tool is a protocol error, not a tool execution error: the
+    // request itself is wrong, so it is answered with JSON-RPC -32602 rather
+    // than an `isError` result the model would try to recover from.
+    throw new ProtocolError(INVALID_PARAMS, `Unknown tool '${name}'.`);
   }
 
   private async handleSearchDocs(args: unknown): Promise<CallToolResult> {
@@ -401,9 +410,17 @@ class DocsServer {
   }
 
   async readResource(uri: string): Promise<ReadResourceResult> {
-    const parsed = new URL(uri);
+    let parsed: URL;
+    try {
+      parsed = new URL(uri);
+    } catch {
+      throw new ProtocolError(INVALID_PARAMS, `Invalid URI: '${uri}'`);
+    }
     if (parsed.protocol !== "docs:") {
-      throw new Error(`Invalid URI scheme: ${parsed.protocol}. Expected 'docs:'`);
+      throw new ProtocolError(
+        INVALID_PARAMS,
+        `Invalid URI scheme: ${parsed.protocol}. Expected 'docs:'`,
+      );
     }
 
     let filepath = parsed.pathname;
@@ -412,14 +429,14 @@ class DocsServer {
       filepath = filepath.slice(1);
     }
     if (!filepath) {
-      throw new Error(`Invalid URI: missing filepath in '${uri}'`);
+      throw new ProtocolError(INVALID_PARAMS, `Invalid URI: missing filepath in '${uri}'`);
     }
 
     const entries = await this.listResourceEntries();
 
     const entry = entries.find((e) => e.filepath === filepath);
     if (!entry) {
-      throw new Error(`Resource not found: ${uri}`);
+      throw new ResourceNotFoundError(uri, `Resource not found: ${uri}`);
     }
 
     // Change this to grab the full document, not chunks.
@@ -485,7 +502,7 @@ class DocsServer {
   private findPrompt(name: string): PromptDefinition {
     const prompt = (this.metadata.prompts ?? []).find((entry) => entry.name === name);
     if (!prompt) {
-      throw new Error(`Prompt '${name}' not found`);
+      throw new ProtocolError(INVALID_PARAMS, `Prompt '${name}' not found`);
     }
     return prompt;
   }
