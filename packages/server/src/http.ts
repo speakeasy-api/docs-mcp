@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import http from "node:http";
 import {
   createMcpHandler,
-  hostHeaderValidationResponse,
   isLegacyRequest,
   legacyStatelessFallback,
   WebStandardStreamableHTTPServerTransport,
@@ -61,14 +60,6 @@ export interface StartHttpServerOptions extends Pick<
    * revision are always served per request, in either mode.
    */
   stateless?: boolean;
-  /**
-   * Hostnames accepted in the Host header, compared without the port. When
-   * set, a request whose Host is not listed is answered with 403 before it
-   * reaches the MCP handler, which protects a localhost bind against DNS
-   * rebinding. Off by default so container and reverse-proxy deployments,
-   * whose Host header names the service, keep working.
-   */
-  allowedHosts?: string[];
 }
 
 export interface HttpServerHandle {
@@ -108,7 +99,6 @@ export async function startHttpServer(
     .use(createBuildInfoMiddleware(buildInfo))
     .use(createErrorMiddleware({ logger }))
     .use(createCORSMiddleware())
-    .use(createHostValidationMiddleware(options.allowedHosts))
     .get("/healthz", handleHealthCheck(buildInfo))
     .get("/mcp", handleGetMCPStream({ allow: sessionManager ? "POST, DELETE" : "POST" }))
     .delete(
@@ -304,20 +294,6 @@ const createCORSMiddleware = (): Middleware => {
     if (corsRes !== false) {
       return corsRes;
     }
-  };
-};
-
-/**
- * DNS rebinding protection: with an allowlist configured, a request whose
- * Host header names any other hostname is refused before it reaches the MCP
- * handler. Without one every Host is accepted.
- */
-const createHostValidationMiddleware = (allowedHosts: string[] | undefined): Middleware => {
-  return (event) => {
-    if (!allowedHosts || allowedHosts.length === 0) {
-      return;
-    }
-    return hostHeaderValidationResponse(event.req, allowedHosts);
   };
 };
 

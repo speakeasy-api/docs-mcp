@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, assert } from "vitest";
 import type http from "node:http";
-import nodeHttp from "node:http";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "../server.js";
@@ -1092,57 +1091,4 @@ describe("HTTP protocol revisions", () => {
       });
     });
   }
-});
-
-// fetch() derives Host from the URL and ignores an explicit header, so the
-// rebinding case goes through node:http, which sends whatever Host it is given.
-function requestWithHost(port: number, host: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const req = nodeHttp.request(
-      { host: "127.0.0.1", port, path: "/healthz", method: "GET", headers: { Host: host } },
-      (res) => {
-        res.resume();
-        res.on("end", () => resolve(res.statusCode ?? 0));
-      },
-    );
-    req.on("error", reject);
-    req.end();
-  });
-}
-
-describe("HTTP host header validation", () => {
-  it("refuses hosts outside the allowlist before reaching the MCP handler", async () => {
-    const handle = await startHttpServer(
-      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { logger, buildInfo, port: 0, allowedHosts: ["localhost", "127.0.0.1"] },
-    );
-
-    try {
-      const addr = handle.httpServer.address();
-      const port = typeof addr === "object" && addr ? addr.port : handle.port;
-
-      const allowed = await fetch(`http://127.0.0.1:${port}/healthz`);
-      expect(allowed.status).toBe(200);
-
-      const rebinding = await requestWithHost(port, "attacker.example");
-      expect(rebinding).toBe(403);
-    } finally {
-      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
-    }
-  });
-
-  it("accepts every host when no allowlist is configured", async () => {
-    const handle = await startHttpServer(
-      () => createMcpServer({ app: { index: new DocsIndex(chunks), metadata } }),
-      { logger, buildInfo, port: 0 },
-    );
-
-    try {
-      const addr = handle.httpServer.address();
-      const port = typeof addr === "object" && addr ? addr.port : handle.port;
-      expect(await requestWithHost(port, "docs-mcp.internal")).toBe(200);
-    } finally {
-      await new Promise<void>((resolve) => handle.httpServer.close(() => resolve()));
-    }
-  });
 });

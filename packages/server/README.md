@@ -16,9 +16,6 @@ npm install -g @speakeasy-api/docs-mcp-server
 # HTTP transport
 docs-mcp-server --index-dir ./dist/.lancedb --transport http --port 20310
 
-# HTTP transport bound to localhost, refusing other Host headers (DNS rebinding protection)
-docs-mcp-server --index-dir ./dist/.lancedb --transport http --allowed-hosts localhost,127.0.0.1
-
 # Stdio transport (for MCP host integration)
 docs-mcp-server --index-dir ./dist/.lancedb --transport stdio
 ```
@@ -130,15 +127,6 @@ Custom tool handlers receive a `ToolCallContext` with `authInfo`, `headers`,
 `clientInfo` (from the `initialize` handshake on 2025-era connections or the
 per-request envelope on 2026-07-28; best-effort and may be missing in
 stateless/degraded handling), and an abort `signal`.
-
-### Host header validation
-
-Pass `allowedHosts: ["localhost", "127.0.0.1"]` (CLI: `--allowed-hosts`, env:
-`ALLOWED_HOSTS`, comma-separated) to answer 403 to any request whose `Host`
-header names another hostname. Use it whenever the server binds to localhost:
-it stops DNS rebinding, where a web page resolves its own domain to `127.0.0.1`
-and reaches the server from the browser. Leave it unset behind a reverse proxy
-or in a container network, where the `Host` header names the service.
 
 ### Stateless HTTP mode
 

@@ -20,7 +20,6 @@ interface ServerCliOptions {
   transport: "stdio" | "http";
   port: number;
   stateless: boolean;
-  allowedHosts?: string;
   customToolsJson?: string;
   gitCommit?: string;
   buildDate?: string;
@@ -58,11 +57,6 @@ program
     "--stateless",
     "Serve each HTTP request without MCP sessions (env: STATELESS)",
     process.env["STATELESS"] === "true",
-  )
-  .option(
-    "--allowed-hosts <hosts>",
-    "Comma-separated hostnames accepted in the Host header; other hosts get 403 (env: ALLOWED_HOSTS)",
-    process.env["ALLOWED_HOSTS"],
   )
   .option(
     "--custom-tools-json <json>",
@@ -130,7 +124,6 @@ program
       const { shutdown } = await startHttpServer(server, {
         port: options.port,
         stateless: options.stateless,
-        ...(options.allowedHosts ? { allowedHosts: parseHostList(options.allowedHosts) } : {}),
         ...(options.gitCommit || options.buildDate
           ? {
               buildInfo: {
@@ -151,13 +144,6 @@ program
   });
 
 void program.parseAsync(process.argv);
-
-function parseHostList(value: string): string[] {
-  return value
-    .split(",")
-    .map((host) => host.trim())
-    .filter((host) => host.length > 0);
-}
 
 function parseNumberOption(value: string): number {
   const parsed = Number(value);
