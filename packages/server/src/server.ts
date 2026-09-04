@@ -22,6 +22,7 @@ import {
   type ListResourceTemplatesResult,
   type ListToolsResult,
   type ReadResourceResult,
+  type ServerCapabilities,
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import { createRequire } from "node:module";
@@ -78,22 +79,32 @@ export interface McpServerOptions {
  * derived from the corpus metadata at runtime rather than registered
  * statically. The same instance serves both protocol eras: the 2025-era
  * `initialize` handshake and the 2026-07-28 per-request envelope.
+ *
+ * Capabilities follow the spec's rule that a server declares a capability
+ * only when it supports it. Tools are always present. `prompts` is declared
+ * only when the corpus defines prompts and `resources` only when some
+ * taxonomy value is marked as an MCP resource; otherwise the corresponding
+ * requests are not handled and answer "Method not found", and clients that
+ * respect the declared capabilities never send them.
  */
 export function createMcpServer(options: McpServerOptions): Server {
   const app = new DocsServer(options.app);
 
   const instructions = app.getInstructions();
+  const capabilities: ServerCapabilities = { tools: {} };
+  if (app.hasPrompts()) {
+    capabilities.prompts = {};
+  }
+  if (app.hasResources()) {
+    capabilities.resources = {};
+  }
   const server = new Server(
     {
       name: options.mcp?.name ?? "@speakeasy-api/docs-mcp-server",
       version: options.mcp?.version ?? PKG_VERSION,
     },
     {
-      capabilities: {
-        tools: {},
-        resources: {},
-        prompts: {},
-      },
+      capabilities,
       cacheHints: options.mcp?.cacheHints ?? DEFAULT_CACHE_HINTS,
       ...(instructions ? { instructions } : {}),
     },
@@ -122,28 +133,32 @@ export function createMcpServer(options: McpServerOptions): Server {
     return app.callTool(request.params.name, request.params.arguments ?? {}, context);
   });
 
-  server.setRequestHandler("resources/list", async () => {
-    const res = await app.getResources();
-    return res satisfies ListResourcesResult;
-  });
+  if (capabilities.resources) {
+    server.setRequestHandler("resources/list", async () => {
+      const res = await app.getResources();
+      return res satisfies ListResourcesResult;
+    });
 
-  server.setRequestHandler("resources/templates/list", async () => {
-    return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
-  });
+    server.setRequestHandler("resources/templates/list", async () => {
+      return { resourceTemplates: [] } satisfies ListResourceTemplatesResult;
+    });
 
-  server.setRequestHandler("resources/read", async (request) => {
-    const result = await app.readResource(request.params.uri);
-    return result satisfies ReadResourceResult;
-  });
+    server.setRequestHandler("resources/read", async (request) => {
+      const result = await app.readResource(request.params.uri);
+      return result satisfies ReadResourceResult;
+    });
+  }
 
-  server.setRequestHandler("prompts/list", async () => {
-    return app.getPrompts() satisfies ListPromptsResult;
-  });
+  if (capabilities.prompts) {
+    server.setRequestHandler("prompts/list", async () => {
+      return app.getPrompts() satisfies ListPromptsResult;
+    });
 
-  server.setRequestHandler("prompts/get", async (request) => {
-    const result = await app.getPrompt(request.params.name, request.params.arguments);
-    return result satisfies GetPromptResult;
-  });
+    server.setRequestHandler("prompts/get", async (request) => {
+      const result = await app.getPrompt(request.params.name, request.params.arguments);
+      return result satisfies GetPromptResult;
+    });
+  }
 
   return server;
 }
@@ -234,6 +249,16 @@ class DocsServer {
 
   getInstructions(): string | undefined {
     return this.metadata.mcpServerInstructions;
+  }
+
+  /** Whether the corpus defines any prompt; drives the `prompts` capability. */
+  hasPrompts(): boolean {
+    return (this.metadata.prompts?.length ?? 0) > 0;
+  }
+
+  /** Whether any taxonomy value is marked as an MCP resource; drives the `resources` capability. */
+  hasResources(): boolean {
+    return this.getResourceFilters().length > 0;
   }
 
   getTools(): ListToolsResult {

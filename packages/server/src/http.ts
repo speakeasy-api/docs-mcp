@@ -4,7 +4,11 @@ import {
   createMcpHandler,
   isLegacyRequest,
   legacyStatelessFallback,
+  PROTOCOL_VERSION_META_KEY,
+  SERVER_INFO_META_KEY,
+  SUBSCRIPTION_ID_META_KEY,
   WebStandardStreamableHTTPServerTransport,
+  type Implementation,
   type LegacyHttpHandler,
   type McpHandlerRequestOptions,
   type McpHttpHandler,
@@ -87,10 +91,18 @@ export async function startHttpServer(
   // per request. In session mode 2025-era requests keep the sessionful
   // serving below, so the handler is strict and only ever sees requests
   // carrying the per-request `_meta` envelope.
-  const modern = createMcpHandler(serverFactory, {
+  const modernEntry = createMcpHandler(serverFactory, {
     legacy: sessionManager ? "reject" : "stateless",
     onerror,
   });
+  const modern: McpHttpHandler = {
+    ...modernEntry,
+    fetch: async (request, requestOptions) =>
+      (await declineSubscriptionsListen(request, {
+        name: buildInfo.name,
+        version: buildInfo.version,
+      })) ?? modernEntry.fetch(request, requestOptions),
+  };
   const legacyFallback = legacyStatelessFallback(serverFactory, onerror);
 
   const app = new H3()
@@ -296,6 +308,110 @@ const createCORSMiddleware = (): Middleware => {
     }
   };
 };
+
+const SUBSCRIPTIONS_LISTEN_METHOD = "subscriptions/listen";
+
+/**
+ * Ends a 2026-07-28 `subscriptions/listen` subscription immediately.
+ *
+ * This server never emits a change notification: the corpus is fixed for the
+ * lifetime of the process and no `listChanged` or `subscribe` capability is
+ * advertised, so the acknowledged filter is always empty. The SDK entry would
+ * still hold the stream open until the client goes away, which pins a
+ * connection (and, behind a tunnel, a multiplexed stream slot) that can never
+ * carry anything. The spec lets a server end a subscription on its own
+ * initiative: acknowledge, then answer the `subscriptions/listen` request with
+ * a completion result and close the stream. Clients treat that as a clean
+ * close rather than a disconnect to retry.
+ *
+ * Only a well-formed modern request is answered here. Anything else (no
+ * per-request envelope, missing `Mcp-Method` header, no `notifications`
+ * filter) falls through to the SDK entry, which owns those rejections.
+ */
+async function declineSubscriptionsListen(
+  request: Request,
+  serverInfo: Implementation,
+): Promise<Response | undefined> {
+  if (request.method !== "POST") {
+    return undefined;
+  }
+  if (request.headers.get("mcp-method") !== SUBSCRIPTIONS_LISTEN_METHOD) {
+    return undefined;
+  }
+
+  let message: unknown;
+  try {
+    message = await request.clone().json();
+  } catch {
+    return undefined;
+  }
+  if (!isModernListenRequest(message)) {
+    return undefined;
+  }
+
+  const subscriptionId = message.id;
+  const acknowledged = {
+    jsonrpc: "2.0",
+    method: "notifications/subscriptions/acknowledged",
+    params: {
+      notifications: {},
+      _meta: { [SUBSCRIPTION_ID_META_KEY]: subscriptionId },
+    },
+  };
+  const completed = {
+    jsonrpc: "2.0",
+    id: subscriptionId,
+    result: {
+      resultType: "complete",
+      _meta: {
+        [SUBSCRIPTION_ID_META_KEY]: subscriptionId,
+        [SERVER_INFO_META_KEY]: serverInfo,
+      },
+    },
+  };
+  const body = [acknowledged, completed]
+    .map((frame) => `event: message\ndata: ${JSON.stringify(frame)}\n\n`)
+    .join("");
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+    },
+  });
+}
+
+interface ModernListenRequest {
+  jsonrpc: "2.0";
+  id: string | number;
+  method: typeof SUBSCRIPTIONS_LISTEN_METHOD;
+  params: { notifications: Record<string, unknown>; _meta: Record<string, unknown> };
+}
+
+function isModernListenRequest(message: unknown): message is ModernListenRequest {
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return false;
+  }
+  const { jsonrpc, id, method, params } = message as Record<string, unknown>;
+  if (jsonrpc !== "2.0" || method !== SUBSCRIPTIONS_LISTEN_METHOD) {
+    return false;
+  }
+  if (typeof id !== "string" && typeof id !== "number") {
+    return false;
+  }
+  if (!params || typeof params !== "object") {
+    return false;
+  }
+  const { notifications, _meta } = params as Record<string, unknown>;
+  if (!notifications || typeof notifications !== "object" || Array.isArray(notifications)) {
+    return false;
+  }
+  if (!_meta || typeof _meta !== "object") {
+    return false;
+  }
+  return typeof (_meta as Record<string, unknown>)[PROTOCOL_VERSION_META_KEY] === "string";
+}
 
 const handleHealthCheck = (buildInfo: BuildInfo) => {
   return defineHandler(() => {

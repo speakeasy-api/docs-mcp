@@ -434,7 +434,7 @@ describe("McpDocsServer resources", () => {
     await using pair = await createTestServer({
       app: {
         index: new DocsIndex(chunks),
-        metadata,
+        metadata: metadataWithResources,
       },
     });
     const { client } = pair;
@@ -534,5 +534,59 @@ describe("McpDocsServer prompts", () => {
     await expect(client.getPrompt({ name: "guides/auth-integration" })).rejects.toThrow(
       /Missing required prompt argument 'auth_method'/,
     );
+  });
+});
+
+describe("McpDocsServer capability advertising", () => {
+  it("declares only tools when the corpus has no prompts and no resources", async () => {
+    await using pair = await createTestServer({
+      app: { index: new DocsIndex(chunks), metadata },
+    });
+    const { client } = pair;
+
+    const capabilities = client.getServerCapabilities();
+    expect(capabilities?.tools).toBeDefined();
+    expect(capabilities?.prompts).toBeUndefined();
+    expect(capabilities?.resources).toBeUndefined();
+
+    await expect(client.request({ method: "prompts/list", params: {} })).rejects.toMatchObject({
+      code: -32601,
+    });
+    await expect(client.request({ method: "resources/list", params: {} })).rejects.toMatchObject({
+      code: -32601,
+    });
+  });
+
+  it("declares prompts and resources when the corpus provides them", async () => {
+    const metadataWithBoth = normalizeMetadata({
+      metadata_version: "1.1.0",
+      corpus_description: "Test docs",
+      taxonomy: {
+        language: {
+          description: "Filter by language.",
+          values: ["python", "typescript"],
+          properties: { typescript: { mcp_resource: true } },
+        },
+      },
+      stats: { total_chunks: 2, total_files: 2, indexed_at: "2026-01-01T00:00:00Z" },
+      embedding: null,
+      prompts: [
+        {
+          name: "guides/auth",
+          messages: [{ role: "user", content: { type: "text", text: "Hello" } }],
+          arguments: [],
+        },
+      ],
+    });
+    await using pair = await createTestServer({
+      app: { index: new DocsIndex(chunks), metadata: metadataWithBoth },
+    });
+    const { client } = pair;
+
+    const capabilities = client.getServerCapabilities();
+    expect(capabilities?.prompts).toBeDefined();
+    expect(capabilities?.resources).toBeDefined();
+    expect((await client.listPrompts()).prompts.map((p) => p.name)).toEqual(["guides/auth"]);
+    expect((await client.listResources()).resources).toHaveLength(1);
   });
 });

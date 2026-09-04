@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it, assert } from "vitest";
 import type http from "node:http";
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import {
+  CLIENT_CAPABILITIES_META_KEY,
+  Client,
+  PROTOCOL_VERSION_META_KEY,
+  SERVER_INFO_META_KEY,
+  StreamableHTTPClientTransport,
+  SUBSCRIPTION_ID_META_KEY,
+} from "@modelcontextprotocol/client";
 import { DocsIndex, normalizeMetadata, type Chunk } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "../server.js";
 import { startHttpServer } from "../http.js";
@@ -1051,6 +1058,22 @@ describe("HTTP protocol revisions", () => {
         await client.close();
       });
 
+      it("advertises through server/discover only the capabilities the corpus has", async () => {
+        const client = new Client(
+          { name: "test-client", version: "0.1.0" },
+          { versionNegotiation: { mode: "auto" } },
+        );
+        await client.connect(new StreamableHTTPClientTransport(mcpUrl));
+        expect(client.getProtocolEra()).toBe("modern");
+
+        const capabilities = client.getServerCapabilities();
+        expect(capabilities?.tools).toBeDefined();
+        expect(capabilities?.prompts).toBeDefined();
+        expect(capabilities?.resources).toBeUndefined();
+
+        await client.close();
+      });
+
       it("serves a client pinned to 2026-07-28", async () => {
         const client = new Client(
           { name: "test-client", version: "0.1.0" },
@@ -1078,6 +1101,82 @@ describe("HTTP protocol revisions", () => {
         expect(result.isError).toBe(false);
 
         await client.close();
+      });
+
+      it("ends a 2026-07-28 subscriptions/listen immediately with an empty acknowledgement", async () => {
+        const res = await fetch(mcpUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2026-07-28",
+            "Mcp-Method": "subscriptions/listen",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 41,
+            method: "subscriptions/listen",
+            params: {
+              notifications: { toolsListChanged: true, promptsListChanged: true },
+              _meta: {
+                [PROTOCOL_VERSION_META_KEY]: "2026-07-28",
+                [CLIENT_CAPABILITIES_META_KEY]: {},
+              },
+            },
+          }),
+        });
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toContain("text/event-stream");
+
+        // The body must end on its own: a held-open stream would hang here.
+        const text = await res.text();
+        const frames = text
+          .split("\n\n")
+          .filter((f) => f.startsWith("event: message"))
+          .map((f) => JSON.parse(f.slice(f.indexOf("data: ") + 6)));
+        expect(frames).toHaveLength(2);
+        expect(frames[0]).toEqual({
+          jsonrpc: "2.0",
+          method: "notifications/subscriptions/acknowledged",
+          params: { notifications: {}, _meta: { [SUBSCRIPTION_ID_META_KEY]: 41 } },
+        });
+        expect(frames[1]).toEqual({
+          jsonrpc: "2.0",
+          id: 41,
+          result: {
+            resultType: "complete",
+            _meta: {
+              [SUBSCRIPTION_ID_META_KEY]: 41,
+              [SERVER_INFO_META_KEY]: { name: buildInfo.name, version: buildInfo.version },
+            },
+          },
+        });
+      });
+
+      it("leaves a malformed subscriptions/listen to the SDK", async () => {
+        const res = await fetch(mcpUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2026-07-28",
+            "Mcp-Method": "subscriptions/listen",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 42,
+            method: "subscriptions/listen",
+            params: {
+              _meta: {
+                [PROTOCOL_VERSION_META_KEY]: "2026-07-28",
+                [CLIENT_CAPABILITIES_META_KEY]: {},
+              },
+            },
+          }),
+        });
+        const text = await res.text();
+        expect(text).toContain("-32602");
+        expect(text).not.toContain("subscriptions/acknowledged");
       });
 
       it("answers GET /mcp with 405 and an Allow header", async () => {
