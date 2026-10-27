@@ -38,6 +38,8 @@ export interface TaxonomyValueProperties {
 export type ScoreMultipliers = Record<string, Record<string, number>>;
 
 export interface ManifestTaxonomyFieldConfig {
+  /** Description of the filter parameter that `search_docs` exposes for this dimension. */
+  description?: string | undefined;
   vector_collapse: boolean;
   properties?: Record<string, TaxonomyValueProperties> | undefined;
 }

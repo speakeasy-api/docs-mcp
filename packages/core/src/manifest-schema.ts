@@ -73,6 +73,15 @@ export const TaxonomyValuePropertiesSchema = z
 
 export const TaxonomyFieldConfigSchema = z
   .object({
+    description: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Description of the filter parameter that search_docs exposes for this taxonomy dimension. Defaults to 'Filter results by {key}.'. Use it to tell agents what the dimension and its values mean.",
+      )
+      .meta({ examples: ["Programming language of SDK-specific documentation."] }),
     vector_collapse: z
       .boolean()
       .default(false)
@@ -91,7 +100,7 @@ export const TaxonomyFieldConfigSchema = z
 export const ManifestTaxonomyConfigSchema = z
   .record(z.string(), TaxonomyFieldConfigSchema)
   .describe(
-    "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing and per-value score multipliers.",
+    "Per-field configuration for taxonomy dimensions. Controls the filter description and search-time behavior such as cross-language result collapsing and per-value score multipliers.",
   );
 
 export const ManifestSchema = z

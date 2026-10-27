@@ -31,7 +31,7 @@ Docs MCP provides a local, in-memory search engine (powered by [LanceDB](https:/
 
 ### Faceted Taxonomy
 
-Metadata keys defined in [`.docs-mcp.json`](#corpus-structure) manifests become enum-injected JSON Schema parameters on the `search_docs` tool. The agent selects from a strict set of valid filter values (e.g. `language: ["typescript", "python", "go"]`). On zero results, the server returns structured hints (e.g. "0 results for 'typescript'. Matches found in: ['python']").
+Metadata keys defined in [`.docs-mcp.json`](#corpus-structure) manifests become enum-injected JSON Schema parameters on the `search_docs` tool. The agent selects from a strict set of valid filter values (e.g. `language: ["typescript", "python", "go"]`). A taxonomy `description` replaces the default `Filter results by {key}.` parameter description, so the schema can say what each value means. On zero results, the server returns structured hints (e.g. "0 results for 'typescript'. Matches found in: ['python']").
 
 ### Vector Collapse
 
@@ -163,6 +163,7 @@ my-docs/
   "taxonomy": {
     "language": { "vector_collapse": true },
     "scope": {
+      "description": "Documentation scope: global-guide (concepts) or sdk-specific (one SDK).",
       "properties": {
         "global-guide": { "mcp_resource": true },
         "legacy": { "score_multiplier": 0.5 },

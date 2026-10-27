@@ -755,7 +755,7 @@ function buildMetadata(
   for (const [key, values] of taxonomyValues.entries()) {
     const config = taxonomyConfig[key];
     taxonomy[key] = {
-      description: `Filter results by ${key}.`,
+      description: config?.description ?? `Filter results by ${key}.`,
       values: [...values].sort((a, b) => a.localeCompare(b)),
       ...(config?.vector_collapse ? { vector_collapse: true } : {}),
       ...(config?.properties ? { properties: config.properties } : {}),
