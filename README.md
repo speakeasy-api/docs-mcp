@@ -43,6 +43,16 @@ SDK documentation for the same API operation across multiple languages produces 
 
 When the agent explicitly filters by language, collapse is automatically skipped — the filter already restricts to a single variant.
 
+### Score Multipliers
+
+A taxonomy value can carry a `score_multiplier` that scales the search score of every chunk tagged with it. Values below 1 demote matching chunks and values above 1 promote them relative to equally relevant chunks, for example to rank documentation for a superseded API below its replacement without removing it from the index:
+
+```json
+{ "taxonomy": { "status": { "properties": { "legacy": { "score_multiplier": 0.5 } } } } }
+```
+
+Multipliers from several taxonomy dimensions multiply together. They apply before vector collapse and pagination, and the scores returned by `search_docs` include them.
+
 ### Hybrid FTS + Semantic Search
 
 Search combines three ranking signals via [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf):
@@ -148,8 +158,16 @@ my-docs/
 
   // Per-field search behavior. vector_collapse deduplicates cross-language
   // variants at search time (only active when no filter is set for that field).
+  // Per-value properties expose matching documents as MCP resources or scale
+  // their search scores.
   "taxonomy": {
     "language": { "vector_collapse": true },
+    "scope": {
+      "properties": {
+        "global-guide": { "mcp_resource": true },
+        "legacy": { "score_multiplier": 0.5 },
+      },
+    },
   },
 
   // Custom instructions sent to MCP clients during initialization.

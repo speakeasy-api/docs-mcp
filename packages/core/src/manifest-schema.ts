@@ -59,6 +59,15 @@ export const TaxonomyValuePropertiesSchema = z
       .describe(
         "When true, documents with this taxonomy dimension value are exposed as first-class MCP resources.",
       ),
+    score_multiplier: z
+      .number()
+      .positive()
+      .refine(Number.isFinite, "score_multiplier must be finite")
+      .optional()
+      .describe(
+        "Multiplies the search score of every chunk tagged with this taxonomy value, so matching chunks rank lower (below 1) or higher (above 1) than equally relevant chunks. Multipliers from several taxonomy dimensions are multiplied together. Applied before result collapsing and pagination; reported scores include the multiplier. Defaults to 1.",
+      )
+      .meta({ examples: [0.5] }),
   })
   .describe("Per-value configuration for a taxonomy dimension value.");
 
@@ -82,7 +91,7 @@ export const TaxonomyFieldConfigSchema = z
 export const ManifestTaxonomyConfigSchema = z
   .record(z.string(), TaxonomyFieldConfigSchema)
   .describe(
-    "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing.",
+    "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing and per-value score multipliers.",
   );
 
 export const ManifestSchema = z

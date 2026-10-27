@@ -15,8 +15,9 @@ const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
 /**
  * Union-merges taxonomy field configs from multiple manifests. If any manifest
  * sets `vector_collapse: true` for a key, the merged result includes it.
- * Similarly, if any manifest sets `mcp_resource: true` for a value, the merged
- * result includes it.
+ * Similarly, if any manifest sets `mcp_resource: true` or a `score_multiplier`
+ * for a value, the merged result includes it. Manifests that set different
+ * multipliers for the same value are rejected.
  */
 export function mergeTaxonomyConfigs(
   manifests: Iterable<Manifest>,
@@ -34,15 +35,30 @@ export function mergeTaxonomyConfigs(
       }
       if (config.properties) {
         for (const [value, props] of Object.entries(config.properties)) {
-          if (props.mcp_resource) {
-            if (!merged[key]) {
-              merged[key] = { vector_collapse: false };
-            }
-            if (!merged[key].properties) {
-              merged[key].properties = {};
-            }
-            merged[key].properties[value] = { mcp_resource: true };
+          if (!props.mcp_resource && props.score_multiplier === undefined) {
+            continue;
           }
+          if (!merged[key]) {
+            merged[key] = { vector_collapse: false };
+          }
+          if (!merged[key].properties) {
+            merged[key].properties = {};
+          }
+          const existing = merged[key].properties[value];
+          if (
+            props.score_multiplier !== undefined &&
+            existing?.score_multiplier !== undefined &&
+            existing.score_multiplier !== props.score_multiplier
+          ) {
+            throw new Error(
+              `Conflicting score_multiplier for taxonomy '${key}' value '${value}': ${existing.score_multiplier} and ${props.score_multiplier}`,
+            );
+          }
+          const scoreMultiplier = props.score_multiplier ?? existing?.score_multiplier;
+          merged[key].properties[value] = {
+            mcp_resource: Boolean(existing?.mcp_resource || props.mcp_resource),
+            ...(scoreMultiplier !== undefined ? { score_multiplier: scoreMultiplier } : {}),
+          };
         }
       }
     }
@@ -236,8 +252,7 @@ function parseFrontmatterOverrides(markdown: string): {
     };
   }
 
-  const title =
-    typeof data.title === "string" && data.title.trim() ? data.title.trim() : undefined;
+  const title = typeof data.title === "string" && data.title.trim() ? data.title.trim() : undefined;
 
   const result: {
     strategy?: ChunkingStrategy;

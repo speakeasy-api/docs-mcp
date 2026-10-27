@@ -7,7 +7,13 @@ import {
   type Table,
 } from "@lancedb/lancedb";
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor.js";
-import { clampLimit, dedupKey, isChunkIdFormat, makeSnippet } from "./search-common.js";
+import {
+  clampLimit,
+  dedupKey,
+  isChunkIdFormat,
+  makeSnippet,
+  scoreMultiplier,
+} from "./search-common.js";
 import type {
   Chunk,
   DocsIndexOptions,
@@ -16,6 +22,7 @@ import type {
   GetDocRequest,
   GetDocResult,
   ListFilepathsRequest,
+  ScoreMultipliers,
   SearchEngine,
   SearchHint,
   SearchHit,
@@ -47,6 +54,7 @@ export interface OpenLanceDbSearchEngineOptions {
   tableName?: string;
   metadataKeys: string[];
   collapseKeys?: string[];
+  scoreMultipliers?: ScoreMultipliers;
   proximityWeight?: number;
   phraseSlop?: number;
   queryEmbeddingProvider?: EmbeddingProvider;
@@ -127,6 +135,7 @@ export class LanceDbSearchEngine implements SearchEngine {
   private readonly table: Table;
   private readonly metadataKeys: string[];
   private readonly collapseKeys: string[];
+  private readonly scoreMultipliers: ScoreMultipliers;
   private readonly proximityWeight: number;
   private readonly phraseSlop: number;
   private readonly queryEmbeddingProvider: EmbeddingProvider | undefined;
@@ -139,6 +148,7 @@ export class LanceDbSearchEngine implements SearchEngine {
     metadataKeys: string[],
     options: DocsIndexOptions & {
       collapseKeys?: string[];
+      scoreMultipliers?: ScoreMultipliers;
       queryEmbeddingProvider?: EmbeddingProvider;
       vectorWeight?: number;
       onWarning?: (message: string) => void;
@@ -147,6 +157,7 @@ export class LanceDbSearchEngine implements SearchEngine {
     this.table = table;
     this.metadataKeys = [...metadataKeys];
     this.collapseKeys = options.collapseKeys ?? [];
+    this.scoreMultipliers = options.scoreMultipliers ?? {};
     this.proximityWeight = options.proximityWeight ?? 1.25;
     this.phraseSlop = normalizePhraseSlop(options.phraseSlop);
     this.queryEmbeddingProvider = options.queryEmbeddingProvider;
@@ -159,12 +170,16 @@ export class LanceDbSearchEngine implements SearchEngine {
     const table = await db.openTable(options.tableName ?? DEFAULT_TABLE_NAME);
     const engineOptions: DocsIndexOptions & {
       collapseKeys?: string[];
+      scoreMultipliers?: ScoreMultipliers;
       queryEmbeddingProvider?: EmbeddingProvider;
       vectorWeight?: number;
       onWarning?: (message: string) => void;
     } = {};
     if (options.collapseKeys !== undefined) {
       engineOptions.collapseKeys = options.collapseKeys;
+    }
+    if (options.scoreMultipliers !== undefined) {
+      engineOptions.scoreMultipliers = options.scoreMultipliers;
     }
     if (options.proximityWeight !== undefined) {
       engineOptions.proximityWeight = options.proximityWeight;
@@ -218,13 +233,9 @@ export class LanceDbSearchEngine implements SearchEngine {
     const matchWeight = request.rrf_weights?.match ?? 1;
     const phraseWeight = request.rrf_weights?.phrase ?? this.proximityWeight;
     const vecWeight = request.rrf_weights?.vector ?? this.vectorWeight;
-    const blended = blendRows(
-      matchRows,
-      phraseRows,
-      vectorRows,
-      phraseWeight,
-      vecWeight,
-      matchWeight,
+    const blended = applyScoreMultipliers(
+      blendRows(matchRows, phraseRows, vectorRows, phraseWeight, vecWeight, matchWeight),
+      this.scoreMultipliers,
     );
 
     // Collapse content-equivalent results across variant axes (e.g. same
@@ -545,14 +556,39 @@ function blendRows(
         score: Number(score.toFixed(6)),
       };
     })
-    .sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return expectStringField(a.row, "chunk_id").localeCompare(
-        expectStringField(b.row, "chunk_id"),
-      );
-    });
+    .sort(compareScoredRows);
+}
+
+/**
+ * Scales each blended score by the multipliers configured for the row's
+ * taxonomy values, then restores score order.
+ */
+function applyScoreMultipliers(
+  rows: Array<{ row: ChunkRow; score: number }>,
+  multipliers: ScoreMultipliers,
+): Array<{ row: ChunkRow; score: number }> {
+  if (Object.keys(multipliers).length === 0) return rows;
+
+  return rows
+    .map((entry) => ({
+      row: entry.row,
+      score: Number(
+        (
+          entry.score * scoreMultiplier((k) => expectStringField(entry.row, k), multipliers)
+        ).toFixed(6),
+      ),
+    }))
+    .sort(compareScoredRows);
+}
+
+function compareScoredRows(
+  a: { row: ChunkRow; score: number },
+  b: { row: ChunkRow; score: number },
+): number {
+  if (b.score !== a.score) {
+    return b.score - a.score;
+  }
+  return expectStringField(a.row, "chunk_id").localeCompare(expectStringField(b.row, "chunk_id"));
 }
 
 function deduplicateRows(

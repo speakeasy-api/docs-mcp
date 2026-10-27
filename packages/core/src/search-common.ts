@@ -1,3 +1,5 @@
+import type { ScoreMultipliers } from "./types.js";
+
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 
@@ -82,6 +84,24 @@ export function dedupKey(
   const partSuffix = partMatch ? `:${partMatch[1]}` : "";
 
   return `${parts.join("/")}:${heading}${partSuffix}`;
+}
+
+/**
+ * Returns the product of the score multipliers configured for a result's
+ * taxonomy values, or 1 when none apply.
+ */
+export function scoreMultiplier(
+  getMetadataValue: (key: string) => string,
+  multipliers: ScoreMultipliers,
+): number {
+  let factor = 1;
+  for (const [key, byValue] of Object.entries(multipliers)) {
+    const multiplier = byValue[getMetadataValue(key)];
+    if (multiplier !== undefined) {
+      factor *= multiplier;
+    }
+  }
+  return factor;
 }
 
 export function matchesMetadataFilters(
