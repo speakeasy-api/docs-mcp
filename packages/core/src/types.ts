@@ -24,7 +24,18 @@ export interface ManifestOverride {
 
 export interface TaxonomyValueProperties {
   mcp_resource: boolean;
+  /**
+   * Multiplies the search score of every result tagged with this taxonomy
+   * value. Values below 1 demote matching results; values above 1 promote them.
+   */
+  score_multiplier?: number;
 }
+
+/**
+ * Configured search score multipliers, keyed by taxonomy key and then by
+ * taxonomy value.
+ */
+export type ScoreMultipliers = Record<string, Record<string, number>>;
 
 export interface ManifestTaxonomyFieldConfig {
   vector_collapse: boolean;
@@ -105,7 +116,7 @@ export interface TaxonomyField {
    * this field is active, since the filter already restricts to a single value.
    */
   vector_collapse?: boolean;
-  /** Per-value properties (e.g. `mcp_resource`) for this taxonomy dimension. */
+  /** Per-value properties (e.g. `mcp_resource`, `score_multiplier`) for this taxonomy dimension. */
   properties?: Record<string, TaxonomyValueProperties>;
 }
 

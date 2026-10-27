@@ -29,6 +29,7 @@ import {
   type EmbedProgressEvent,
   type EmbeddingMetadata,
   type ManifestTaxonomyFieldConfig,
+  type TaxonomyValueProperties,
   type IndexBuildStep,
   type FileMeta,
   type Manifest,
@@ -718,7 +719,7 @@ function buildMetadata(
       description: string;
       values: string[];
       vector_collapse?: boolean;
-      properties?: Record<string, { mcp_resource: boolean }>;
+      properties?: Record<string, TaxonomyValueProperties>;
     }
   >;
   stats: {
@@ -748,7 +749,7 @@ function buildMetadata(
       description: string;
       values: string[];
       vector_collapse?: boolean;
-      properties?: Record<string, { mcp_resource: boolean }>;
+      properties?: Record<string, TaxonomyValueProperties>;
     }
   > = {};
   for (const [key, values] of taxonomyValues.entries()) {

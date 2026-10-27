@@ -283,6 +283,52 @@ describe("mergeTaxonomyConfigs", () => {
     expect(mergeTaxonomyConfigs(manifests)).toEqual({});
   });
 
+  it("merges score multipliers with mcp_resource for the same value", () => {
+    const manifests: Manifest[] = [
+      {
+        version: "1",
+        taxonomy: {
+          status: {
+            vector_collapse: false,
+            properties: { legacy: { mcp_resource: false, score_multiplier: 0.5 } },
+          },
+        },
+      },
+      {
+        version: "1",
+        taxonomy: {
+          status: {
+            vector_collapse: false,
+            properties: { legacy: { mcp_resource: true } },
+          },
+        },
+      },
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      status: {
+        vector_collapse: false,
+        properties: { legacy: { mcp_resource: true, score_multiplier: 0.5 } },
+      },
+    });
+  });
+
+  it("rejects conflicting score multipliers for the same value", () => {
+    const manifests: Manifest[] = [0.5, 0.8].map((score_multiplier) => ({
+      version: "1",
+      taxonomy: {
+        status: {
+          vector_collapse: false,
+          properties: { legacy: { mcp_resource: false, score_multiplier } },
+        },
+      },
+    }));
+
+    expect(() => mergeTaxonomyConfigs(manifests)).toThrow(
+      "Conflicting score_multiplier for taxonomy 'status' value 'legacy'",
+    );
+  });
+
   it("parses taxonomy config with properties", () => {
     const manifest = parseManifest({
       version: "1",

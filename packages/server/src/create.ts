@@ -6,9 +6,11 @@ import {
   LanceDbSearchEngine,
   createEmbeddingProvider,
   getCollapseKeys,
+  getScoreMultipliers,
   normalizeMetadata,
   type EmbeddingMetadata,
   type EmbeddingProvider,
+  type ScoreMultipliers,
   type SearchEngine,
 } from "@speakeasy-api/docs-mcp-core";
 import { createMcpServer } from "./server.js";
@@ -220,6 +222,7 @@ export async function createDocsServer(
   const metadata = normalizeMetadata(metadataDocument);
   const metadataKeys = Object.keys(metadata.taxonomy);
   const collapseKeys = getCollapseKeys(metadata.taxonomy);
+  const scoreMultipliers = getScoreMultipliers(metadata.taxonomy);
   const indexConfig = parseIndexConfig(metadataDocument);
   const queryEmbeddingProvider = resolveQueryEmbeddingProvider(logger, options, metadata.embedding);
 
@@ -228,6 +231,7 @@ export async function createDocsServer(
     tableName: string;
     metadataKeys: string[];
     collapseKeys: string[];
+    scoreMultipliers: ScoreMultipliers;
     queryEmbeddingProvider?: EmbeddingProvider;
     proximityWeight?: number;
     phraseSlop?: number;
@@ -237,6 +241,7 @@ export async function createDocsServer(
     tableName: indexConfig.table,
     metadataKeys,
     collapseKeys,
+    scoreMultipliers,
   };
   if (queryEmbeddingProvider !== undefined) {
     loadInput.queryEmbeddingProvider = queryEmbeddingProvider;
@@ -285,6 +290,7 @@ async function loadSearchEngine(
     tableName: string;
     metadataKeys: string[];
     collapseKeys: string[];
+    scoreMultipliers: ScoreMultipliers;
     queryEmbeddingProvider?: EmbeddingProvider;
     proximityWeight?: number;
     phraseSlop?: number;
@@ -302,6 +308,7 @@ async function loadSearchEngine(
     tableName: string;
     metadataKeys: string[];
     collapseKeys?: string[];
+    scoreMultipliers?: ScoreMultipliers;
     queryEmbeddingProvider?: EmbeddingProvider;
     proximityWeight?: number;
     phraseSlop?: number;
@@ -312,6 +319,9 @@ async function loadSearchEngine(
     tableName: input.tableName,
     metadataKeys: input.metadataKeys,
     ...(input.collapseKeys.length > 0 ? { collapseKeys: input.collapseKeys } : {}),
+    ...(Object.keys(input.scoreMultipliers).length > 0
+      ? { scoreMultipliers: input.scoreMultipliers }
+      : {}),
     onWarning: (message: string) => logger.warn(message),
   };
   if (input.queryEmbeddingProvider !== undefined) {

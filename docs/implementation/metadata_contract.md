@@ -93,6 +93,7 @@ This document defines the schema for `metadata.json`, the build artifact generat
   - `values` array: items are trimmed, deduplicated, sorted ascending. Canonical casing is preserved as discovered in the corpus (no forced lowercase).
   - Empty strings are rejected.
   - `description` is optional. If omitted, the server defaults to `"Filter results by {key}."`
+  - `properties` is optional and keyed by taxonomy value. `mcp_resource: true` exposes matching documents as MCP resources. `score_multiplier` must be a positive finite number; the server multiplies the search score of every chunk with that value by it, and multiplies the factors of several dimensions together. Values with neither property are dropped.
 - **`taxonomy` limits**
   - Max keys: `64`
   - Max key length: `64` chars

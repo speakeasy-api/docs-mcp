@@ -4,6 +4,7 @@ import type {
   EmbeddingMetadata,
   FileMeta,
   PromptDefinition,
+  ScoreMultipliers,
   TaxonomyField,
   TaxonomyValueProperties,
   ToolDescriptions,
@@ -17,6 +18,25 @@ export function getCollapseKeys(taxonomy: Record<string, TaxonomyField>): string
   return Object.entries(taxonomy)
     .filter(([, field]) => field.vector_collapse === true)
     .map(([key]) => key);
+}
+
+/**
+ * Returns the `score_multiplier` configured for each taxonomy value, keyed by
+ * taxonomy key and then by value. Values without a multiplier, or with a
+ * multiplier of 1, are omitted.
+ */
+export function getScoreMultipliers(taxonomy: Record<string, TaxonomyField>): ScoreMultipliers {
+  const multipliers: ScoreMultipliers = {};
+  for (const [key, field] of Object.entries(taxonomy)) {
+    for (const [value, properties] of Object.entries(field.properties ?? {})) {
+      const multiplier = properties.score_multiplier;
+      if (multiplier === undefined || multiplier === 1) {
+        continue;
+      }
+      (multipliers[key] ??= {})[value] = multiplier;
+    }
+  }
+  return multipliers;
 }
 
 const LIMITS = {
@@ -326,13 +346,31 @@ function normalizeProperties(
       throw new Error(`taxonomy['${taxonomyKey}'].properties['${valKey}'] must be an object`);
     }
     const props = valProps as Record<string, unknown>;
-    if (props.mcp_resource === true) {
-      result[valKey] = { mcp_resource: true };
+    const mcpResource = props.mcp_resource === true;
+    const scoreMultiplier = normalizeScoreMultiplier(
+      props.score_multiplier,
+      `taxonomy['${taxonomyKey}'].properties['${valKey}'].score_multiplier`,
+    );
+    if (mcpResource || scoreMultiplier !== undefined) {
+      result[valKey] = {
+        mcp_resource: mcpResource,
+        ...(scoreMultiplier !== undefined ? { score_multiplier: scoreMultiplier } : {}),
+      };
       hasAny = true;
     }
   }
 
   return hasAny ? result : undefined;
+}
+
+function normalizeScoreMultiplier(value: unknown, label: string): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new Error(`${label} must be a positive finite number`);
+  }
+  return value;
 }
 
 function normalizeStats(value: unknown): CorpusMetadata["stats"] {

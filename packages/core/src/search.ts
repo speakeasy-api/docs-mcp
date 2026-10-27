@@ -6,6 +6,7 @@ import {
   makeSnippet,
   matchesMetadataFilters,
   normalizeSearchText,
+  scoreMultiplier,
   tokenizeSearchText,
 } from "./search-common.js";
 import type {
@@ -15,6 +16,7 @@ import type {
   GetDocRequest,
   GetDocResult,
   ListFilepathsRequest,
+  ScoreMultipliers,
   SearchEngine,
   SearchHit,
   SearchHint,
@@ -28,13 +30,21 @@ export class InMemorySearchEngine implements SearchEngine {
   private readonly byFile: Map<string, Chunk[]>;
   private readonly proximityWeight: number;
   private readonly collapseKeys: string[];
+  private readonly scoreMultipliers: ScoreMultipliers;
 
-  constructor(chunks: Chunk[], options: DocsIndexOptions & { collapseKeys?: string[] } = {}) {
+  constructor(
+    chunks: Chunk[],
+    options: DocsIndexOptions & {
+      collapseKeys?: string[];
+      scoreMultipliers?: ScoreMultipliers;
+    } = {},
+  ) {
     this.chunks = [...chunks];
     this.byId = new Map(chunks.map((chunk) => [chunk.chunk_id, chunk]));
     this.byFile = new Map<string, Chunk[]>();
     this.proximityWeight = options.proximityWeight ?? 1.25;
     this.collapseKeys = options.collapseKeys ?? [];
+    this.scoreMultipliers = options.scoreMultipliers ?? {};
 
     for (const chunk of chunks) {
       const list = this.byFile.get(chunk.filepath) ?? [];
@@ -66,7 +76,9 @@ export class InMemorySearchEngine implements SearchEngine {
       .filter((chunk) => matchesMetadataFilters(chunk.metadata, filters, taxonomyKeys))
       .map((chunk) => ({
         chunk,
-        score: scoreChunk(chunk, query, proximityWeight),
+        score:
+          scoreChunk(chunk, query, proximityWeight) *
+          scoreMultiplier((k) => chunk.metadata[k] ?? "", this.scoreMultipliers),
       }))
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score || a.chunk.chunk_id.localeCompare(b.chunk.chunk_id));
