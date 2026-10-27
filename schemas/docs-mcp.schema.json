@@ -86,6 +86,14 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "description": {
+            "description": "Description of the filter parameter that search_docs exposes for this taxonomy dimension. Defaults to 'Filter results by {key}.'. Use it to tell agents what the dimension and its values mean.",
+            "examples": [
+              "Programming language of SDK-specific documentation."
+            ],
+            "type": "string",
+            "minLength": 1
+          },
           "vector_collapse": {
             "default": false,
             "description": "When true, this taxonomy dimension identifies content variants that are near-identical in vector space (e.g. the same API operation documented in multiple SDK languages). At search time, results sharing the same content identity — determined by normalizing this field's value out of the filepath — are collapsed to the highest-scoring result. Has no effect when a filter for this field is active, since the filter already restricts to a single value.",
@@ -128,7 +136,7 @@
         "additionalProperties": false,
         "description": "Configuration for a taxonomy field's search-time behavior."
       },
-      "description": "Per-field configuration for taxonomy dimensions. Controls search-time behavior such as cross-language result collapsing and per-value score multipliers."
+      "description": "Per-field configuration for taxonomy dimensions. Controls the filter description and search-time behavior such as cross-language result collapsing and per-value score multipliers."
     },
     "mcpServerInstructions": {
       "description": "Custom MCP server instructions sent to clients during initialization. Helps coding agents understand what this server provides and how to use it effectively.",

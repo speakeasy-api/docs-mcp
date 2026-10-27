@@ -313,6 +313,33 @@ describe("mergeTaxonomyConfigs", () => {
     });
   });
 
+  it("merges a taxonomy description from any manifest", () => {
+    const manifests: Manifest[] = [
+      { version: "1", taxonomy: { status: { vector_collapse: false } } },
+      {
+        version: "1",
+        taxonomy: {
+          status: { description: "Release status: current or legacy.", vector_collapse: false },
+        },
+      },
+    ];
+
+    expect(mergeTaxonomyConfigs(manifests)).toEqual({
+      status: { description: "Release status: current or legacy.", vector_collapse: false },
+    });
+  });
+
+  it("rejects conflicting taxonomy descriptions", () => {
+    const manifests: Manifest[] = ["Release status.", "Lifecycle stage."].map((description) => ({
+      version: "1",
+      taxonomy: { status: { description, vector_collapse: false } },
+    }));
+
+    expect(() => mergeTaxonomyConfigs(manifests)).toThrow(
+      "Conflicting description for taxonomy 'status'",
+    );
+  });
+
   it("rejects conflicting score multipliers for the same value", () => {
     const manifests: Manifest[] = [0.5, 0.8].map((score_multiplier) => ({
       version: "1",
@@ -348,6 +375,18 @@ describe("mergeTaxonomyConfigs", () => {
         properties: { typescript: { mcp_resource: true } },
       },
     });
+  });
+
+  it("parses and trims a taxonomy description", () => {
+    const manifest = parseManifest({
+      version: "1",
+      taxonomy: { status: { description: "  Release status: current or legacy.  " } },
+    });
+
+    expect(manifest.taxonomy?.status?.description).toBe("Release status: current or legacy.");
+    expect(() =>
+      parseManifest({ version: "1", taxonomy: { status: { description: "   " } } }),
+    ).toThrow();
   });
 });
 

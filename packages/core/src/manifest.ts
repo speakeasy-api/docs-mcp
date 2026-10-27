@@ -14,7 +14,8 @@ const DEFAULT_STRATEGY: ChunkingStrategy = { chunk_by: "h2" };
 
 /**
  * Union-merges taxonomy field configs from multiple manifests. If any manifest
- * sets `vector_collapse: true` for a key, the merged result includes it.
+ * sets `vector_collapse: true` or a `description` for a key, the merged result
+ * includes it; manifests that set different descriptions for a key are rejected.
  * Similarly, if any manifest sets `mcp_resource: true` or a `score_multiplier`
  * for a value, the merged result includes it. Manifests that set different
  * multipliers for the same value are rejected.
@@ -27,6 +28,18 @@ export function mergeTaxonomyConfigs(
   for (const manifest of manifests) {
     if (!manifest.taxonomy) continue;
     for (const [key, config] of Object.entries(manifest.taxonomy)) {
+      if (config.description !== undefined) {
+        const existing = merged[key]?.description;
+        if (existing !== undefined && existing !== config.description) {
+          throw new Error(
+            `Conflicting description for taxonomy '${key}': '${existing}' and '${config.description}'`,
+          );
+        }
+        if (!merged[key]) {
+          merged[key] = { vector_collapse: false };
+        }
+        merged[key].description = config.description;
+      }
       if (config.vector_collapse) {
         if (!merged[key]) {
           merged[key] = { vector_collapse: false };
